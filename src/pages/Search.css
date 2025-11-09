@@ -228,6 +228,12 @@
   justify-self: start;
 }
 
+.footer-bar {
+  position: sticky; /* already set inline, keep for safety */
+  bottom: 0;
+  backdrop-filter: saturate(110%) blur(6px);
+}
+
 @media (min-width: 640px) {
   .filters-grid > .btn {
     justify-self: stretch;

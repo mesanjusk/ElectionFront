@@ -1,5 +1,5 @@
 // client/src/pages/Search.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api";
 import { clearToken } from "../auth";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -13,12 +13,12 @@ const pick = (obj, keys) => {
   return "";
 };
 const getName = (r) =>
-  pick(r, ["name", "Name"]) || pick(r.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) || "—";
-const getEPIC = (r) => pick(r, ["voter_id", "EPIC"]) || pick(r.__raw, ["EPIC", "कार्ड नं"]) || "";
-const getPart = (r) => pick(r.__raw, ["भाग नं.", "Part No", "Part", "Booth"]) || "";
-const getSerial = (r) => pick(r.__raw, ["अनु. नं.", "Serial No", "Serial", "Sr No"]) || "";
+  pick(r, ["name", "Name"]) || pick(r?.__raw || {}, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) || "—";
+const getEPIC = (r) => pick(r, ["voter_id", "EPIC"]) || pick(r?.__raw || {}, ["EPIC", "कार्ड नं"]) || "";
+const getPart = (r) => pick(r?.__raw || {}, ["भाग नं.", "Part No", "Part", "Booth"]) || "";
+const getSerial = (r) => pick(r?.__raw || {}, ["अनु. नं.", "Serial No", "Serial", "Sr No"]) || "";
 const getGender = (r) => {
-  const g = (pick(r.__raw, ["Gender", "gender", "लिंग"]) || r.gender || r.Gender || "")
+  const g = (pick(r?.__raw || {}, ["Gender", "gender", "लिंग"]) || r.gender || r.Gender || "")
     .toString()
     .toLowerCase();
   if (!g) return "";
@@ -26,14 +26,13 @@ const getGender = (r) => {
   if (g.startsWith("f") || g.includes("स्त्री")) return "F";
   return g.toUpperCase();
 };
-const getAge = (r) => (pick(r.__raw, ["Age", "age", "वय"]) || r.Age || r.age || "").toString();
+const getAge = (r) => (pick(r?.__raw || {}, ["Age", "age", "वय"]) || r.Age || r.age || "").toString();
 
 /* Only read phone from DB fields (NOT from __raw). This avoids showing guessed numbers. */
 const getDBPhone = (r) => {
   const fromDb = pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
   const d = String(fromDb).replace(/[^\d]/g, "");
   if (!d) return "";
-  // normalize common Indian formats
   if (d.length === 12 && d.startsWith("91")) return d.slice(2);
   if (d.length === 11 && d.startsWith("0")) return d.slice(1);
   return d.length === 10 ? d : "";
@@ -338,6 +337,7 @@ function ResultCard({ r, index, page, limit, onOpen, onPhoneSaved }) {
           {part && <span className="badge badge--muted">भाग {part}</span>}
           {serial && <span className="badge badge--muted">अनु {serial}</span>}
           {tag && <span className="badge badge--accent">{tag}</span>}
+
         </div>
       </div>
 
@@ -360,6 +360,22 @@ function ResultCard({ r, index, page, limit, onOpen, onPhoneSaved }) {
   );
 }
 
+/* ---------- click-outside helper for menu ---------- */
+function useClickOutside(ref, onOutside) {
+  useEffect(() => {
+    function handler(e) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target)) onOutside?.();
+    }
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [ref, onOutside]);
+}
+
 export default function Search() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState([]);
@@ -373,20 +389,15 @@ export default function Search() {
 
   const [voiceLang, setVoiceLang] = useState("mr-IN");
 
-  const [filterKey, setFilterKey] = useState("");
-  const [filterVal, setFilterVal] = useState("");
-  const filters = useMemo(() => {
-    const key = filterKey.trim();
-    const value = filterVal.trim();
-    if (!key || !value) return {};
-    return { [key]: value };
-  }, [filterKey, filterVal]);
-
-  const trimmedQuery = q.trim();
-  const shouldSearch = trimmedQuery.length >= 2 || Object.keys(filters).length > 0;
-
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useClickOutside(menuRef, () => setMenuOpen(false));
+
+  const trimmedQuery = q.trim();
+  const shouldSearch = trimmedQuery.length >= 2;
 
   const openRecord = (record) => {
     setSelectedRecord(record);
@@ -400,11 +411,10 @@ export default function Search() {
   const runSearchOnline = useCallback(async () => {
     const params = { page, limit };
     if (trimmedQuery) params.q = trimmedQuery;
-    Object.entries(filters).forEach(([k, v]) => (params[`filters[${k}]`] = v));
     const { data } = await api.get("/api/voters/search", { params });
     setRows(data.results || []);
     setTotal(data.total || 0);
-  }, [filters, limit, page, trimmedQuery]);
+  }, [limit, page, trimmedQuery]);
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -431,11 +441,11 @@ export default function Search() {
     }
     const id = setTimeout(search, 240);
     return () => clearTimeout(id);
-  }, [shouldSearch, search, trimmedQuery, filters]);
+  }, [shouldSearch, search, trimmedQuery]);
 
   useEffect(() => {
     setPage(1);
-  }, [q, filterKey, filterVal]);
+  }, [q]);
 
   const male = rows.reduce((n, r) => (getGender(r) === "M" ? n + 1 : n), 0);
   const female = rows.reduce((n, r) => (getGender(r) === "F" ? n + 1 : n), 0);
@@ -469,179 +479,162 @@ export default function Search() {
   };
 
   return (
-    <div className="app-shell">
-      <header className="top-bar">
+    <div className="app-shell" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {/* ---------- TOP NAVBAR with Search ---------- */}
+      <header className="top-bar" style={{ position: "sticky", top: 0, zIndex: 50 }}>
         <div className="top-bar__group">
-          <button className="icon-button" type="button" aria-label="Toggle menu">
-            <span aria-hidden>☰</span>
-          </button>
-          <div className="brand">
-            <span className="brand__mark">VS</span>
-            <span className="brand__title">Voter Console</span>
+          {/* Toggle menu */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Open menu"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <span aria-hidden>☰</span>
+            </button>
+
+            {menuOpen && (
+              <div
+                ref={menuRef}
+                className="menu-sheet"
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  marginTop: 6,
+                  minWidth: 200,
+                  background: "var(--panel,#fff)",
+                  color: "inherit",
+                  borderRadius: 10,
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+                  padding: 10,
+                }}
+              >
+                <div style={{ padding: "6px 6px 10px" }}>
+                  <label className="field" style={{ width: "100%" }}>
+                    <span className="field__label">Voice language</span>
+                    <select
+                      className="select"
+                      value={voiceLang}
+                      onChange={(e) => setVoiceLang(e.target.value)}
+                    >
+                      <option value="mr-IN">Marathi (mr-IN)</option>
+                      <option value="hi-IN">Hindi (hi-IN)</option>
+                      <option value="en-IN">English (en-IN)</option>
+                    </select>
+                  </label>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button className="btn btn--subtle" type="button" onClick={logout} aria-label="Sign out">
+                    Logout ⎋
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        <div className="top-bar__group">
-          <label className="sr-only" htmlFor="voice-lang">
-            Voice search language
+
+        {/* SEARCH bar centered/right in the top bar */}
+        <div className="top-bar__group" style={{ flex: 1, gap: 8 }}>
+          <label className="sr-only" htmlFor="search-query">
+            Search voters
           </label>
-          <select
-            id="voice-lang"
-            className="select select--compact"
-            value={voiceLang}
-            onChange={(e) => setVoiceLang(e.target.value)}
-          >
-            <option value="mr-IN">MR</option>
-            <option value="hi-IN">HI</option>
-            <option value="en-IN">EN</option>
-          </select>
-          <button className="icon-button" type="button" onClick={logout} aria-label="Sign out">
-            <span aria-hidden>⎋</span>
+          <input
+            id="search-query"
+            className="input"
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, EPIC or phone"
+            autoComplete="off"
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <VoiceSearchButton onResult={setQ} lang={voiceLang} className="btn btn--ghost" disabled={loading} />
+          <button className="btn btn--subtle" type="button" onClick={() => setQ("")} disabled={!q}>
+            Clear
           </button>
         </div>
       </header>
 
-      <main className="app-content">
-        <div className="app-content__main">
-          <section className="panel search-panel" aria-labelledby="search-panel-title">
-            <div className="panel__header">
-              <h1 className="panel__title" id="search-panel-title">
-                Search Voter Name
-              </h1>
-            </div>
+      {/* ---------- MAIN CONTENT (records) ---------- */}
+      <main className="app-content" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <section className="panel search-panel" aria-labelledby="search-panel-title" style={{ paddingBottom: 8 }}>
+          <div className="panel__header">
+            <h1 className="panel__title" id="search-panel-title">
+              {/* Intentionally blank title to save vertical space */}
+            </h1>
+          </div>
 
-            <div className="search-field">
-              <div className="search-field__row">
-                <label className="sr-only" htmlFor="search-query">
-                  Search voters
-                </label>
-                <input
-                  id="search-query"
-                  className="input"
-                  type="search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search by name, EPIC or phone"
-                  autoComplete="off"
-                />
-                <div className="search-field__actions">
-                  <VoiceSearchButton onResult={setQ} lang={voiceLang} className="btn btn--ghost" disabled={loading} />
-                  <button className="btn btn--subtle" type="button" onClick={() => setQ("")} disabled={!q}>
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </div>
+          
 
-            {!shouldSearch && !loading && !errMsg && (
-              <p className="help-text">Type at least two characters or add a filter to start searching.</p>
+          {errMsg ? (
+            <div className="alert alert--error" role="alert">
+              <span aria-hidden>⚠️</span>
+              <span>{errMsg}</span>
+            </div>
+          ) : null}
+        </section>
+
+        <section style={{ flex: 1, minHeight: 0 }}>
+          <div className="results-list">
+            {rows.map((r, i) => (
+              <ResultCard
+                key={i}
+                r={r}
+                index={i}
+                page={page}
+                limit={limit}
+                onOpen={openRecord}
+                onPhoneSaved={handlePhoneSaved}
+              />
+            ))}
+            {!rows.length && shouldSearch && !loading && !errMsg && (
+              <div className="empty-state">No results yet. Try refining your search.</div>
             )}
-
-            {errMsg ? (
-              <div className="alert alert--error" role="alert">
-                <span aria-hidden>⚠️</span>
-                <span>{errMsg}</span>
-              </div>
-            ) : null}
-
-            <div className="filters-grid">
-              <label className="field">
-                <span className="field__label">Filter field</span>
-                <input
-                  className="input"
-                  value={filterKey}
-                  onChange={(e) => setFilterKey(e.target.value)}
-                  placeholder="e.g. भाग नं."
-                />
-              </label>
-              <label className="field">
-                <span className="field__label">Filter value</span>
-                <input
-                  className="input"
-                  value={filterVal}
-                  onChange={(e) => setFilterVal(e.target.value)}
-                  placeholder="e.g. 1"
-                />
-              </label>
-              <button
-                className="btn btn--ghost"
-                type="button"
-                onClick={search}
-                disabled={loading || !filterKey.trim() || !filterVal.trim()}
-              >
-                Apply filter
-              </button>
-            </div>
-
-            <div className="meta-row">
-              <div className="meta-row__per-page">
-                <span>Results per page</span>
-                <select
-                  className="select select--compact"
-                  value={limit}
-                  onChange={(e) => setLimit(parseInt(e.target.value, 10))}
-                >
-                  {[10, 20, 50, 100].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="meta-row__group">
-                <span>Status:</span>
-                <span className="meta-row__count">{loading ? "Searching…" : `Found ${total}`}</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel results-panel" aria-live="polite">
-            <div className="results-list">
-              {rows.map((r, i) => (
-                <ResultCard key={i} r={r} index={i} page={page} limit={limit} onOpen={openRecord} onPhoneSaved={handlePhoneSaved} />
-              ))}
-              {!rows.length && shouldSearch && !loading && !errMsg && (
-                <div className="empty-state">No results yet. Try refining your search.</div>
-              )}
-            </div>
-
-            <nav className="pager" aria-label="Pagination">
-              <button className="btn btn--subtle" type="button" onClick={() => setPage(1)} disabled={page <= 1}>
-                ⏮ First
-              </button>
-              <button className="btn btn--subtle" type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-                ◀ Prev
-              </button>
-              <span className="pager__info">Page {page} of {pages}</span>
-              <button className="btn btn--subtle" type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
-                Next ▶
-              </button>
-              <button className="btn btn--subtle" type="button" onClick={() => setPage(pages)} disabled={page >= pages}>
-                Last ⏭
-              </button>
-            </nav>
-          </section>
-        </div>
-
-        <aside className="app-content__aside">
-          <section className="panel stats-panel" aria-live="polite">
-            <h2 className="stats-panel__title">Result breakdown</h2>
-            <div className="stats-cards">
-              <div className="stat-card">
-                <span className="stat-card__label">Male</span>
-                <span className="stat-card__value">{male}</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-card__label">Female</span>
-                <span className="stat-card__value">{female}</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-card__label">Total</span>
-                <span className="stat-card__value">{total}</span>
-              </div>
-            </div>
-          </section>
-        </aside>
+          </div>
+        </section>
       </main>
+
+      {/* ---------- BOTTOM FOOTER: breakdown + per-page + pagination in one row ---------- */}
+      <footer
+        className="footer-bar"
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "var(--panel,#fff)",
+          borderTop: "1px solid var(--hairline,#e5e7eb)",
+          padding: "8px 12px",
+          zIndex: 40,
+        }}
+      >
+        <div
+          className="footer-row"
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Left: result breakdown */}
+          <div className="stats-inline" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="badge badge--muted">Male: <strong>{male}</strong></span>
+            <span className="badge badge--muted">Female: <strong>{female}</strong></span>
+            <span className="badge badge--accent">Total: <strong>{total}</strong></span>
+            <span className="meta-row__count" style={{ marginLeft: 6 }}>
+              {loading ? "Searching…" : ""}
+            </span>
+          </div>
+
+          {/* Center: per page */}
+          
+
+          {/* Right: pagination */}
+          
+        </div>
+      </footer>
 
       <PWAInstallPrompt bottom={96} />
 
