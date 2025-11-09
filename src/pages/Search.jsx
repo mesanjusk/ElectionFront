@@ -12,18 +12,58 @@ const pick = (obj, keys) => {
   for (const k of keys) if (obj?.[k] !== undefined && obj?.[k] !== null) return obj[k];
   return "";
 };
-const getName = (r) => pick(r, ["name", "Name"]) || pick(r.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) || "—";
+const getName = (r) =>
+  pick(r, ["name", "Name"]) || pick(r.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) || "—";
 const getEPIC = (r) => pick(r, ["voter_id", "EPIC"]) || pick(r.__raw, ["EPIC", "कार्ड नं"]) || "";
 const getPart = (r) => pick(r.__raw, ["भाग नं.", "Part No", "Part", "Booth"]) || "";
 const getSerial = (r) => pick(r.__raw, ["अनु. नं.", "Serial No", "Serial", "Sr No"]) || "";
 const getGender = (r) => {
-  const g = (pick(r.__raw, ["Gender", "gender", "लिंग"]) || r.gender || r.Gender || "").toString().toLowerCase();
+  const g = (pick(r.__raw, ["Gender", "gender", "लिंग"]) || r.gender || r.Gender || "")
+    .toString()
+    .toLowerCase();
   if (!g) return "";
   if (g.startsWith("m") || g.includes("पुरुष")) return "M";
   if (g.startsWith("f") || g.includes("स्त्री")) return "F";
   return g.toUpperCase();
 };
 const getAge = (r) => (pick(r.__raw, ["Age", "age", "वय"]) || r.Age || r.age || "").toString();
+
+/* Phone extractor */
+const getPhone = (r) => {
+  const candidatesRaw =
+    pick(r, ["mobile", "phone", "Mobile", "Phone", "contact", "Contact"]) ||
+    pick(r.__raw, [
+      "mobile",
+      "phone",
+      "Mobile",
+      "Phone",
+      "Mobile No",
+      "Contact No",
+      "Contact",
+      "मोबाइल",
+      "मोबा",
+      "मोबा/ ईमेल नं.",
+      "संपर्क",
+    ]) ||
+    "";
+
+  const extraPool = Object.values(r.__raw || {})
+    .filter((v) => typeof v === "string")
+    .join(" ");
+  const pool = [String(candidatesRaw), extraPool].join(" | ");
+
+  const matches = pool.match(/(?:\+?91[-\s]*)?(\d[\d\s\-]{8,16}\d)/g) || [];
+  const cleaned = matches
+    .map((m) => m.replace(/[^\d]/g, ""))
+    .map((d) => {
+      if (d.length === 12 && d.startsWith("91")) return d.slice(2);
+      return d;
+    })
+    .filter((d) => d.length === 10 || d.length === 11 || d.length === 12);
+
+  const tenDigit = cleaned.find((d) => d.length === 10);
+  return tenDigit || cleaned[0] || "";
+};
 
 /* ---------- small util: normalize axios/network errors ---------- */
 function getReadableError(err) {
@@ -42,18 +82,115 @@ function getReadableError(err) {
   return "Something went wrong while fetching results.";
 }
 
+/* ---------- Modal component ---------- */
+function RecordModal({ open, onClose, record }) {
+  if (!open) return null;
+  const data = record?.__raw || record || {};
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Full record"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        className="modal-sheet"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--panel, #fff)",
+          color: "inherit",
+          width: "min(960px, 92vw)",
+          maxHeight: "86vh",
+          borderRadius: 12,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          className="modal-header"
+          style={{ padding: "12px 16px", borderBottom: "1px solid var(--hairline,#e5e7eb)" }}
+        >
+          <strong>Full record</strong>
+        </div>
+        <div className="modal-body" style={{ padding: 16, overflow: "auto" }}>
+          <pre style={{ margin: 0, fontSize: 13 }}>{JSON.stringify(data, null, 2)}</pre>
+        </div>
+        <div
+          className="modal-footer"
+          style={{
+            padding: 12,
+            borderTop: "1px solid var(--hairline,#e5e7eb)",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button className="btn btn--subtle" type="button" onClick={onClose} autoFocus>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- single result card ---------- */
-function ResultCard({ r, index, page, limit }) {
+function ResultCard({ r, index, page, limit, onPasteToSearch, onOpen }) {
   const name = getName(r);
   const epic = getEPIC(r);
   const part = getPart(r);
   const serial = getSerial(r);
   const gender = getGender(r);
   const age = getAge(r);
+  const phone = getPhone(r);
   const tag = gender ? `${gender}${age ? "-" + age : ""}` : age || "—";
 
+  const copyToClipboard = async (text, e) => {
+    e?.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      console.debug("Copied to clipboard:", text);
+    } catch {
+      alert("Could not copy. Your browser may have blocked clipboard access.");
+    }
+  };
+
+  const pasteIntoSearch = (e) => {
+    e?.stopPropagation();
+    if (typeof onPasteToSearch === "function" && phone) onPasteToSearch(phone);
+  };
+
+  const openDialer = (e) => {
+    e?.stopPropagation();
+    if (phone) window.location.href = `tel:${phone}`;
+  };
+
+  const handleCardKey = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen?.(r);
+    }
+  };
+
   return (
-    <article className="result-card">
+    <article
+      className="result-card"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen?.(r)}
+      onKeyDown={handleCardKey}
+    >
       <div className="result-card__header">
         <span className="result-card__index">{(page - 1) * limit + index + 1}</span>
         <div className="result-card__pills">
@@ -62,16 +199,51 @@ function ResultCard({ r, index, page, limit }) {
           {tag && <span className="badge badge--accent">{tag}</span>}
         </div>
       </div>
+
       <h3 className="result-card__title">{name}</h3>
+
       {epic ? (
         <p className="result-card__epic">
           EPIC: <strong>{epic}</strong>
         </p>
       ) : null}
-      <details>
-        <summary>View full record</summary>
-        <pre>{JSON.stringify(r.__raw || r, null, 2)}</pre>
-      </details>
+
+      {/* Phone actions (do not open modal) */}
+      <div className="phone-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+        {phone ? (
+          <>
+            <button
+              className="btn btn--primary"
+              type="button"
+              onClick={openDialer}
+              aria-label={`Call ${phone}`}
+              title="Call"
+            >
+              📞 {phone}
+            </button>
+            <button
+              className="btn btn--ghost"
+              type="button"
+              onClick={(e) => copyToClipboard(phone, e)}
+              aria-label={`Copy ${phone}`}
+              title="Copy to clipboard"
+            >
+              📋 Copy
+            </button>
+            <button
+              className="btn btn--ghost"
+              type="button"
+              onClick={pasteIntoSearch}
+              aria-label={`Paste ${phone} into search`}
+              title="Paste into search box"
+            >
+              ⎘ Paste
+            </button>
+          </>
+        ) : (
+          <span className="badge badge--muted">No phone</span>
+        )}
+      </div>
     </article>
   );
 }
@@ -101,11 +273,21 @@ export default function Search() {
   const trimmedQuery = q.trim();
   const shouldSearch = trimmedQuery.length >= 2 || Object.keys(filters).length > 0;
 
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+
+  const openRecord = (record) => {
+    setSelectedRecord(record);
+    setModalOpen(true);
+  };
+  const closeRecord = () => {
+    setModalOpen(false);
+    setSelectedRecord(null);
+  };
+
   const runSearchOnline = useCallback(async () => {
     const params = { page, limit };
-    if (trimmedQuery) {
-      params.q = trimmedQuery;
-    }
+    if (trimmedQuery) params.q = trimmedQuery;
     Object.entries(filters).forEach(([k, v]) => (params[`filters[${k}]`] = v));
     const { data } = await api.get("/api/voters/search", { params });
     setRows(data.results || []);
@@ -135,7 +317,6 @@ export default function Search() {
       setErrMsg("");
       return;
     }
-
     const id = setTimeout(search, 240);
     return () => clearTimeout(id);
   }, [shouldSearch, search, trimmedQuery, filters]);
@@ -151,6 +332,8 @@ export default function Search() {
     clearToken();
     window.location.href = "/login";
   };
+
+  const handlePasteToSearch = (value) => setQ(value || "");
 
   return (
     <div className="app-shell">
@@ -189,11 +372,8 @@ export default function Search() {
           <section className="panel search-panel" aria-labelledby="search-panel-title">
             <div className="panel__header">
               <h1 className="panel__title" id="search-panel-title">
-                Voter lookup
+                Search Voter Name
               </h1>
-              <p className="panel__subtitle">
-                Search the electoral roll by name, EPIC, booth and more. Voice search is available in Marathi, Hindi or English.
-              </p>
             </div>
 
             <div className="search-field">
@@ -211,18 +391,8 @@ export default function Search() {
                   autoComplete="off"
                 />
                 <div className="search-field__actions">
-                  <VoiceSearchButton
-                    onResult={setQ}
-                    lang={voiceLang}
-                    className="btn btn--ghost"
-                    disabled={loading}
-                  />
-                  <button
-                    className="btn btn--subtle"
-                    type="button"
-                    onClick={() => setQ("")}
-                    disabled={!q}
-                  >
+                  <VoiceSearchButton onResult={setQ} lang={voiceLang} className="btn btn--ghost" disabled={loading} />
+                  <button className="btn btn--subtle" type="button" onClick={() => setQ("")} disabled={!q}>
                     Clear
                   </button>
                 </div>
@@ -286,9 +456,7 @@ export default function Search() {
               </div>
               <div className="meta-row__group">
                 <span>Status:</span>
-                <span className="meta-row__count">
-                  {loading ? "Searching…" : `Found ${total}`}
-                </span>
+                <span className="meta-row__count">{loading ? "Searching…" : `Found ${total}`}</span>
               </div>
             </div>
           </section>
@@ -296,7 +464,15 @@ export default function Search() {
           <section className="panel results-panel" aria-live="polite">
             <div className="results-list">
               {rows.map((r, i) => (
-                <ResultCard key={i} r={r} index={i} page={page} limit={limit} />
+                <ResultCard
+                  key={i}
+                  r={r}
+                  index={i}
+                  page={page}
+                  limit={limit}
+                  onPasteToSearch={handlePasteToSearch}
+                  onOpen={openRecord}
+                />
               ))}
               {!rows.length && shouldSearch && !loading && !errMsg && (
                 <div className="empty-state">No results yet. Try refining your search.</div>
@@ -304,12 +480,7 @@ export default function Search() {
             </div>
 
             <nav className="pager" aria-label="Pagination">
-              <button
-                className="btn btn--subtle"
-                type="button"
-                onClick={() => setPage(1)}
-                disabled={page <= 1}
-              >
+              <button className="btn btn--subtle" type="button" onClick={() => setPage(1)} disabled={page <= 1}>
                 ⏮ First
               </button>
               <button
@@ -331,12 +502,7 @@ export default function Search() {
               >
                 Next ▶
               </button>
-              <button
-                className="btn btn--subtle"
-                type="button"
-                onClick={() => setPage(pages)}
-                disabled={page >= pages}
-              >
+              <button className="btn btn--subtle" type="button" onClick={() => setPage(pages)} disabled={page >= pages}>
                 Last ⏭
               </button>
             </nav>
@@ -361,12 +527,13 @@ export default function Search() {
               </div>
             </div>
           </section>
-
-          <AdminUsers />
         </aside>
       </main>
 
       <PWAInstallPrompt bottom={96} />
+
+      {/* Modal for full record */}
+      <RecordModal open={modalOpen} onClose={closeRecord} record={selectedRecord} />
     </div>
   );
 }
