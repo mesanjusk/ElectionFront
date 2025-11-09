@@ -50,7 +50,7 @@ export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN', 
       aria-pressed={active}
       title={active ? 'Tap to stop voice search' : 'Start voice search'}
     >
-      {active ? '🎙️ Listening…' : '🎤 Voice'}
+      {active ? '🎙️ ' : '🎤 '}
     </button>
   );
 }

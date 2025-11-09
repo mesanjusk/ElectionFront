@@ -228,6 +228,17 @@
   justify-self: start;
 }
 
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--panel, #fff);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+
 .footer-bar {
   position: sticky; /* already set inline, keep for safety */
   bottom: 0;

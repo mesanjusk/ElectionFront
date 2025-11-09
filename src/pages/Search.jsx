@@ -337,7 +337,6 @@ function ResultCard({ r, index, page, limit, onOpen, onPhoneSaved }) {
           {part && <span className="badge badge--muted">भाग {part}</span>}
           {serial && <span className="badge badge--muted">अनु {serial}</span>}
           {tag && <span className="badge badge--accent">{tag}</span>}
-
         </div>
       </div>
 
@@ -513,7 +512,7 @@ export default function Search() {
               >
                 <div style={{ padding: "6px 6px 10px" }}>
                   <label className="field" style={{ width: "100%" }}>
-                    <span className="field__label">Voice language</span>
+                    <span className="field__label"></span>
                     <select
                       className="select"
                       value={voiceLang}
@@ -535,11 +534,21 @@ export default function Search() {
           </div>
         </div>
 
-        {/* SEARCH bar centered/right in the top bar */}
-        <div className="top-bar__group" style={{ flex: 1, gap: 8 }}>
+        {/* SEARCH bar with fixed widths: input 50%, voice 15%, clear 15% */}
+        <div
+          className="top-bar__group"
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            justifyContent: "flex-end",
+          }}
+        >
           <label className="sr-only" htmlFor="search-query">
             Search voters
           </label>
+
           <input
             id="search-query"
             className="input"
@@ -548,11 +557,31 @@ export default function Search() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by name, EPIC or phone"
             autoComplete="off"
-            style={{ flex: 1, minWidth: 0 }}
+            style={{ width: "60%", minWidth: 220 }}
           />
-          <VoiceSearchButton onResult={setQ} lang={voiceLang} className="btn btn--ghost" disabled={loading} />
-          <button className="btn btn--subtle" type="button" onClick={() => setQ("")} disabled={!q}>
-            Clear
+
+          {/* Voice: icon-only, 15% width */}
+          <div style={{ width: "10%", minWidth: 40, display: "flex", justifyContent: "center" }}>
+            <VoiceSearchButton
+              onResult={setQ}
+              lang={voiceLang}
+              className="icon-button"
+              disabled={loading}
+              
+            />
+          </div>
+
+          {/* Clear: icon-only, 15% width */}
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => setQ("")}
+            disabled={!q}
+            aria-label="Clear search"
+            
+            style={{ width: "10%", minWidth: 40 }}
+          >
+            ✖
           </button>
         </div>
       </header>
@@ -565,8 +594,6 @@ export default function Search() {
               {/* Intentionally blank title to save vertical space */}
             </h1>
           </div>
-
-          
 
           {errMsg ? (
             <div className="alert alert--error" role="alert">
@@ -620,18 +647,21 @@ export default function Search() {
         >
           {/* Left: result breakdown */}
           <div className="stats-inline" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="badge badge--muted">Male: <strong>{male}</strong></span>
-            <span className="badge badge--muted">Female: <strong>{female}</strong></span>
-            <span className="badge badge--accent">Total: <strong>{total}</strong></span>
+            <span className="badge badge--muted">
+              Male: <strong>{male}</strong>
+            </span>
+            <span className="badge badge--muted">
+              Female: <strong>{female}</strong>
+            </span>
+            <span className="badge badge--accent">
+              Total: <strong>{total}</strong>
+            </span>
             <span className="meta-row__count" style={{ marginLeft: 6 }}>
               {loading ? "Searching…" : ""}
             </span>
           </div>
 
           {/* Center: per page */}
-          
-
-          {/* Right: pagination */}
           
         </div>
       </footer>
