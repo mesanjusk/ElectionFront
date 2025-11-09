@@ -1,19 +1,16 @@
-// client/public/sw.js
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open("voter-pwa-cache").then((cache) => {
-      return cache.addAll(["/", "/index.html", "/manifest.webmanifest"]);
-    })
-  );
-  self.skipWaiting();
-});
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET or cross-origin if you want
+  if (event.request.method !== 'GET') return;
 
-self.addEventListener("activate", (e) => {
-  e.waitUntil(self.clients.claim());
-});
-
-self.addEventListener("fetch", (e) => {
-  e.respondWith(
-    caches.match(e.request).then((response) => response || fetch(e.request))
-  );
+  event.respondWith((async () => {
+    try {
+      const network = await fetch(event.request);
+      // (optional) cache successful responses here
+      return network;
+    } catch (err) {
+      // (optional) fallback to cache here
+      // return await caches.match(event.request) || new Response("Offline", { status: 503 });
+      throw err; // surface the error so you notice bad URLs
+    }
+  })());
 });

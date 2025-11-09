@@ -23,6 +23,23 @@ const getGender = (r) => {
 };
 const getAge    = (r) => (pick(r.__raw, ["Age","age","वय"]) || r.Age || r.age || "").toString();
 
+/* ---------- small util: normalize axios/network errors ---------- */
+function getReadableError(err) {
+  if (err?.isAxiosError) {
+    if (err.response) {
+      const code = err.response.status;
+      const msg =
+        (err.response.data && (err.response.data.message || err.response.data.error)) ||
+        `Server responded with ${code}`;
+      return `${msg}`;
+    }
+    if (err.request) return "Network error: cannot reach API (check internet / base URL / CORS).";
+    return err.message || "Request error.";
+  }
+  if (typeof err?.message === "string") return err.message;
+  return "Something went wrong while fetching results.";
+}
+
 /* ---------- single result card ---------- */
 function ResultCard({ r, index, page, limit }) {
   const name   = getName(r);
@@ -59,6 +76,7 @@ export default function Search() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -67,13 +85,12 @@ export default function Search() {
 
   const [voiceLang, setVoiceLang] = useState("mr-IN");
 
-  // simple equals filter
   const [filterKey, setFilterKey] = useState("");
   const [filterVal, setFilterVal] = useState("");
   const filters = useMemo(() => (filterKey && filterVal ? { [filterKey]: filterVal } : {}), [filterKey, filterVal]);
 
   const runSearchOnline = async () => {
-    const params = { q, page, limit };
+    const params = { q: q.trim(), page, limit };
     Object.entries(filters).forEach(([k, v]) => (params[`filters[${k}]`] = v));
     const { data } = await api.get("/api/voters/search", { params });
     setRows(data.results || []);
@@ -82,8 +99,14 @@ export default function Search() {
 
   const search = async () => {
     setLoading(true);
+    setErrMsg("");
     try {
       await runSearchOnline();
+    } catch (err) {
+      console.error("Search failed:", err);
+      setRows([]);
+      setTotal(0);
+      setErrMsg(getReadableError(err));
     } finally {
       setLoading(false);
     }
@@ -92,7 +115,6 @@ export default function Search() {
   useEffect(() => {
     const id = setTimeout(search, 220);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, page, limit, filterKey, filterVal]);
 
   useEffect(() => setPage(1), [q, filterKey, filterVal]);
@@ -114,11 +136,7 @@ export default function Search() {
             <option value="hi-IN">HI</option>
             <option value="en-IN">EN</option>
           </select>
-          <button
-            onClick={()=>{ clearToken(); location.href="/login"; }}
-            style={st.iconButton}
-            aria-label="logout"
-          >⎋</button>
+          <button onClick={()=>{ clearToken(); location.href="/login"; }} style={st.iconButton} aria-label="logout">⎋</button>
         </div>
       </div>
 
@@ -137,7 +155,12 @@ export default function Search() {
           </div>
         </div>
 
-        {/* filter chips */}
+        {errMsg ? (
+          <div style={st.errorBar}>
+            <strong style={{marginRight:8}}>Error:</strong> {errMsg}
+          </div>
+        ) : null}
+
         <div style={st.filters}>
           <input
             value={filterKey}
@@ -154,7 +177,6 @@ export default function Search() {
           <button onClick={search} style={st.primaryBtn}>Apply</button>
         </div>
 
-        {/* page size / meta */}
         <div style={st.metaRow}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span style={{opacity:.8}}>Per page</span>
@@ -168,42 +190,37 @@ export default function Search() {
         </div>
       </div>
 
-      {/* column strip */}
       <div style={st.listHead}>
         <span>#</span><span>Part</span><span>Sr</span><span>Name / EPIC</span><span>G/A</span>
       </div>
 
-      {/* results */}
       <div style={st.list}>
         {rows.map((r, i) => (
           <ResultCard key={i} r={r} index={i} page={page} limit={limit} />
         ))}
-        {!rows.length && !loading && <div style={st.empty}>No results</div>}
+        {!rows.length && !loading && !errMsg && <div style={st.empty}>No results</div>}
       </div>
 
-      {/* pager */}
       <div style={st.pager}>
-        <button onClick={()=>setPage(1)}              disabled={page<=1}    style={st.pBtn}>⏮</button>
-        <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page<=1}    style={st.pBtn}>◀</button>
+        <button onClick={()=>setPage(1)} disabled={page<=1} style={st.pBtn}>⏮</button>
+        <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page<=1} style={st.pBtn}>◀</button>
         <div style={st.pInfo}>Page {page}/{pages}</div>
         <button onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page>=pages} style={st.pBtn}>▶</button>
-        <button onClick={()=>setPage(pages)}          disabled={page>=pages} style={st.pBtn}>⏭</button>
+        <button onClick={()=>setPage(pages)} disabled={page>=pages} style={st.pBtn}>⏭</button>
       </div>
 
-      {/* bottom stats */}
       <div style={st.bottom}>
         <div style={st.stat}><span>Male</span><strong>{male}</strong></div>
         <div style={st.stat}><span>Female</span><strong>{female}</strong></div>
         <div style={st.stat}><span>Total</span><strong>{total}</strong></div>
       </div>
 
-      {/* Floating Install App */}
       <PWAInstallPrompt bottom={72} />
     </div>
   );
 }
 
-/* styles (same as before) */
+/* ---------- styles ---------- */
 const primary   = "#155EEF";
 const primaryD  = "#0B4DB3";
 const bg        = "#0F172A";
@@ -227,6 +244,8 @@ const st = {
   searchInput: { border:`1px solid ${border}`, borderRadius:12, padding:"12px 14px", fontSize:15, background:"#fff" },
   searchActions: { display:"flex", alignItems:"center", gap:8 },
   clear: { background:"#FEE2E2", border:"1px solid #FECACA", color:"#991B1B", borderRadius:10, padding:"10px 12px", fontWeight:700 },
+
+  errorBar: { background:"#FEF2F2", border:"1px solid #FECACA", color:"#7F1D1D", padding:"10px 12px", borderRadius:10, fontSize:13 },
 
   filters: { display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:8 },
   chip: { border:`1px solid ${pillBr}`, background:pillBg, color:primaryD, borderRadius:12, padding:"10px 12px", fontSize:14 },
