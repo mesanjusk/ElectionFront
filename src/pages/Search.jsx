@@ -1,5 +1,5 @@
 // client/src/pages/Search.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api";
 import { clearToken } from "../auth";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -91,20 +91,28 @@ export default function Search() {
 
   const [filterKey, setFilterKey] = useState("");
   const [filterVal, setFilterVal] = useState("");
-  const filters = useMemo(
-    () => (filterKey && filterVal ? { [filterKey]: filterVal } : {}),
-    [filterKey, filterVal]
-  );
+  const filters = useMemo(() => {
+    const key = filterKey.trim();
+    const value = filterVal.trim();
+    if (!key || !value) return {};
+    return { [key]: value };
+  }, [filterKey, filterVal]);
 
-  const runSearchOnline = async () => {
-    const params = { q: q.trim(), page, limit };
+  const trimmedQuery = q.trim();
+  const shouldSearch = trimmedQuery.length >= 2 || Object.keys(filters).length > 0;
+
+  const runSearchOnline = useCallback(async () => {
+    const params = { page, limit };
+    if (trimmedQuery) {
+      params.q = trimmedQuery;
+    }
     Object.entries(filters).forEach(([k, v]) => (params[`filters[${k}]`] = v));
     const { data } = await api.get("/api/voters/search", { params });
     setRows(data.results || []);
     setTotal(data.total || 0);
-  };
+  }, [filters, limit, page, trimmedQuery]);
 
-  const search = async () => {
+  const search = useCallback(async () => {
     setLoading(true);
     setErrMsg("");
     try {
@@ -117,14 +125,24 @@ export default function Search() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runSearchOnline]);
 
   useEffect(() => {
-    const id = setTimeout(search, 220);
-    return () => clearTimeout(id);
-  }, [q, page, limit, filterKey, filterVal]);
+    if (!shouldSearch) {
+      setLoading(false);
+      setRows([]);
+      setTotal(0);
+      setErrMsg("");
+      return;
+    }
 
-  useEffect(() => setPage(1), [q, filterKey, filterVal]);
+    const id = setTimeout(search, 240);
+    return () => clearTimeout(id);
+  }, [shouldSearch, search, trimmedQuery, filters]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, filterKey, filterVal]);
 
   const male = rows.reduce((n, r) => (getGender(r) === "M" ? n + 1 : n), 0);
   const female = rows.reduce((n, r) => (getGender(r) === "F" ? n + 1 : n), 0);
@@ -211,6 +229,10 @@ export default function Search() {
               </div>
             </div>
 
+            {!shouldSearch && !loading && !errMsg && (
+              <p className="help-text">Type at least two characters or add a filter to start searching.</p>
+            )}
+
             {errMsg ? (
               <div className="alert alert--error" role="alert">
                 <span aria-hidden>⚠️</span>
@@ -237,7 +259,12 @@ export default function Search() {
                   placeholder="e.g. 1"
                 />
               </label>
-              <button className="btn btn--ghost" type="button" onClick={search} disabled={loading}>
+              <button
+                className="btn btn--ghost"
+                type="button"
+                onClick={search}
+                disabled={loading || !filterKey.trim() || !filterVal.trim()}
+              >
                 Apply filter
               </button>
             </div>
@@ -271,7 +298,9 @@ export default function Search() {
               {rows.map((r, i) => (
                 <ResultCard key={i} r={r} index={i} page={page} limit={limit} />
               ))}
-              {!rows.length && !loading && !errMsg && <div className="empty-state">No results yet. Try refining your search.</div>}
+              {!rows.length && shouldSearch && !loading && !errMsg && (
+                <div className="empty-state">No results yet. Try refining your search.</div>
+              )}
             </div>
 
             <nav className="pager" aria-label="Pagination">
