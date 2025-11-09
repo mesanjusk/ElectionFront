@@ -28,42 +28,26 @@ const getGender = (r) => {
 };
 const getAge = (r) => (pick(r.__raw, ["Age", "age", "वय"]) || r.Age || r.age || "").toString();
 
-/* Phone extractor */
-const getPhone = (r) => {
-  const candidatesRaw =
-    pick(r, ["mobile", "phone", "Mobile", "Phone", "contact", "Contact"]) ||
-    pick(r.__raw, [
-      "mobile",
-      "phone",
-      "Mobile",
-      "Phone",
-      "Mobile No",
-      "Contact No",
-      "Contact",
-      "मोबाइल",
-      "मोबा",
-      "मोबा/ ईमेल नं.",
-      "संपर्क",
-    ]) ||
-    "";
-
-  const extraPool = Object.values(r.__raw || {})
-    .filter((v) => typeof v === "string")
-    .join(" ");
-  const pool = [String(candidatesRaw), extraPool].join(" | ");
-
-  const matches = pool.match(/(?:\+?91[-\s]*)?(\d[\d\s\-]{8,16}\d)/g) || [];
-  const cleaned = matches
-    .map((m) => m.replace(/[^\d]/g, ""))
-    .map((d) => {
-      if (d.length === 12 && d.startsWith("91")) return d.slice(2);
-      return d;
-    })
-    .filter((d) => d.length === 10 || d.length === 11 || d.length === 12);
-
-  const tenDigit = cleaned.find((d) => d.length === 10);
-  return tenDigit || cleaned[0] || "";
+/* Only read phone from DB fields (NOT from __raw). This avoids showing guessed numbers. */
+const getDBPhone = (r) => {
+  const fromDb = pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
+  const d = String(fromDb).replace(/[^\d]/g, "");
+  if (!d) return "";
+  // normalize common Indian formats
+  if (d.length === 12 && d.startsWith("91")) return d.slice(2);
+  if (d.length === 11 && d.startsWith("0")) return d.slice(1);
+  return d.length === 10 ? d : "";
 };
+
+const normalizePhoneInput = (raw) => {
+  if (!raw) return "";
+  let d = String(raw).replace(/[^\d]/g, "");
+  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return d.length === 10 ? d : "";
+};
+
+const getId = (r) => r?._id || r?.id || r?.__raw?._id || r?.__raw?.id || "";
 
 /* ---------- small util: normalize axios/network errors ---------- */
 function getReadableError(err) {
@@ -82,7 +66,108 @@ function getReadableError(err) {
   return "Something went wrong while fetching results.";
 }
 
-/* ---------- Modal component ---------- */
+/* ---------- Small phone editor modal ---------- */
+function PhoneModal({ open, onClose, initialValue, onSave }) {
+  const [val, setVal] = useState(initialValue || "");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setVal(initialValue || "");
+      setErr("");
+    }
+  }, [open, initialValue]);
+
+  if (!open) return null;
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Edit mobile"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1100,
+      }}
+    >
+      <div
+        className="modal-sheet"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--panel, #fff)",
+          color: "inherit",
+          width: "min(380px, 92vw)",
+          borderRadius: 12,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div className="modal-header" style={{ padding: "10px 14px", borderBottom: "1px solid var(--hairline,#e5e7eb)" }}>
+          <strong>{initialValue ? "Edit mobile" : "Add mobile"}</strong>
+        </div>
+        <div className="modal-body" style={{ padding: 14 }}>
+          <label className="field" style={{ width: "100%" }}>
+            <span className="field__label">Mobile (India, 10 digits)</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="e.g. 9876543210"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+            />
+          </label>
+          {err ? (
+            <div className="alert alert--error" style={{ marginTop: 8 }}>
+              <span aria-hidden>⚠️</span>
+              <span style={{ marginLeft: 6 }}>{err}</span>
+            </div>
+          ) : null}
+        </div>
+        <div
+          className="modal-footer"
+          style={{ padding: 10, borderTop: "1px solid var(--hairline,#e5e7eb)", display: "flex", justifyContent: "flex-end", gap: 8 }}
+        >
+          <button className="btn btn--subtle" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn--primary"
+            type="button"
+            disabled={saving}
+            onClick={async () => {
+              setErr("");
+              const normalized = normalizePhoneInput(val);
+              if (!normalized) {
+                setErr("Enter a valid 10-digit mobile.");
+                return;
+              }
+              try {
+                setSaving(true);
+                await onSave(normalized);
+              } catch (e) {
+                setErr(getReadableError(e));
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Full record modal ---------- */
 function RecordModal({ open, onClose, record }) {
   if (!open) return null;
   const data = record?.__raw || record || {};
@@ -117,25 +202,13 @@ function RecordModal({ open, onClose, record }) {
           flexDirection: "column",
         }}
       >
-        <div
-          className="modal-header"
-          style={{ padding: "12px 16px", borderBottom: "1px solid var(--hairline,#e5e7eb)" }}
-        >
+        <div className="modal-header" style={{ padding: "12px 16px", borderBottom: "1px solid var(--hairline,#e5e7eb)" }}>
           <strong>Full record</strong>
         </div>
         <div className="modal-body" style={{ padding: 16, overflow: "auto" }}>
           <pre style={{ margin: 0, fontSize: 13 }}>{JSON.stringify(data, null, 2)}</pre>
         </div>
-        <div
-          className="modal-footer"
-          style={{
-            padding: 12,
-            borderTop: "1px solid var(--hairline,#e5e7eb)",
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-          }}
-        >
+        <div className="modal-footer" style={{ padding: 12, borderTop: "1px solid var(--hairline,#e5e7eb)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button className="btn btn--subtle" type="button" onClick={onClose} autoFocus>
             Close
           </button>
@@ -146,41 +219,51 @@ function RecordModal({ open, onClose, record }) {
 }
 
 /* ---------- single result card ---------- */
-function ResultCard({ r, index, page, limit, onPasteToSearch, onOpen }) {
+function ResultCard({ r, index, page, limit, onOpen, onPhoneSaved }) {
   const name = getName(r);
   const epic = getEPIC(r);
   const part = getPart(r);
   const serial = getSerial(r);
   const gender = getGender(r);
   const age = getAge(r);
-  const phone = getPhone(r);
+  const dbPhone = getDBPhone(r); // ONLY DB phone
   const tag = gender ? `${gender}${age ? "-" + age : ""}` : age || "—";
 
-  const copyToClipboard = async (text, e) => {
-    e?.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(text);
-      console.debug("Copied to clipboard:", text);
-    } catch {
-      alert("Could not copy. Your browser may have blocked clipboard access.");
-    }
-  };
-
-  const pasteIntoSearch = (e) => {
-    e?.stopPropagation();
-    if (typeof onPasteToSearch === "function" && phone) onPasteToSearch(phone);
-  };
-
-  const openDialer = (e) => {
-    e?.stopPropagation();
-    if (phone) window.location.href = `tel:${phone}`;
-  };
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
 
   const handleCardKey = (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       onOpen?.(r);
     }
+  };
+
+  const handleSavePhone = async (normalized) => {
+    const id = getId(r);
+    const epicVal = getEPIC(r);
+
+    const tryPaths = id
+      ? [{ url: `/api/voters/${id}`, body: { mobile: normalized } }]
+      : epicVal
+      ? [{ url: `/api/voters/by-epic/${encodeURIComponent(epicVal)}`, body: { mobile: normalized } }]
+      : [];
+
+    if (!tryPaths.length) throw new Error("Record id/EPIC not found; cannot update.");
+
+    let success = false;
+    let lastErr = null;
+    for (const p of tryPaths) {
+      try {
+        const { data } = await api.patch(p.url, p.body);
+        onPhoneSaved?.(index, normalized, data);
+        success = true;
+        break;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (!success) throw lastErr || new Error("Update failed");
+    setPhoneModalOpen(false);
   };
 
   return (
@@ -190,7 +273,65 @@ function ResultCard({ r, index, page, limit, onPasteToSearch, onOpen }) {
       tabIndex={0}
       onClick={() => onOpen?.(r)}
       onKeyDown={handleCardKey}
+      style={{ position: "relative" }}
     >
+      {/* Top-right + icon (always visible for add/edit); does NOT open record modal */}
+      <button
+        type="button"
+        className="icon-button"
+        aria-label={dbPhone ? "Edit mobile" : "Add mobile"}
+        title={dbPhone ? "Edit mobile" : "Add mobile"}
+        onClick={(e) => {
+          e.stopPropagation();
+          setPhoneModalOpen(true);
+        }}
+        style={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          display: "grid",
+          placeItems: "center",
+          background: "var(--panel, #fff)",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+          fontSize: 18,
+          lineHeight: 1,
+        }}
+      >
+        +
+      </button>
+
+      {/* Round phone icon if DB number present (does NOT open record modal) */}
+      {dbPhone ? (
+        <a
+          href={`tel:${dbPhone}`}
+          onClick={(e) => e.stopPropagation()}
+          className="round-phone"
+          aria-label={`Call ${dbPhone}`}
+          title={`Call ${dbPhone}`}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 44,
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            background: "var(--accent, #10b981)",
+            color: "#fff",
+            textDecoration: "none",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+            fontSize: 16,
+            lineHeight: 1,
+          }}
+        >
+          📞
+        </a>
+      ) : null}
+
       <div className="result-card__header">
         <span className="result-card__index">{(page - 1) * limit + index + 1}</span>
         <div className="result-card__pills">
@@ -208,42 +349,13 @@ function ResultCard({ r, index, page, limit, onPasteToSearch, onOpen }) {
         </p>
       ) : null}
 
-      {/* Phone actions (do not open modal) */}
-      <div className="phone-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-        {phone ? (
-          <>
-            <button
-              className="btn btn--primary"
-              type="button"
-              onClick={openDialer}
-              aria-label={`Call ${phone}`}
-              title="Call"
-            >
-              📞 {phone}
-            </button>
-            <button
-              className="btn btn--ghost"
-              type="button"
-              onClick={(e) => copyToClipboard(phone, e)}
-              aria-label={`Copy ${phone}`}
-              title="Copy to clipboard"
-            >
-              📋 Copy
-            </button>
-            <button
-              className="btn btn--ghost"
-              type="button"
-              onClick={pasteIntoSearch}
-              aria-label={`Paste ${phone} into search`}
-              title="Paste into search box"
-            >
-              ⎘ Paste
-            </button>
-          </>
-        ) : (
-          <span className="badge badge--muted">No phone</span>
-        )}
-      </div>
+      {/* Small phone editor modal */}
+      <PhoneModal
+        open={phoneModalOpen}
+        onClose={() => setPhoneModalOpen(false)}
+        initialValue={dbPhone}
+        onSave={handleSavePhone}
+      />
     </article>
   );
 }
@@ -333,7 +445,28 @@ export default function Search() {
     window.location.href = "/login";
   };
 
-  const handlePasteToSearch = (value) => setQ(value || "");
+  // Merge updated phone into row (in DB-only fields + mirror in __raw for consistency)
+  const handlePhoneSaved = (rowIndex, newMobile, serverData) => {
+    setRows((prev) => {
+      const next = [...prev];
+      const current = { ...(next[rowIndex] || {}) };
+      current.mobile = newMobile;
+      current.Mobile = newMobile;
+      current.phone = newMobile;
+      current.Phone = newMobile;
+      if (current.__raw) {
+        current.__raw.Mobile = newMobile;
+        current.__raw["Mobile No"] = newMobile;
+        current.__raw["मोबाइल"] = newMobile;
+        current.__raw["Contact"] = newMobile;
+      }
+      if (serverData && typeof serverData === "object") {
+        Object.assign(current, serverData);
+      }
+      next[rowIndex] = current;
+      return next;
+    });
+  };
 
   return (
     <div className="app-shell">
@@ -464,15 +597,7 @@ export default function Search() {
           <section className="panel results-panel" aria-live="polite">
             <div className="results-list">
               {rows.map((r, i) => (
-                <ResultCard
-                  key={i}
-                  r={r}
-                  index={i}
-                  page={page}
-                  limit={limit}
-                  onPasteToSearch={handlePasteToSearch}
-                  onOpen={openRecord}
-                />
+                <ResultCard key={i} r={r} index={i} page={page} limit={limit} onOpen={openRecord} onPhoneSaved={handlePhoneSaved} />
               ))}
               {!rows.length && shouldSearch && !loading && !errMsg && (
                 <div className="empty-state">No results yet. Try refining your search.</div>
@@ -483,23 +608,11 @@ export default function Search() {
               <button className="btn btn--subtle" type="button" onClick={() => setPage(1)} disabled={page <= 1}>
                 ⏮ First
               </button>
-              <button
-                className="btn btn--subtle"
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
+              <button className="btn btn--subtle" type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
                 ◀ Prev
               </button>
-              <span className="pager__info">
-                Page {page} of {pages}
-              </span>
-              <button
-                className="btn btn--subtle"
-                type="button"
-                onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                disabled={page >= pages}
-              >
+              <span className="pager__info">Page {page} of {pages}</span>
+              <button className="btn btn--subtle" type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
                 Next ▶
               </button>
               <button className="btn btn--subtle" type="button" onClick={() => setPage(pages)} disabled={page >= pages}>
