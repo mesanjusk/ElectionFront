@@ -48,6 +48,29 @@ const normalizePhoneInput = (raw) => {
 
 const getId = (r) => r?._id || r?.id || r?.__raw?._id || r?.__raw?.id || "";
 
+/* ---------- client-side scoring for sorting ---------- */
+function scoreRecord(r, q) {
+  if (!q) return 0;
+  const s = String(q).toLowerCase();
+  const fields = [
+    getName(r),
+    r.voter_id || r?.__raw?.voter_id || "",
+    r.EPIC || r?.__raw?.EPIC || "",
+    (r.Booth ?? ""),
+    (r.Address ?? ""),
+    (r.Gender ?? ""),
+    (r.Age ?? ""),
+  ].map((x) => String(x || "").toLowerCase());
+  let score = 0;
+  for (const f of fields) {
+    if (!f) continue;
+    if (f === s) score += 100;      // exact match
+    if (f.startsWith(s)) score += 30;
+    if (f.includes(s)) score += 10;
+  }
+  return score;
+}
+
 /* ---------- small util: normalize axios/network errors ---------- */
 function getReadableError(err) {
   if (err?.isAxiosError) {
@@ -376,18 +399,18 @@ function useClickOutside(ref, onOutside) {
 }
 
 export default function Search() {
+  // Search + UI state
   const [q, setQ] = useState("");
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState([]);          // <- keep originals
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
 
+  // Keep these if your UI uses them (ResultCard uses page/limit to display index)
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(20);                  // no pagination now; just used for display
   const [total, setTotal] = useState(0);
-  const pages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total, limit]);
 
   const [voiceLang, setVoiceLang] = useState("mr-IN");
-
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
@@ -407,28 +430,56 @@ export default function Search() {
     setSelectedRecord(null);
   };
 
-  const runSearchOnline = useCallback(async () => {
-    const params = { page, limit };
-    if (trimmedQuery) params.q = trimmedQuery;
-    const { data } = await api.get("/api/voters/search", { params });
-    setRows(data.results || []);
-    setTotal(data.total || 0);
-  }, [limit, page, trimmedQuery]);
+  /* ------------ Load ALL once, then filter & sort locally ------------ */
+  const [allRows, setAllRows] = useState([]);
 
-  const search = useCallback(async () => {
-    setLoading(true);
-    setErrMsg("");
-    try {
-      await runSearchOnline();
-    } catch (err) {
-      console.error("Search failed:", err);
-      setRows([]);
-      setTotal(0);
-      setErrMsg(getReadableError(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [runSearchOnline]);
+  const loadAll = useCallback(async () => {
+    const { data } = await api.get("/api/voters/all");
+    const list = data?.results || data || [];
+    setAllRows(list);
+    return list;
+  }, []);
+
+  const recompute = useCallback(
+    (list, q) => {
+      const L = list ?? allRows;
+      const query = (q ?? trimmedQuery).trim();
+
+      if (!query) {
+        const out = [...L];
+        setRows(out);
+        setTotal(out.length);
+        return;
+      }
+
+      const withScore = L.map((r) => ({ r, s: scoreRecord(r, query) }));
+      withScore.sort((a, b) => b.s - a.s);
+      const out = withScore.map((x) => x.r);
+
+      setRows(out);
+      setTotal(out.length);
+    },
+    [allRows, trimmedQuery, setRows, setTotal]
+  );
+
+  const search = useCallback(
+    async () => {
+      setLoading(true);
+      setErrMsg("");
+      try {
+        const list = allRows.length ? allRows : await loadAll();
+        recompute(list, trimmedQuery);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setRows([]);
+        setTotal(0);
+        setErrMsg(getReadableError(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [allRows, loadAll, recompute, trimmedQuery, setRows, setTotal]
+  );
 
   useEffect(() => {
     if (!shouldSearch) {
@@ -534,7 +585,7 @@ export default function Search() {
           </div>
         </div>
 
-        {/* SEARCH bar with fixed widths: input 50%, voice 15%, clear 15% */}
+        {/* SEARCH bar */}
         <div
           className="top-bar__group"
           style={{
@@ -560,25 +611,23 @@ export default function Search() {
             style={{ width: "60%", minWidth: 220 }}
           />
 
-          {/* Voice: icon-only, 15% width */}
+          {/* Voice */}
           <div style={{ width: "10%", minWidth: 40, display: "flex", justifyContent: "center" }}>
             <VoiceSearchButton
               onResult={setQ}
               lang={voiceLang}
               className="icon-button"
               disabled={loading}
-              
             />
           </div>
 
-          {/* Clear: icon-only, 15% width */}
+          {/* Clear */}
           <button
             className="icon-button"
             type="button"
             onClick={() => setQ("")}
             disabled={!q}
             aria-label="Clear search"
-            
             style={{ width: "10%", minWidth: 40 }}
           >
             ✖
@@ -591,7 +640,7 @@ export default function Search() {
         <section className="panel search-panel" aria-labelledby="search-panel-title" style={{ paddingBottom: 8 }}>
           <div className="panel__header">
             <h1 className="panel__title" id="search-panel-title">
-              {/* Intentionally blank title to save vertical space */}
+              {/* blank to save vertical space */}
             </h1>
           </div>
 
@@ -623,7 +672,7 @@ export default function Search() {
         </section>
       </main>
 
-      {/* ---------- BOTTOM FOOTER: breakdown + per-page + pagination in one row ---------- */}
+      {/* ---------- FOOTER: breakdown ---------- */}
       <footer
         className="footer-bar"
         style={{
@@ -661,8 +710,7 @@ export default function Search() {
             </span>
           </div>
 
-          {/* Center: per page */}
-          
+          {/* Center: (pagination removed) */}
         </div>
       </footer>
 
