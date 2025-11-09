@@ -1,14 +1,14 @@
 // client/src/components/VoiceSearchButton.jsx
 import React, { useRef, useState } from 'react';
 
-export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN' }) {
+export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN', className = 'btn btn--ghost' }) {
   const recRef = useRef(null);
   const [active, setActive] = useState(false);
 
   const start = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      alert('Voice search not supported on this browser');
+      window.alert('Voice search is not supported in this browser.');
       return;
     }
     const rec = new SR();
@@ -19,8 +19,10 @@ export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN' }
     setActive(true);
 
     rec.onresult = (e) => {
-      const text = e.results[0][0].transcript;
-      onResult?.(text);
+      const text = e.results?.[0]?.[0]?.transcript;
+      if (text && typeof onResult === 'function') {
+        onResult(text);
+      }
     };
     rec.onend = () => setActive(false);
     rec.onerror = () => setActive(false);
@@ -28,11 +30,27 @@ export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN' }
     rec.start();
   };
 
-  const stop = () => recRef.current?.stop();
+  const stop = () => {
+    recRef.current?.stop();
+  };
+
+  const handleClick = () => {
+    if (active) stop();
+    else start();
+  };
+
+  const classes = [className, active ? 'btn--listening' : ''].filter(Boolean).join(' ');
 
   return (
-    <button onClick={active ? stop : start} disabled={disabled} style={{padding:'8px 12px'}}>
-      {active ? '🎙️ Listening… (tap to stop)' : '🎤 Voice'}
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      className={classes}
+      aria-pressed={active}
+      title={active ? 'Tap to stop voice search' : 'Start voice search'}
+    >
+      {active ? '🎙️ Listening…' : '🎤 Voice'}
     </button>
   );
 }

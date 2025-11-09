@@ -1,12 +1,17 @@
 {
-  "name": "Voter Search PWA",
-  "short_name": "Voters",
+  "name": "Voter Console",
+  "short_name": "Voter",
+  "description": "Search and manage voter records with offline-ready access for field teams.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0F766E",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
+  ],
+  "categories": ["productivity", "business"],
+  "prefer_related_applications": false
 }

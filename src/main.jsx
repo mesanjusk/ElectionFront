@@ -9,17 +9,19 @@ import {
 import Login from './pages/Login.jsx';
 import Search from './pages/Search.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/src/sw.js').catch(console.error);
-  });
-}
+import './styles/theme.css';
 
 const router = createBrowserRouter(
   [
     { path: '/login', element: <Login /> },
-    { path: '/', element: <ProtectedRoute><Search /></ProtectedRoute> },
+    {
+      path: '/',
+      element: (
+        <ProtectedRoute>
+          <Search />
+        </ProtectedRoute>
+      ),
+    },
     { path: '*', loader: () => redirect('/') },
   ],
   {
@@ -34,10 +36,15 @@ createRoot(document.getElementById('root')).render(
   <RouterProvider router={router} />
 );
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js")
-      .then(() => console.log("✅ Service worker registered"))
-      .catch((err) => console.log("SW reg failed:", err));
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        console.log('✅ Service worker registered:', registration.scope);
+      })
+      .catch((err) => {
+        console.error('SW registration failed:', err);
+      });
   });
 }
