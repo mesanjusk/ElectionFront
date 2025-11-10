@@ -276,88 +276,91 @@ export default function Search() {
   const male = visible.reduce((n, r) => (getGender(r) === "M" ? n + 1 : n), 0);
   const female = visible.reduce((n, r) => (getGender(r) === "F" ? n + 1 : n), 0);
 
+  const visibleTotal = visible.length;
+  const matchedTotal = filtered.length;
+  const syncedTotal = allRows.length;
+
   return (
     <div className="sx-page">
-      {/* ===== Top bar (menu + voice + clear) ===== */}
-      <header className="sx-header">
-        <div className="sx-header-row">
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button className="sx-icon" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu">☰</button>
-            <h1 style={{ margin: 0 }}>All Voters</h1>
+      <header className="sx-appbar">
+        <div className="sx-appbar__brand">
+          <button
+            className="sx-appbar__icon"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Open quick settings"
+            type="button"
+          >
+            ☰
+          </button>
+          <div className="sx-appbar__titles">
+            <h1 className="sx-appbar__title">Voter Explorer</h1>
+            <span className="sx-appbar__meta">Offline • IndexedDB</span>
           </div>
-          <div className="sx-subline">Offline • IndexedDB</div>
         </div>
-
-        {menuOpen && (
-          <div
-            ref={menuRef}
-            className="menu-sheet"
-            style={{
-              position: "absolute",
-              top: "56px",
-              left: "12px",
-              background: "var(--card,#fff)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              boxShadow: "0 10px 30px rgba(0,0,0,.15)",
-              padding: 10,
-              zIndex: 10,
+        <div className="sx-appbar__actions">
+          <button
+            className="sx-appbar__action"
+            type="button"
+            aria-label="Refresh local records"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await loadAll();
+              } finally {
+                setBusy(false);
+              }
             }}
           >
-            <div style={{ padding: "6px 6px 10px" }}>
-              <label className="field" style={{ width: "100%" }}>
-                <span className="field__label">Voice language</span>
-                <select
-                  className="select"
-                  value={voiceLang}
-                  onChange={(e) => setVoiceLang(e.target.value)}
-                >
-                  <option value="mr-IN">Marathi (mr-IN)</option>
-                  <option value="hi-IN">Hindi (hi-IN)</option>
-                  <option value="en-IN">English (en-IN)</option>
-                </select>
-              </label>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button className="sx-btn" onClick={logout}>Logout ⎋</button>
-            </div>
-          </div>
-        )}
-
-        <div className="sx-search" style={{ gridTemplateColumns: "1fr auto auto" }}>
-          <input
-            className="sx-input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name / EPIC / mobile / serial"
-            autoComplete="off"
-          />
-          <VoiceSearchButton
-            onResult={setQ}
-            lang={voiceLang}
-            className="sx-icon"
-            disabled={busy}
-            title="Voice search"
-          />
-          <button className="sx-icon" aria-label="Clear" onClick={() => setQ("")} disabled={!q}>✕</button>
-        </div>
-
-        <div className="sx-stats">
-          Showing <b>{visible.length.toLocaleString()}</b> of{" "}
-          <b>{filtered.length.toLocaleString()}</b>
-          {filtered.length !== allRows.length ? (
-            <span className="sx-muted"> (from {allRows.length.toLocaleString()})</span>
-          ) : null}
+            ⟳
+          </button>
         </div>
       </header>
 
-      {/* ===== Cards: show EPIC + RPS, then fields like in your image ===== */}
-      <main className="sx-content">
-        <div className="sx-cards">
-          {visible.map((r, i) => {
-            const name = getName(r);
-            const epic = getEPIC(r);
-            const rps = getRPS(r);
+      {menuOpen && (
+        <div ref={menuRef} className="sx-menu-sheet">
+          <label className="field">
+            <span className="field__label">Voice language</span>
+            <select
+              className="select"
+              value={voiceLang}
+              onChange={(e) => setVoiceLang(e.target.value)}
+            >
+              <option value="mr-IN">Marathi (mr-IN)</option>
+              <option value="hi-IN">Hindi (hi-IN)</option>
+              <option value="en-IN">English (en-IN)</option>
+            </select>
+          </label>
+          <div className="sx-menu-sheet__actions">
+            <button className="btn btn--ghost" onClick={logout} type="button">
+              Logout ⎋
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="sx-body">
+        <section className="sx-glance">
+          <article className="sx-glance-card">
+            <span className="sx-glance-card__label">Visible now</span>
+            <span className="sx-glance-card__value">{visibleTotal.toLocaleString()}</span>
+          </article>
+          <article className="sx-glance-card">
+            <span className="sx-glance-card__label">Matches</span>
+            <span className="sx-glance-card__value">{matchedTotal.toLocaleString()}</span>
+          </article>
+          <article className="sx-glance-card">
+            <span className="sx-glance-card__label">Synced offline</span>
+            <span className="sx-glance-card__value">{syncedTotal.toLocaleString()}</span>
+          </article>
+        </section>
+
+        <section className="sx-content">
+          <div className="sx-cards">
+            {visible.map((r, i) => {
+              const name = getName(r);
+              const epic = getEPIC(r);
+              const rps = getRPS(r);
             const part = getPart(r);
             const serialTxt = getSerialText(r);
             const serialNum = getSerialNum(r);
@@ -371,65 +374,64 @@ export default function Search() {
               rps || (part && !Number.isNaN(serialNum) ? `${part}/${serialNum}` : part || null),
             ].filter(Boolean).join("   ");
 
-            return (
-              <div className="sx-card" key={r._id || `${i}-${epic}`}>
-                <div className="sx-card-top">
-                  {/* tiny serial badge on left like the PDF */}
-                  <div className="sx-serial-badge">{!Number.isNaN(serialNum) ? serialNum : (serialTxt || "—")}</div>
-                  <div className="sx-topline">{topRight}</div>
-                </div>
+              return (
+                <div className="sx-card" key={r._id || `${i}-${epic}`}>
+                  <div className="sx-card-top">
+                    <div className="sx-serial-badge">{!Number.isNaN(serialNum) ? serialNum : serialTxt || "—"}</div>
+                    <div className="sx-topline">{topRight}</div>
+                  </div>
 
-                <div className="sx-card-head" style={{ marginTop: 6 }}>
-                  <div className="sx-name" title={name}>{name}</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {mob ? (
-                      <a
+                  <div className="sx-card-head">
+                    <div className="sx-name" title={name}>{name}</div>
+                    <div className="sx-chip-group">
+                      {mob ? (
+                        <a
+                          className="sx-chip"
+                          href={`tel:${mob}`}
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Call ${mob}`}
+                        >
+                          📞
+                        </a>
+                      ) : null}
+                      <button
                         className="sx-chip"
-                        href={`tel:${mob}`}
-                        onClick={(e) => e.stopPropagation()}
-                        title={`Call ${mob}`}
+                        onClick={() => setSelected(r)}
+                        title={mob ? "Edit mobile" : "Add mobile"}
+                        type="button"
                       >
-                        📞
-                      </a>
-                    ) : null}
-                    <button
-                      className="sx-chip"
-                      onClick={() => setSelected(r)}
-                      title={mob ? "Edit mobile" : "Add mobile"}
-                    >
-                      ＋
-                    </button>
+                        ✎
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-               
-                <div className="sx-row"><span className="sx-k">वय</span><span className="sx-v">{age || "—"}</span></div>
-                <div className="sx-row"><span className="sx-k">लिंग</span><span className="sx-v">{gender || "—"}</span></div>
-                <div className="sx-row"><span className="sx-k">C/O</span><span className="sx-v">{getCareOf(r) || "—"}</span></div>
+                  <div className="sx-row"><span className="sx-k">वय</span><span className="sx-v">{age || "—"}</span></div>
+                  <div className="sx-row"><span className="sx-k">लिंग</span><span className="sx-v">{gender || "—"}</span></div>
+                  <div className="sx-row"><span className="sx-k">C/O</span><span className="sx-v">{getCareOf(r) || "—"}</span></div>
 
-                <div className="sx-row">
-                  <span className="sx-k">EPIC</span>
-                  <span className="sx-v">{epic}</span>
-                </div>
-                {rps ? (
                   <div className="sx-row">
-                    <span className="sx-k">R/P/S</span>
-                    <span className="sx-v">{rps}</span>
+                    <span className="sx-k">EPIC</span>
+                    <span className="sx-v">{epic}</span>
                   </div>
-                ) : null}
-                <div className="sx-row">
-                  <span className="sx-k">Mobile</span>
-                  <span className="sx-v">{mob ? `📱 ${mob}` : <i>—</i>}</span>
+                  {rps ? (
+                    <div className="sx-row">
+                      <span className="sx-k">R/P/S</span>
+                      <span className="sx-v">{rps}</span>
+                    </div>
+                  ) : null}
+                  <div className="sx-row">
+                    <span className="sx-k">Mobile</span>
+                    <span className="sx-v">{mob ? `📱 ${mob}` : <i>—</i>}</span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        <div ref={sentinelRef} className="sx-sentinel" />
+          <div ref={sentinelRef} className="sx-sentinel" />
+        </section>
       </main>
 
-      {/* ===== Floating Pull / Push ===== */}
       <div className="sx-fab-wrap">
         <button
           className="sx-fab"
@@ -446,6 +448,7 @@ export default function Search() {
               setBusy(false);
             }
           }}
+          type="button"
         >
           ⬇ Pull
         </button>
@@ -463,6 +466,7 @@ export default function Search() {
               setBusy(false);
             }
           }}
+          type="button"
         >
           ⬆ Push
         </button>
@@ -477,26 +481,44 @@ export default function Search() {
         }}
       />
 
-      <PWAInstallPrompt bottom={96} />
+      <PWAInstallPrompt bottom={150} />
 
-      {/* Footer stats */}
-      <footer
-        className="footer-bar"
-        style={{
-          position: "sticky",
-          bottom: 0,
-          background: "var(--panel,#fff)",
-          borderTop: "1px solid var(--hairline,#e5e7eb)",
-          padding: "8px 12px",
-          zIndex: 4,
-        }}
-      >
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <span className="badge badge--muted">Male: <strong>{male}</strong></span>
-            <span className="badge badge--muted">Female: <strong>{female}</strong></span>
-            <span className="badge badge--accent">Visible: <strong>{visible.length}</strong></span>
+      <footer className="sx-bottom-bar">
+        <div className="sx-bottom-bar__stats">
+          <div className="sx-bottom-bar__stat">
+            Male<strong>{male.toLocaleString()}</strong>
           </div>
+          <div className="sx-bottom-bar__stat">
+            Female<strong>{female.toLocaleString()}</strong>
+          </div>
+          <div className="sx-bottom-bar__stat">
+            Total<strong>{visibleTotal.toLocaleString()}</strong>
+          </div>
+        </div>
+        <div className="sx-bottom-bar__search">
+          <input
+            className="sx-search-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, EPIC, booth or phone"
+            autoComplete="off"
+          />
+          <VoiceSearchButton
+            onResult={setQ}
+            lang={voiceLang}
+            className="sx-search-action"
+            disabled={busy}
+            title="Voice search"
+          />
+          <button
+            className="sx-search-action"
+            aria-label="Clear search"
+            onClick={() => setQ("")}
+            disabled={!q}
+            type="button"
+          >
+            ✕
+          </button>
         </div>
       </footer>
     </div>

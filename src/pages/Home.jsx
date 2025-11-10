@@ -16,29 +16,50 @@ export default function Home() {
   };
 
   return (
-    <div className="container" style={{ maxWidth: 800, margin: '40px auto', padding: 16 }}>
-      <h2>Voter Lookup (Offline Ready)</h2>
-      <p>Type a name or EPIC (voter ID). Works offline once synced.</p>
+    <div className="page page--center">
+      <div className="card" style={{ gap: '1.75rem', textAlign: 'center' }}>
+        <div className="brand brand--center">
+          <span className="brand__mark">EV</span>
+          <div>
+            <span className="brand__title">Election Vision</span>
+            <p className="help-text">Field-ready voter lookup</p>
+          </div>
+        </div>
+        <div className="panel__header">
+          <h1 className="panel__title">Find voters instantly</h1>
+          <p className="panel__subtitle">
+            Search by name, EPIC or booth to jump straight into the mobile-first roster.
+          </p>
+        </div>
+        <div className="form-grid" style={{ textAlign: 'left' }}>
+          <label className="field">
+            <span className="field__label">Search term</span>
+            <input
+              className="input"
+              placeholder="Start typing a name or EPIC"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </label>
+          <button className="btn btn--primary" type="button" onClick={() => goSearch()}>
+            Go to results
+          </button>
+        </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <input
-          placeholder="Search name or EPIC…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          style={{ flex: 1, padding: 10, fontSize: 16 }}
-        />
-        <button onClick={() => goSearch()} style={{ padding: '10px 16px' }}>
-          Search
-        </button>
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <h4>Quick options</h4>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => goSearch('12')}>Booth 12</button>
-          <button onClick={() => goSearch('30')}>Booth 30</button>
-          <button onClick={() => goSearch('45')}>Booth 45</button>
-          {/* Add your own useful shortcuts */}
+        <div className="form-grid">
+          <span className="help-text">Quick booth filters</span>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {[12, 30, 45, 58].map((booth) => (
+              <button
+                key={booth}
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => goSearch(String(booth))}
+              >
+                Booth {booth}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
