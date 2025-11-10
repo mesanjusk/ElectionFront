@@ -8,7 +8,7 @@ import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
 import "./Search.css";
 
-/* ---------------- Robust getters: EN + MR + __raw fallbacks ---------------- */
+/* ---------------- helpers (EN + MR + __raw fallbacks) ---------------- */
 const pick = (obj, keys) => {
   if (!obj) return "";
   for (const k of keys) {
@@ -17,6 +17,7 @@ const pick = (obj, keys) => {
   }
   return "";
 };
+
 const getName = (r) =>
   pick(r, ["name", "Name"]) ||
   pick(r?.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) ||
@@ -27,14 +28,59 @@ const getEPIC = (r) =>
   pick(r?.__raw, ["EPIC", "voter_id", "कार्ड नं"]) ||
   "—";
 
-const getMobile = (r) =>
-  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) ||
-  pick(r?.__raw, ["Mobile", "Mobile No", "मोबाइल", "Contact"]) ||
+/* R/P/S combined token and parts */
+const getRPS = (r) =>
+  pick(r, ["RPS", "RollPartSerial"]) ||
+  pick(r?.__raw, [
+    "RPS",
+    "Roll/Part/Serial",
+    "Roll / Part / Serial",
+    "R/P/S",
+    "Roll-Part-Serial",
+  ]) ||
   "";
 
-const getBooth = (r) =>
-  pick(r, ["booth", "Booth"]) ||
-  pick(r?.__raw, ["Booth", "Part", "Part No", "भाग नं."]) ||
+/* Part/Booth */
+const getPart = (r) =>
+  pick(r, ["Part", "part", "Booth", "booth"]) ||
+  pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
+  "";
+
+/* Serial (text & numeric) */
+const getSerialText = (r) =>
+  // include top-level "Serial No" (with space) because some datasets store it exactly like that
+  pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
+  pick(r?.__raw, ["Serial No", "Serial", "Sr No", "SrNo", "अनु. नं.", "अनुक्रमांक", "अनुक्रमांक नं."]) ||
+  "";
+const num = (s) => {
+  const m = String(s || "").match(/\d+/g);
+  if (!m) return NaN;
+  // prefer last number token (handles "अनु. नं. 514")
+  const n = parseInt(m[m.length - 1], 10);
+  return Number.isNaN(n) ? NaN : n;
+};
+const getSerialNum = (r) => {
+  const t = getSerialText(r);
+  if (t) return num(t);
+  // sometimes present only inside RPS as roll/part/serial
+  const rps = getRPS(r);
+  if (rps && /\d+\/\d+\/\d+/.test(rps)) {
+    const last = rps.split("/").pop();
+    return num(last);
+  }
+  return NaN;
+};
+
+/* House No */
+const getHouseNo = (r) =>
+  pick(r, ["House No", "House", "HouseNumber"]) ||
+  pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
+  "";
+
+/* Age & Gender */
+const getAge = (r) =>
+  pick(r, ["Age", "age"]) ||
+  pick(r?.__raw, ["Age", "age", "वय"]) ||
   "";
 
 const getGender = (r) => {
@@ -49,6 +95,33 @@ const getGender = (r) => {
   return s.toUpperCase();
 };
 
+/* Care-of (father/husband/guardian) */
+const getCareOf = (r) =>
+  pick(r, [
+    "Father Name",
+    "Husband Name",
+    "Guardian Name",
+    "CareOf",
+    "C_O",
+    "C/O",
+  ]) ||
+  pick(r?.__raw, [
+    "वडिलांचे नाव",
+    "वडिलांचे नांव",
+    "पतीचे नाव",
+    "पतीचे नांव",
+    "Guardians Name",
+    "Guardian Name",
+    "Father Name",
+    "Father's Name",
+    "Husband Name",
+    "Husband's Name",
+  ]) ||
+  "";
+
+/* Phone (only DB fields, not guessed from __raw) */
+const getMobile = (r) =>
+  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
 const normalizePhone = (raw) => {
   if (!raw) return "";
   let d = String(raw).replace(/[^\d]/g, "");
@@ -72,10 +145,7 @@ function MobileEditModal({ open, voter, onClose }) {
         </div>
         <div className="sx-dialog-body">
           <div className="sx-sub">{getName(voter)}</div>
-          <div className="sx-row">
-            <span className="sx-k">EPIC</span>
-            <span className="sx-v">{getEPIC(voter)}</span>
-          </div>
+          <div className="sx-row"><span className="sx-k">EPIC</span><span className="sx-v">{getEPIC(voter)}</span></div>
           <input
             className="sx-input"
             value={mobile}
@@ -121,7 +191,7 @@ function useClickOutside(ref, onOutside) {
 
 /* ================================== PAGE ================================== */
 export default function Search() {
-  // auth for any server calls (Pull/Push)
+  // auth for server Pull/Push
   useEffect(() => {
     const t = localStorage.getItem("token");
     if (t) setAuthToken(t);
@@ -134,10 +204,10 @@ export default function Search() {
 
   const [q, setQ] = useState("");
   const [allRows, setAllRows] = useState([]);
-  const [visibleCount, setVisibleCount] = useState(200); // infinite scroll window
+  const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
 
-  const [selected, setSelected] = useState(null); // for MobileEditModal
+  const [selected, setSelected] = useState(null);
   const sentinelRef = useRef(null);
 
   const logout = () => {
@@ -145,33 +215,49 @@ export default function Search() {
     location.href = "/login";
   };
 
-  // Load ALL from IndexedDB, sorted by name
+  // Load ALL from IndexedDB, **sorted by Serial Number only**
   const loadAll = useCallback(async () => {
     const arr = await db.voters.toArray();
-    arr.sort((a, b) => getName(a).localeCompare(getName(b)));
+    arr.sort((a, b) => {
+      const sa = getSerialNum(a);
+      const sb = getSerialNum(b);
+      const aNaN = Number.isNaN(sa);
+      const bNaN = Number.isNaN(sb);
+      if (aNaN && bNaN) return 0;
+      if (aNaN) return 1;     // NaNs go to the end
+      if (bNaN) return -1;
+      return sa - sb;
+    });
     setAllRows(arr);
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Filter locally
+  // Filter locally by name/epic/mobile (order preserved after filter)
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return allRows;
     return allRows.filter((r) => {
       const name = getName(r).toLowerCase();
       const epic = getEPIC(r).toLowerCase();
-      const mob = getMobile(r).toLowerCase();
-      return name.includes(term) || epic.includes(term) || mob.includes(term);
+      const mob = (getMobile(r) || "").toLowerCase();
+      const rps = (getRPS(r) || "").toLowerCase();
+      const part = (getPart(r) || "").toLowerCase();
+      const serialTxt = (getSerialText(r) || "").toLowerCase();
+      return (
+        name.includes(term) ||
+        epic.includes(term) ||
+        mob.includes(term) ||
+        rps.includes(term) ||
+        part.includes(term) ||
+        serialTxt.includes(term)
+      );
     });
   }, [q, allRows]);
 
-  // Reset infinite window when query changes
   useEffect(() => setVisibleCount(200), [q]);
 
-  // Infinite scroll sentinel
+  // Infinite scroll
   useEffect(() => {
     if (!sentinelRef.current) return;
     const el = sentinelRef.current;
@@ -186,13 +272,13 @@ export default function Search() {
 
   const visible = filtered.slice(0, visibleCount);
 
-  // Stats (from current visible list)
+  // Stats (current window)
   const male = visible.reduce((n, r) => (getGender(r) === "M" ? n + 1 : n), 0);
   const female = visible.reduce((n, r) => (getGender(r) === "F" ? n + 1 : n), 0);
 
   return (
     <div className="sx-page">
-      {/* ===== Top bar (YOUR OLD UI bits: menu + voice + clear) ===== */}
+      {/* ===== Top bar (menu + voice + clear) ===== */}
       <header className="sx-header">
         <div className="sx-header-row">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -202,13 +288,22 @@ export default function Search() {
           <div className="sx-subline">Offline • IndexedDB</div>
         </div>
 
-        {/* Dropdown menu (voice language + logout) */}
         {menuOpen && (
-          <div ref={menuRef} className="menu-sheet" style={{
-            position: "absolute", top: "56px", left: "12px",
-            background: "var(--card,#fff)", border: "1px solid var(--border)",
-            borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,.15)", padding: 10, zIndex: 10
-          }}>
+          <div
+            ref={menuRef}
+            className="menu-sheet"
+            style={{
+              position: "absolute",
+              top: "56px",
+              left: "12px",
+              background: "var(--card,#fff)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              boxShadow: "0 10px 30px rgba(0,0,0,.15)",
+              padding: 10,
+              zIndex: 10,
+            }}
+          >
             <div style={{ padding: "6px 6px 10px" }}>
               <label className="field" style={{ width: "100%" }}>
                 <span className="field__label">Voice language</span>
@@ -229,13 +324,12 @@ export default function Search() {
           </div>
         )}
 
-        {/* Search row with Voice and Clear (mobile-first) */}
         <div className="sx-search" style={{ gridTemplateColumns: "1fr auto auto" }}>
           <input
             className="sx-input"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name / EPIC / mobile"
+            placeholder="Search name / EPIC / mobile / serial"
             autoComplete="off"
           />
           <VoiceSearchButton
@@ -257,18 +351,35 @@ export default function Search() {
         </div>
       </header>
 
-      {/* ===== Scrollable content: mobile-first cards with + edit and phone icon ===== */}
+      {/* ===== Cards: show EPIC + RPS, then fields like in your image ===== */}
       <main className="sx-content">
         <div className="sx-cards">
-          {visible.map((r) => {
+          {visible.map((r, i) => {
             const name = getName(r);
             const epic = getEPIC(r);
+            const rps = getRPS(r);
+            const part = getPart(r);
+            const serialTxt = getSerialText(r);
+            const serialNum = getSerialNum(r);
+            const house = getHouseNo(r);
+            const age = getAge(r);
+            const gender = getGender(r);
             const mob = getMobile(r);
-            const booth = getBooth(r);
+
+            const topRight = [
+              epic || null,
+              rps || (part && !Number.isNaN(serialNum) ? `${part}/${serialNum}` : part || null),
+            ].filter(Boolean).join("   ");
 
             return (
-              <div className="sx-card" key={r._id}>
-                <div className="sx-card-head">
+              <div className="sx-card" key={r._id || `${i}-${epic}`}>
+                <div className="sx-card-top">
+                  {/* tiny serial badge on left like the PDF */}
+                  <div className="sx-serial-badge">{!Number.isNaN(serialNum) ? serialNum : (serialTxt || "—")}</div>
+                  <div className="sx-topline">{topRight}</div>
+                </div>
+
+                <div className="sx-card-head" style={{ marginTop: 6 }}>
                   <div className="sx-name" title={name}>{name}</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     {mob ? (
@@ -281,34 +392,44 @@ export default function Search() {
                         📞
                       </a>
                     ) : null}
-                    <button className="sx-chip" onClick={() => setSelected(r)} title={mob ? "Edit mobile" : "Add mobile"}>＋</button>
+                    <button
+                      className="sx-chip"
+                      onClick={() => setSelected(r)}
+                      title={mob ? "Edit mobile" : "Add mobile"}
+                    >
+                      ＋
+                    </button>
                   </div>
                 </div>
+
+               
+                <div className="sx-row"><span className="sx-k">वय</span><span className="sx-v">{age || "—"}</span></div>
+                <div className="sx-row"><span className="sx-k">लिंग</span><span className="sx-v">{gender || "—"}</span></div>
+                <div className="sx-row"><span className="sx-k">C/O</span><span className="sx-v">{getCareOf(r) || "—"}</span></div>
 
                 <div className="sx-row">
                   <span className="sx-k">EPIC</span>
                   <span className="sx-v">{epic}</span>
                 </div>
+                {rps ? (
+                  <div className="sx-row">
+                    <span className="sx-k">R/P/S</span>
+                    <span className="sx-v">{rps}</span>
+                  </div>
+                ) : null}
                 <div className="sx-row">
                   <span className="sx-k">Mobile</span>
                   <span className="sx-v">{mob ? `📱 ${mob}` : <i>—</i>}</span>
                 </div>
-                {booth ? (
-                  <div className="sx-row">
-                    <span className="sx-k">Booth</span>
-                    <span className="sx-v">{booth}</span>
-                  </div>
-                ) : null}
               </div>
             );
           })}
         </div>
 
-        {/* Infinite scroll grow point */}
         <div ref={sentinelRef} className="sx-sentinel" />
       </main>
 
-      {/* ===== Floating Pull / Push (same as new flow) ===== */}
+      {/* ===== Floating Pull / Push ===== */}
       <div className="sx-fab-wrap">
         <button
           className="sx-fab"
@@ -347,7 +468,6 @@ export default function Search() {
         </button>
       </div>
 
-      {/* Modal for + edit */}
       <MobileEditModal
         open={!!selected}
         voter={selected}
@@ -357,10 +477,9 @@ export default function Search() {
         }}
       />
 
-      {/* PWA prompt kept */}
       <PWAInstallPrompt bottom={96} />
 
-      {/* Footer stats like your old UI (male/female from current visible window) */}
+      {/* Footer stats */}
       <footer
         className="footer-bar"
         style={{
