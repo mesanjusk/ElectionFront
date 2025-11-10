@@ -1,81 +1,44 @@
+// client/src/pages/Login.jsx
 import React, { useState } from 'react';
-import api from '../api';
-import { setToken } from '../auth';
-import { useNavigate } from 'react-router-dom';
+import { apiLogin, setAuthToken } from '../services/api';
+import { pullAll } from '../services/sync';
 
 export default function Login() {
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const nav = useNavigate();
+  const [progress, setProgress] = useState(0);
 
-  const submit = async (e) => {
+  async function onSubmit(e) {
     e.preventDefault();
     setLoading(true);
-    setError('');
     try {
-      const { data } = await api.post('/api/auth/login', { email, password });
-      setToken(data.token);
-      nav('/');
-    } catch (e) {
-      const message = e?.response?.data?.error || 'Login failed. Please check your credentials.';
-      setError(message);
+      const { token } = await apiLogin({ email, password });
+      localStorage.setItem('token', token);
+      setAuthToken(token);
+      let total = 0;
+      await pullAll({
+        onProgress: ({ total: t }) => {
+          total = t;
+          setProgress(t);
+        },
+      });
+      alert(`Synced ${total} records to your device. You can now work fully offline.`);
+      window.location.href = '/search';
+    } catch (err) {
+      alert('Login or Sync failed: ' + err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="page page--center">
-      <div className="card auth-card">
-        <div className="brand brand--light brand--center">
-          <span className="brand__mark">VS</span>
-          <span className="brand__title">Voter Console</span>
-        </div>
-        <div className="panel__header">
-          <h1 className="panel__title">Welcome back</h1>
-          <p className="panel__subtitle">Sign in to continue to the voter search dashboard.</p>
-        </div>
-        {error && (
-          <div className="alert alert--error" role="alert">
-            <span aria-hidden>⚠️</span>
-            <span>{error}</span>
-          </div>
-        )}
-        <form className="form-grid" onSubmit={submit}>
-          <label className="field">
-            <span className="field__label">Email address</span>
-            <input
-              className="input"
-              placeholder="you@example.com"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
-          </label>
-          <label className="field">
-            <span className="field__label">Password</span>
-            <input
-              className="input"
-              placeholder="••••••••"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-            />
-          </label>
-          <button className="btn btn--primary" type="submit" disabled={loading}>
-            {loading ? 'Signing you in…' : 'Sign in'}
-          </button>
-        </form>
-        <p className="panel__subtitle text-center">
-          Tip: use the credentials shared by your administrator.
-        </p>
-      </div>
-    </div>
+    <form onSubmit={onSubmit} style={{ maxWidth: 360, margin: '40px auto', display:'grid', gap:8 }}>
+      <h2>Login</h2>
+      <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" />
+      <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" />
+      <button disabled={loading}>{loading ? 'Syncing…' : 'Login'}</button>
+      {loading ? <div>Downloaded: {progress}</div> : null}
+    </form>
   );
 }
