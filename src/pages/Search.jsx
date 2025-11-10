@@ -28,7 +28,6 @@ const getEPIC = (r) =>
   pick(r?.__raw, ["EPIC", "voter_id", "कार्ड नं"]) ||
   "—";
 
-/* R/P/S combined token and parts */
 const getRPS = (r) =>
   pick(r, ["RPS", "RollPartSerial"]) ||
   pick(r?.__raw, [
@@ -40,13 +39,12 @@ const getRPS = (r) =>
   ]) ||
   "";
 
-/* Part/Booth */
 const getPart = (r) =>
   pick(r, ["Part", "part", "Booth", "booth"]) ||
   pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
   "";
 
-/* Serial (text & numeric) */
+/* Serial */
 const getSerialText = (r) => {
   const v =
     pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
@@ -62,14 +60,12 @@ const getSerialText = (r) => {
     "";
   return v == null ? "" : String(v);
 };
-
 const num = (s) => {
   const m = String(s || "").match(/\d+/g);
   if (!m) return NaN;
   const n = parseInt(m[m.length - 1], 10);
   return Number.isNaN(n) ? NaN : n;
 };
-
 const getSerialNum = (r) => {
   const t = getSerialText(r);
   if (t) return num(t);
@@ -81,7 +77,11 @@ const getSerialNum = (r) => {
   return NaN;
 };
 
-/* Optional fields kept for future use */
+const getHouseNo = (r) =>
+  pick(r, ["House No", "House", "HouseNumber"]) ||
+  pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
+  "";
+
 const getAge = (r) =>
   pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
 
@@ -97,6 +97,29 @@ const getGender = (r) => {
   return s.toUpperCase();
 };
 
+const getCareOf = (r) =>
+  pick(r, [
+    "Father Name",
+    "Husband Name",
+    "Guardian Name",
+    "CareOf",
+    "C_O",
+    "C/O",
+  ]) ||
+  pick(r?.__raw, [
+    "वडिलांचे नाव",
+    "वडिलांचे नांव",
+    "पतीचे नाव",
+    "पतीचे नांव",
+    "Guardians Name",
+    "Guardian Name",
+    "Father Name",
+    "Father's Name",
+    "Husband Name",
+    "Husband's Name",
+  ]) ||
+  "";
+
 /* Phone (DB fields only) */
 const getMobile = (r) =>
   pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
@@ -106,6 +129,31 @@ const normalizePhone = (raw) => {
   if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
   if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
   return d.length === 10 ? d : "";
+};
+
+/* Share text for WhatsApp */
+const buildShareText = (r) => {
+  const name = getName(r);
+  const epic = getEPIC(r);
+  const part = getPart(r);
+  const serial = getSerialNum(r);
+  const rps = getRPS(r);
+  const age = getAge(r);
+  const gender = getGender(r);
+  const house = getHouseNo(r);
+  const co = getCareOf(r);
+
+  const lines = [
+    `Voter Details`,
+    `Name: ${name}`,
+    `EPIC: ${epic}`,
+    `Part: ${part || "—"}  Serial: ${!Number.isNaN(serial) ? serial : "—"}`,
+    rps ? `R/P/S: ${rps}` : null,
+    `Age: ${age || "—"}  Sex: ${gender || "—"}`,
+    house ? `House: ${house}` : null,
+    co ? `C/O: ${co}` : null,
+  ].filter(Boolean);
+  return lines.join("\n");
 };
 
 /* ---------------- Small mobile edit modal (local only) ---------------- */
@@ -160,6 +208,55 @@ function MobileEditModal({ open, voter, onClose }) {
   );
 }
 
+/* ---------------- Full Record Details modal ---------------- */
+function RecordModal({ open, voter, onClose }) {
+  if (!open || !voter) return null;
+  const fields = [
+    ["Name", getName(voter)],
+    ["EPIC", getEPIC(voter)],
+    ["R/P/S", getRPS(voter) || "—"],
+    ["Part", getPart(voter) || "—"],
+    ["Serial", !Number.isNaN(getSerialNum(voter)) ? getSerialNum(voter) : (getSerialText(voter) || "—")],
+    ["Age", getAge(voter) || "—"],
+    ["Sex", getGender(voter) || "—"],
+    ["House", getHouseNo(voter) || "—"],
+    ["C/O", getCareOf(voter) || "—"],
+    ["Mobile", getMobile(voter) || "—"],
+  ];
+  const shareText = buildShareText(voter);
+
+  const mob = getMobile(voter);
+  const waUrl = mob
+    ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+    : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+  return (
+    <div className="sx-modal" onClick={() => onClose(false)}>
+      <div className="sx-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="sx-dialog-head">
+          <div className="sx-title">Record details</div>
+          <button className="sx-icon" onClick={() => onClose(false)}>✕</button>
+        </div>
+        <div className="sx-dialog-body">
+          {fields.map(([k, v]) => (
+            <div className="sx-row" key={k}>
+              <span className="sx-k">{k}</span>
+              <span className="sx-v">{String(v)}</span>
+            </div>
+          ))}
+          <textarea className="sx-textarea" readOnly value={shareText} />
+        </div>
+        <div className="sx-dialog-foot">
+          <a className="sx-btn primary" href={waUrl} target="_blank" rel="noreferrer">
+            Share on WhatsApp
+          </a>
+          <button className="sx-btn ghost" onClick={() => onClose(false)}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Click-outside helper for the top menu ---------------- */
 function useClickOutside(ref, onOutside) {
   useEffect(() => {
@@ -184,6 +281,15 @@ export default function Search() {
     if (t) setAuthToken(t);
   }, []);
 
+  const [userName, setUserName] = useState("User");
+  useEffect(() => {
+    // flexible sources; adjust to your app if needed
+    const u = localStorage.getItem("userName") ||
+              localStorage.getItem("name") ||
+              JSON.parse(localStorage.getItem("user") || "{}").name;
+    if (u) setUserName(u);
+  }, []);
+
   const [voiceLang, setVoiceLang] = useState("mr-IN");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -195,6 +301,7 @@ export default function Search() {
   const [busy, setBusy] = useState(false);
 
   const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
   const sentinelRef = useRef(null);
 
   const logout = () => {
@@ -202,7 +309,6 @@ export default function Search() {
     location.href = "/login";
   };
 
-  // Load ALL from IndexedDB, **sorted by Serial Number only**
   const loadAll = useCallback(async () => {
     const arr = await db.voters.toArray();
     arr.sort((a, b) => {
@@ -211,18 +317,15 @@ export default function Search() {
       const aNaN = Number.isNaN(sa);
       const bNaN = Number.isNaN(sb);
       if (aNaN && bNaN) return 0;
-      if (aNaN) return 1; // NaNs to end
+      if (aNaN) return 1;
       if (bNaN) return -1;
       return sa - sb;
     });
     setAllRows(arr);
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Filter locally by name/epic/mobile (order preserved after filter)
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return allRows;
@@ -233,7 +336,6 @@ export default function Search() {
       const rps = (getRPS(r) || "").toLowerCase();
       const part = (getPart(r) || "").toLowerCase();
       const serialTxt = String(getSerialText(r) ?? "").toLowerCase();
-
       return (
         name.includes(term) ||
         epic.includes(term) ||
@@ -247,15 +349,12 @@ export default function Search() {
 
   useEffect(() => setVisibleCount(200), [q]);
 
-  // Infinite scroll
   useEffect(() => {
     if (!sentinelRef.current) return;
     const el = sentinelRef.current;
     const io = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
-        setVisibleCount((c) =>
-          Math.min(c + 300, filtered.length || c + 300)
-        );
+        setVisibleCount((c) => Math.min(c + 300, filtered.length || c + 300));
       }
     });
     io.observe(el);
@@ -281,67 +380,68 @@ export default function Search() {
 
   return (
     <div className="sx-page">
-      {/* Top Appbar — titles removed */}
-      <header className="sx-appbar">
-        <div className="sx-appbar__brand">
-          <button
-            className="sx-appbar__icon"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Open quick settings"
-            type="button"
-          >
-            ☰
-          </button>
-        </div>
+      {/* Top Appbar: username after toggle, then pull+push */}
+      <header className="sx-appbar sx-appbar--single">
+  <div className="sx-left">
+    <button
+      className="sx-appbar__icon"
+      onClick={() => setMenuOpen((v) => !v)}
+      aria-label="Menu"
+      type="button"
+    >
+      ☰
+    </button>
+    <span className="sx-username" title={userName}>{userName}</span>
+  </div>
 
-        <div className="sx-appbar__actions">
-          <button
-            className="sx-appbar__action"
-            type="button"
-            aria-label="Pull"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                const c = await pullAll();
-                alert(`Pulled ${c} changes from server.`);
-                await loadAll();
-              } catch (e) {
-                alert("Pull failed: " + (e?.message || e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            ⬇
-          </button>
-          <button
-            className="sx-appbar__action"
-            type="button"
-            aria-label="Push"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                const res = await pushOutbox();
-                alert(
-                  `Pushed: ${res.pushed}${
-                    res.failed?.length ? `, Failed: ${res.failed.length}` : ""
-                  }`
-                );
-              } catch (e) {
-                alert("Push failed: " + (e?.message || e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            ⬆
-          </button>
-        </div>
-      </header>
+  <div className="sx-right">
+    <button
+      className="sx-appbar__action"
+      type="button"
+      aria-label="Pull"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const c = await pullAll();
+          alert(`Pulled ${c} changes from server.`);
+          await loadAll();
+        } catch (e) {
+          alert("Pull failed: " + (e?.message || e));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      ⬇
+    </button>
+    <button
+      className="sx-appbar__action"
+      type="button"
+      aria-label="Push"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await pushOutbox();
+          alert(
+            `Pushed: ${res.pushed}${
+              res.failed?.length ? `, Failed: ${res.failed.length}` : ""
+            }`
+          );
+        } catch (e) {
+          alert("Push failed: " + (e?.message || e));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      ⬆
+    </button>
+  </div>
+</header>
 
-      {/* Slide-down settings sheet */}
+
       {menuOpen && (
         <div ref={menuRef} className="sx-menu-sheet">
           <label className="field">
@@ -364,7 +464,7 @@ export default function Search() {
         </div>
       )}
 
-      {/* Search bar below navbar */}
+      {/* Search bar */}
       <div className="sx-toolbar">
         <input
           className="sx-search-input"
@@ -391,7 +491,7 @@ export default function Search() {
         </button>
       </div>
 
-      {/* Content */}
+      {/* Content, with bottom padding for fixed footer */}
       <main className="sx-body sx-body--with-footer">
         <section className="sx-content">
           <div className="sx-cards sx-cards--compact">
@@ -403,8 +503,13 @@ export default function Search() {
               const gender = getGender(r);
               const mob = getMobile(r);
 
+              const shareText = buildShareText(r);
+              const waHref = mob
+                ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+                : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
               return (
-                <div className="sx-card sx-card--tiny" key={r._id || `${i}-${serialTxt}`}>
+                <div className="sx-card sx-card--readable" key={r._id || `${i}-${serialTxt}`}>
                   {/* Row 1: Serial · Age · Sex · Edit */}
                   <div className="sx-row-compact">
                     <div className="sx-serial-pill">
@@ -414,7 +519,7 @@ export default function Search() {
                     <div className="sx-mini">{gender || "—"}</div>
                     <button
                       className="sx-mini-btn"
-                      onClick={() => setSelected(r)}
+                      onClick={(e) => { e.stopPropagation(); setSelected(r); }}
                       title={mob ? "Edit mobile" : "Add mobile"}
                       type="button"
                     >
@@ -422,29 +527,58 @@ export default function Search() {
                     </button>
                   </div>
 
-                  {/* Row 2: Name ...................... phone/+ */}
+                  {/* Row 2: Name ...................... phone / whatsapp / + */}
                   <div className="sx-row-compact">
-                    <div className="sx-name-compact" title={name}>
+                    <button
+                      className="sx-name-compact sx-name-button"
+                      title={name}
+                      onClick={() => setDetail(r)}
+                      type="button"
+                    >
                       {name}
-                    </div>
+                    </button>
+
                     {mob ? (
-                      <a
-                        className="sx-mini-btn"
-                        href={`tel:${mob}`}
-                        onClick={(e) => e.stopPropagation()}
-                        title={`Call ${mob}`}
-                      >
-                        📞
-                      </a>
+                      <>
+                        <a
+                          className="sx-mini-btn"
+                          href={`tel:${mob}`}
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Call ${mob}`}
+                        >
+                          📞
+                        </a>
+                        <a
+                          className="sx-mini-btn"
+                          href={waHref}
+                          onClick={(e) => e.stopPropagation()}
+                          title="WhatsApp"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          🟢
+                        </a>
+                      </>
                     ) : (
-                      <button
-                        className="sx-mini-btn"
-                        title="Add mobile"
-                        onClick={() => setSelected(r)}
-                        type="button"
-                      >
-                        ＋
-                      </button>
+                      <>
+                        {/* WhatsApp without number → open composer to pick a contact */}
+                        <a
+                          className="sx-mini-btn"
+                          href={waHref}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Share to WhatsApp"
+                        >
+                          🟢
+                        </a>
+                        <button
+                          className="sx-mini-btn"
+                          title="Add mobile"
+                          onClick={(e) => { e.stopPropagation(); setSelected(r); }}
+                          type="button"
+                        >
+                          ＋
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -456,34 +590,17 @@ export default function Search() {
         </section>
       </main>
 
-      {/* Fixed bottom footer stats (mobile responsive) */}
-      <footer className="sx-footer-stats">
-        <div className="sx-footer-stat">
-          <span className="k">Visible</span>
-          <strong className="v">{visibleTotal.toLocaleString()}</strong>
-        </div>
-        <div className="sx-footer-stat">
-          <span className="k">Matches</span>
-          <strong className="v">{matchedTotal.toLocaleString()}</strong>
-        </div>
-        <div className="sx-footer-stat">
-          <span className="k">Synced</span>
-          <strong className="v">{syncedTotal.toLocaleString()}</strong>
-        </div>
-        <div className="sx-footer-stat">
-          <span className="k">Male</span>
-          <strong className="v">{male.toLocaleString()}</strong>
-        </div>
-        <div className="sx-footer-stat">
-          <span className="k">Female</span>
-          <strong className="v">{female.toLocaleString()}</strong>
-        </div>
-        <div className="sx-footer-stat">
-          <span className="k">Total</span>
-          <strong className="v">{total.toLocaleString()}</strong>
-        </div>
+      {/* Fixed bottom footer stats: all 6 in ONE row */}
+      <footer className="sx-footer-stats sx-footer--one-row">
+        <div className="sx-footer-stat"><span className="k">Visible</span><strong className="v">{visibleTotal.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Matches</span><strong className="v">{matchedTotal.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Synced</span><strong className="v">{syncedTotal.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Male</span><strong className="v">{male.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Female</span><strong className="v">{female.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Total</span><strong className="v">{total.toLocaleString()}</strong></div>
       </footer>
 
+      {/* Modals */}
       <MobileEditModal
         open={!!selected}
         voter={selected}
@@ -492,8 +609,12 @@ export default function Search() {
           if (ok) await loadAll();
         }}
       />
+      <RecordModal
+        open={!!detail}
+        voter={detail}
+        onClose={() => setDetail(null)}
+      />
 
-      {/* Lift it a bit so it doesn't clash with the fixed footer */}
       <PWAInstallPrompt bottom={90} />
     </div>
   );

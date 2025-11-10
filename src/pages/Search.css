@@ -1,110 +1,201 @@
-/* Make room for fixed footer (approx height incl. safe area) */
+/* Space for fixed footer */
 .sx-body--with-footer {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Fixed bottom stats bar */
+/* Appbar: username next to toggle */
+.sx-username {
+  margin-left: 8px;
+  font-weight: 600;
+  max-width: 40vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer: force single row with horizontal scroll if needed */
 .sx-footer-stats {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 0; right: 0; bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
-  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
-  background: #ffffff;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: #fff;
   border-top: 1px solid #eee;
+  overflow-x: auto; /* keep in a single row even on tiny screens */
+  -webkit-overflow-scrolling: touch;
 }
+.sx-footer-stats::-webkit-scrollbar { display: none; }
 
-/* Compact items inside footer */
 .sx-footer-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 1.05;
+  min-width: 72px; /* ensure tappable width */
   font-size: 11px;
+  line-height: 1.05;
   white-space: nowrap;
 }
-.sx-footer-stat .k { color: #64748b; }     /* label */
-.sx-footer-stat .v { font-size: 12px; }    /* value */
+.sx-footer-stat .k { color: #64748b; }
+.sx-footer-stat .v { font-size: 12px; }
 
-/* Mobile responsiveness: switch to 3x2 grid on narrow screens */
-@media (max-width: 420px) {
-  .sx-footer-stats {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* Even narrower: 2x3 if needed */
-@media (max-width: 330px) {
-  .sx-footer-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* --- existing compact card helpers (from earlier message) --- */
+/* Compact cards but slightly bigger for readability */
 .sx-cards.sx-cards--compact {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
-  padding: 8px 8px 12px;
+  gap: 8px;
+  padding: 10px 10px 14px;
 }
-.sx-card.sx-card--tiny {
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--sx-border, #e7e7e7);
+.sx-card.sx-card--readable {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--sx-border, #e6e6e6);
   background: var(--sx-card, #fff);
 }
+
 .sx-row-compact {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 18px;
-  line-height: 18px;
+  gap: 10px;
+  min-height: 20px;
+  line-height: 20px;
 }
+
 .sx-serial-pill {
   font-weight: 700;
-  font-size: 12px;
-  padding: 1px 6px;
+  font-size: 13px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: #eef2ff;
   color: #334155;
 }
-.sx-mini,
-.sx-mini-btn { font-size: 12px; }
+
+.sx-mini, .sx-mini-btn { font-size: 13px; }
 .sx-mini-btn {
-  padding: 0 6px;
-  line-height: 18px;
-  border-radius: 8px;
+  padding: 0 8px;
+  line-height: 20px;
+  border-radius: 9px;
   border: 1px solid transparent;
   background: transparent;
 }
 .sx-mini-btn:active { transform: scale(0.98); }
+
+/* Name becomes a button to open details modal */
 .sx-name-compact {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1 1 auto;
 }
+.sx-name-button {
+  all: unset;
+  cursor: pointer;
+  display: inline-block;
+  width: 100%;
+}
+.sx-name-button:active { opacity: 0.8; }
 
-/* Top search toolbar */
+/* Toolbar (search row) */
 .sx-toolbar {
   display: flex;
   gap: 6px;
-  padding: 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--sx-border, #eee);
 }
 .sx-search-input {
   flex: 1 1 auto;
-  height: 34px;
+  height: 36px;
   padding: 0 10px;
 }
 .sx-search-action {
-  height: 34px;
-  min-width: 34px;
+  height: 36px;
+  min-width: 36px;
   border-radius: 8px;
+}
+
+/* Dialog textarea for share preview */
+.sx-textarea {
+  width: 100%;
+  min-height: 100px;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+/* Make the appbar a single neat row */
+.sx-appbar.sx-appbar--single {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.sx-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sx-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Menu icon */
+.sx-appbar__icon {
+  font-size: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Username next to menu */
+.sx-username {
+  font-weight: 600;
+  font-size: 15px;
+  color: #111;
+  max-width: 45vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pull/Push buttons */
+.sx-appbar__action {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.sx-appbar__action:active {
+  transform: scale(0.9);
+}
+
+/* Mobile responsive spacing */
+@media (max-width: 480px) {
+  .sx-appbar.sx-appbar--single {
+    padding: 6px 10px;
+  }
+  .sx-username {
+    font-size: 14px;
+    max-width: 40vw;
+  }
+  .sx-appbar__icon, .sx-appbar__action {
+    font-size: 18px;
+  }
 }
