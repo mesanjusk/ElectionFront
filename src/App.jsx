@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
+import AdminHome from './pages/AdminHome.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 export default function App() {
@@ -17,6 +18,14 @@ export default function App() {
         element={(
           <ProtectedRoute>
             <Home />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin"
+        element={(
+          <ProtectedRoute requiredRole="admin">
+            <AdminHome />
           </ProtectedRoute>
         )}
       />
