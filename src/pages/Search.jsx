@@ -272,9 +272,16 @@ export default function Search() {
 
   const visible = filtered.slice(0, visibleCount);
 
-  // Stats (current window)
-  const male = visible.reduce((n, r) => (getGender(r) === "M" ? n + 1 : n), 0);
-  const female = visible.reduce((n, r) => (getGender(r) === "F" ? n + 1 : n), 0);
+  const { male, female, total } = useMemo(() => {
+    let maleCount = 0;
+    let femaleCount = 0;
+    for (const row of filtered) {
+      const g = getGender(row);
+      if (g === "M") maleCount += 1;
+      else if (g === "F") femaleCount += 1;
+    }
+    return { male: maleCount, female: femaleCount, total: filtered.length };
+  }, [filtered]);
 
   const visibleTotal = visible.length;
   const matchedTotal = filtered.length;
@@ -361,18 +368,20 @@ export default function Search() {
               const name = getName(r);
               const epic = getEPIC(r);
               const rps = getRPS(r);
-            const part = getPart(r);
-            const serialTxt = getSerialText(r);
-            const serialNum = getSerialNum(r);
-            const house = getHouseNo(r);
-            const age = getAge(r);
-            const gender = getGender(r);
-            const mob = getMobile(r);
+              const part = getPart(r);
+              const serialTxt = getSerialText(r);
+              const serialNum = getSerialNum(r);
+              const house = getHouseNo(r);
+              const age = getAge(r);
+              const gender = getGender(r);
+              const mob = getMobile(r);
 
-            const topRight = [
-              epic || null,
-              rps || (part && !Number.isNaN(serialNum) ? `${part}/${serialNum}` : part || null),
-            ].filter(Boolean).join("   ");
+              const topRight = [
+                epic || null,
+                rps || (part && !Number.isNaN(serialNum) ? `${part}/${serialNum}` : part || null),
+              ]
+                .filter(Boolean)
+                .join("   ");
 
               return (
                 <div className="sx-card" key={r._id || `${i}-${epic}`}>
@@ -417,6 +426,12 @@ export default function Search() {
                     <div className="sx-row">
                       <span className="sx-k">R/P/S</span>
                       <span className="sx-v">{rps}</span>
+                    </div>
+                  ) : null}
+                  {house ? (
+                    <div className="sx-row">
+                      <span className="sx-k">House</span>
+                      <span className="sx-v">{house}</span>
                     </div>
                   ) : null}
                   <div className="sx-row">
@@ -492,7 +507,7 @@ export default function Search() {
             Female<strong>{female.toLocaleString()}</strong>
           </div>
           <div className="sx-bottom-bar__stat">
-            Total<strong>{visibleTotal.toLocaleString()}</strong>
+            Total<strong>{total.toLocaleString()}</strong>
           </div>
         </div>
         <div className="sx-bottom-bar__search">

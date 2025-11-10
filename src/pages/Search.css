@@ -165,7 +165,7 @@
 }
 
 .sx-card {
-  width: min(100%, 360px);
+  width: min(100%, 320px);
   background: var(--sx-surface);
   border: 1px solid var(--sx-border);
   border-radius: 20px;
@@ -466,7 +466,7 @@
 
 @media (min-width: 480px) {
   .sx-card {
-    width: min(100%, 420px);
+    width: min(100%, 360px);
   }
 
   .sx-fab-wrap {
