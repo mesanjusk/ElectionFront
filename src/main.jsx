@@ -7,7 +7,9 @@ import {
   redirect,
 } from 'react-router-dom';
 import Login from './pages/Login.jsx';
+import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
+import AdminHome from './pages/AdminHome.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import './styles/theme.css';
 
@@ -18,7 +20,23 @@ const router = createBrowserRouter(
       path: '/',
       element: (
         <ProtectedRoute>
+          <Home />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/search',
+      element: (
+        <ProtectedRoute>
           <Search />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/admin',
+      element: (
+        <ProtectedRoute requiredRole="admin">
+          <AdminHome />
         </ProtectedRoute>
       ),
     },
@@ -32,10 +50,7 @@ const router = createBrowserRouter(
   }
 );
 
-
-
 function RootApp() {
- 
   return <RouterProvider router={router} />;
 }
 
