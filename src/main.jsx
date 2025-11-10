@@ -1,5 +1,5 @@
 // client/src/main.jsx
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -32,47 +32,10 @@ const router = createBrowserRouter(
   }
 );
 
-const MOBILE_UA_REGEX = /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i;
 
-function isMobileDevice() {
-  if (typeof window === 'undefined') return true;
-  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
-  if (MOBILE_UA_REGEX.test(ua)) {
-    return true;
-  }
-  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isNarrow = window.innerWidth <= 900;
-  return isTouch && isNarrow;
-}
 
 function RootApp() {
-  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
-
-  useEffect(() => {
-    const update = () => setIsMobile(isMobileDevice());
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('orientationchange', update);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('orientationchange', update);
-    };
-  }, []);
-
-  if (!isMobile) {
-    return (
-      <div className="mobile-only" role="alert" aria-live="assertive">
-        <div className="mobile-only__card">
-          <h1 className="mobile-only__title">Mobile device required</h1>
-          <p className="mobile-only__body">
-            This application is optimised for mobile field agents and is only available on
-            mobile browsers. Please open the app from an Android or iOS device to continue.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
+ 
   return <RouterProvider router={router} />;
 }
 
