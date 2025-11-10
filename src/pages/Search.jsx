@@ -4,8 +4,11 @@ import api from "../api";
 import { clearToken } from "../auth";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
-import AdminUsers from "./AdminUsers.jsx";
+import AdminUsers from "./AdminUsers.jsx"; // (kept if you show it elsewhere)
 import "./Search.css";
+
+// NEW: offline helpers
+import { searchOffline, upsertVoters } from "../offline/db";
 
 /* ---------- helpers for mixed EN/MR datasets ---------- */
 const pick = (obj, keys) => {
@@ -15,10 +18,10 @@ const pick = (obj, keys) => {
 const getName = (r) =>
   pick(r, ["name", "Name"]) || pick(r?.__raw || {}, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) || "—";
 const getEPIC = (r) => pick(r, ["voter_id", "EPIC"]) || pick(r?.__raw || {}, ["EPIC", "कार्ड नं"]) || "";
-const getPart = (r) => pick(r?.__raw || {}, ["भाग नं.", "Part No", "Part", "Booth"]) || "";
+const getPart = (r) => pick(r?.__raw || {}, ["भाग नं.", "Part No", "Part", "Booth"]) || (r?.Booth ?? "");
 const getSerial = (r) => pick(r?.__raw || {}, ["अनु. नं.", "Serial No", "Serial", "Sr No"]) || "";
 const getGender = (r) => {
-  const g = (pick(r?.__raw || {}, ["Gender", "gender", "लिंग"]) || r.gender || r.Gender || "")
+  const g = (pick(r?.__raw || {}, ["Gender", "gender", "লিংগ", "लिंग"]) || r.gender || r.Gender || "")
     .toString()
     .toLowerCase();
   if (!g) return "";
@@ -47,29 +50,6 @@ const normalizePhoneInput = (raw) => {
 };
 
 const getId = (r) => r?._id || r?.id || r?.__raw?._id || r?.__raw?.id || "";
-
-/* ---------- client-side scoring for sorting ---------- */
-function scoreRecord(r, q) {
-  if (!q) return 0;
-  const s = String(q).toLowerCase();
-  const fields = [
-    getName(r),
-    r.voter_id || r?.__raw?.voter_id || "",
-    r.EPIC || r?.__raw?.EPIC || "",
-    (r.Booth ?? ""),
-    (r.Address ?? ""),
-    (r.Gender ?? ""),
-    (r.Age ?? ""),
-  ].map((x) => String(x || "").toLowerCase());
-  let score = 0;
-  for (const f of fields) {
-    if (!f) continue;
-    if (f === s) score += 100;      // exact match
-    if (f.startsWith(s)) score += 30;
-    if (f.includes(s)) score += 10;
-  }
-  return score;
-}
 
 /* ---------- small util: normalize axios/network errors ---------- */
 function getReadableError(err) {
@@ -398,16 +378,18 @@ function useClickOutside(ref, onOutside) {
   }, [ref, onOutside]);
 }
 
+/* ==================== MAIN PAGE (OFFLINE-FIRST) ==================== */
 export default function Search() {
   // Search + UI state
   const [q, setQ] = useState("");
-  const [rows, setRows] = useState([]);          // <- keep originals
-  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState([]);
+  const [loadingOffline, setLoadingOffline] = useState(false);
+  const [loadingOnline, setLoadingOnline] = useState(false);
   const [errMsg, setErrMsg] = useState("");
 
-  // Keep these if your UI uses them (ResultCard uses page/limit to display index)
-  const [page, setPage] = useState(1);
-  const [limit] = useState(20);                  // no pagination now; just used for display
+  // page index used only for index display
+  const [page] = useState(1);
+  const [limit] = useState(20);
   const [total, setTotal] = useState(0);
 
   const [voiceLang, setVoiceLang] = useState("mr-IN");
@@ -430,73 +412,62 @@ export default function Search() {
     setSelectedRecord(null);
   };
 
-  /* ------------ Load ALL once, then filter & sort locally ------------ */
-  const [allRows, setAllRows] = useState([]);
-
-  const loadAll = useCallback(async () => {
-    const { data } = await api.get("/api/voters/all");
-    const list = data?.results || data || [];
-    setAllRows(list);
-    return list;
-  }, []);
-
-  const recompute = useCallback(
-    (list, q) => {
-      const L = list ?? allRows;
-      const query = (q ?? trimmedQuery).trim();
-
-      if (!query) {
-        const out = [...L];
-        setRows(out);
-        setTotal(out.length);
-        return;
-      }
-
-      const withScore = L.map((r) => ({ r, s: scoreRecord(r, query) }));
-      withScore.sort((a, b) => b.s - a.s);
-      const out = withScore.map((x) => x.r);
-
-      setRows(out);
-      setTotal(out.length);
-    },
-    [allRows, trimmedQuery, setRows, setTotal]
-  );
-
-  const search = useCallback(
-    async () => {
-      setLoading(true);
-      setErrMsg("");
-      try {
-        const list = allRows.length ? allRows : await loadAll();
-        recompute(list, trimmedQuery);
-      } catch (err) {
-        console.error("Search failed:", err);
-        setRows([]);
-        setTotal(0);
-        setErrMsg(getReadableError(err));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [allRows, loadAll, recompute, trimmedQuery, setRows, setTotal]
-  );
-
-  useEffect(() => {
+  /* ------------ 1) OFFLINE instant results from IndexedDB ------------ */
+  const doOfflineSearch = useCallback(async () => {
+    setErrMsg("");
     if (!shouldSearch) {
-      setLoading(false);
       setRows([]);
       setTotal(0);
-      setErrMsg("");
       return;
     }
-    const id = setTimeout(search, 240);
-    return () => clearTimeout(id);
-  }, [shouldSearch, search, trimmedQuery]);
+    setLoadingOffline(true);
+    try {
+      const res = await searchOffline({ q: trimmedQuery, page: 1, limit });
+      const items = res?.items || [];
+      setRows(items);
+      setTotal(items.length); // offline count for the page; total unknown without full scan
+    } catch (err) {
+      // do not block UI; just show message
+      setErrMsg(getReadableError(err));
+      setRows([]);
+      setTotal(0);
+    } finally {
+      setLoadingOffline(false);
+    }
+  }, [shouldSearch, trimmedQuery, limit]);
 
+  /* ------------ 2) ONLINE refresh (if connected) ------------ */
+  const doOnlineRefresh = useCallback(async () => {
+    if (!shouldSearch || !navigator.onLine) return;
+    setLoadingOnline(true);
+    try {
+      const { data } = await api.get("/api/voters/search", {
+        params: { q: trimmedQuery, page: 1, limit },
+      });
+      const fresh = data?.items || data?.results || data || [];
+      if (Array.isArray(fresh) && fresh.length) {
+        await upsertVoters(fresh); // keep cache warm
+        setRows(fresh);
+        setTotal(typeof data?.total === "number" ? data.total : fresh.length);
+      }
+    } catch (err) {
+      // Ignore network errors; offline results are already shown
+      // Optionally display a subtle hint:
+      // setErrMsg(prev => prev || getReadableError(err));
+    } finally {
+      setLoadingOnline(false);
+    }
+  }, [shouldSearch, trimmedQuery, limit]);
+
+  // Debounced trigger when query changes
   useEffect(() => {
-    setPage(1);
-  }, [q]);
+    const t = setTimeout(() => {
+      doOfflineSearch().then(() => doOnlineRefresh());
+    }, 200);
+    return () => clearTimeout(t);
+  }, [doOfflineSearch, doOnlineRefresh, trimmedQuery]);
 
+  // Gender counts from current rows
   const male = rows.reduce((n, r) => (getGender(r) === "M" ? n + 1 : n), 0);
   const female = rows.reduce((n, r) => (getGender(r) === "F" ? n + 1 : n), 0);
 
@@ -505,7 +476,7 @@ export default function Search() {
     window.location.href = "/login";
   };
 
-  // Merge updated phone into row (in DB-only fields + mirror in __raw for consistency)
+  // Merge updated phone into UI row (and mirror __raw keys commonly used)
   const handlePhoneSaved = (rowIndex, newMobile, serverData) => {
     setRows((prev) => {
       const next = [...prev];
@@ -527,6 +498,12 @@ export default function Search() {
       return next;
     });
   };
+
+  const subtitle = useMemo(() => {
+    if (loadingOffline) return "Loading offline…";
+    if (loadingOnline) return "Refreshing from server…";
+    return "";
+  }, [loadingOffline, loadingOnline]);
 
   return (
     <div className="app-shell" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -617,7 +594,7 @@ export default function Search() {
               onResult={setQ}
               lang={voiceLang}
               className="icon-button"
-              disabled={loading}
+              disabled={loadingOffline || loadingOnline}
             />
           </div>
 
@@ -638,10 +615,11 @@ export default function Search() {
       {/* ---------- MAIN CONTENT (records) ---------- */}
       <main className="app-content" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <section className="panel search-panel" aria-labelledby="search-panel-title" style={{ paddingBottom: 8 }}>
-          <div className="panel__header">
+          <div className="panel__header" style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <h1 className="panel__title" id="search-panel-title">
               {/* blank to save vertical space */}
             </h1>
+            {subtitle ? <span style={{ fontSize: 12, opacity: 0.7 }}>— {subtitle}</span> : null}
           </div>
 
           {errMsg ? (
@@ -656,7 +634,7 @@ export default function Search() {
           <div className="results-list">
             {rows.map((r, i) => (
               <ResultCard
-                key={i}
+                key={r.id || i}
                 r={r}
                 index={i}
                 page={page}
@@ -665,7 +643,7 @@ export default function Search() {
                 onPhoneSaved={handlePhoneSaved}
               />
             ))}
-            {!rows.length && shouldSearch && !loading && !errMsg && (
+            {!rows.length && shouldSearch && !loadingOffline && !loadingOnline && !errMsg && (
               <div className="empty-state">No results yet. Try refining your search.</div>
             )}
           </div>
@@ -706,11 +684,9 @@ export default function Search() {
               Total: <strong>{total}</strong>
             </span>
             <span className="meta-row__count" style={{ marginLeft: 6 }}>
-              {loading ? "Searching…" : ""}
+              {loadingOffline || loadingOnline ? "Searching…" : ""}
             </span>
           </div>
-
-          {/* Center: (pagination removed) */}
         </div>
       </footer>
 
