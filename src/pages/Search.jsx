@@ -47,11 +47,17 @@ const getPart = (r) =>
   "";
 
 /* Serial (text & numeric) */
-const getSerialText = (r) =>
-  // include top-level "Serial No" (with space) because some datasets store it exactly like that
-  pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
-  pick(r?.__raw, ["Serial No", "Serial", "Sr No", "SrNo", "अनु. नं.", "अनुक्रमांक", "अनुक्रमांक नं."]) ||
-  "";
+const getSerialText = (r) => {
+  const v =
+    // include top-level "Serial No" as well
+    pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
+    pick(r?.__raw, ["Serial No", "Serial", "Sr No", "SrNo", "अनु. नं.", "अनुक्रमांक", "अनुक्रमांक नं."]) ||
+    "";
+
+  // force string (covers numbers, objects, null/undefined)
+  return v == null ? "" : String(v);
+};
+
 const num = (s) => {
   const m = String(s || "").match(/\d+/g);
   if (!m) return NaN;
@@ -243,7 +249,8 @@ export default function Search() {
       const mob = (getMobile(r) || "").toLowerCase();
       const rps = (getRPS(r) || "").toLowerCase();
       const part = (getPart(r) || "").toLowerCase();
-      const serialTxt = (getSerialText(r) || "").toLowerCase();
+      const serialTxt = String(getSerialText(r) ?? "").toLowerCase();
+
       return (
         name.includes(term) ||
         epic.includes(term) ||
