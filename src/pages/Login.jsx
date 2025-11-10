@@ -49,15 +49,15 @@ export default function Login() {
       <div className="card auth-card login-card">
         <header className="login-card__header">
           <div className="brand brand--center">
-            <span className="brand__mark">EV</span>
+            <span className="brand__mark">SB</span>
             <div>
-              <span className="brand__title">Election Vision</span>
-              <p className="login-card__tagline">Mobile operations console</p>
+              <span className="brand__title">SMart BOOK</span>
+              <p className="login-card__tagline">Manage Voters Data</p>
             </div>
           </div>
-          <h1 className="login-card__title">Welcome back</h1>
+          
           <p className="login-card__subtitle">
-            Sign in to refresh your offline voter database and continue field work anywhere.
+          
           </p>
         </header>
 
@@ -101,7 +101,7 @@ export default function Login() {
             <span className="login-progress__label">Downloading {progress.toLocaleString()} records…</span>
           </div>
         ) : (
-          <p className="login-card__hint">Offline sync keeps every booth list accessible even without network.</p>
+          <p className="login-card__hint"></p>
         )}
       </div>
     </div>
