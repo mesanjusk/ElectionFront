@@ -49,26 +49,30 @@ const getPart = (r) =>
 /* Serial (text & numeric) */
 const getSerialText = (r) => {
   const v =
-    // include top-level "Serial No" as well
     pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
-    pick(r?.__raw, ["Serial No", "Serial", "Sr No", "SrNo", "अनु. नं.", "अनुक्रमांक", "अनुक्रमांक नं."]) ||
+    pick(r?.__raw, [
+      "Serial No",
+      "Serial",
+      "Sr No",
+      "SrNo",
+      "अनु. नं.",
+      "अनुक्रमांक",
+      "अनुक्रमांक नं.",
+    ]) ||
     "";
-
-  // force string (covers numbers, objects, null/undefined)
   return v == null ? "" : String(v);
 };
 
 const num = (s) => {
   const m = String(s || "").match(/\d+/g);
   if (!m) return NaN;
-  // prefer last number token (handles "अनु. नं. 514")
   const n = parseInt(m[m.length - 1], 10);
   return Number.isNaN(n) ? NaN : n;
 };
+
 const getSerialNum = (r) => {
   const t = getSerialText(r);
   if (t) return num(t);
-  // sometimes present only inside RPS as roll/part/serial
   const rps = getRPS(r);
   if (rps && /\d+\/\d+\/\d+/.test(rps)) {
     const last = rps.split("/").pop();
@@ -77,17 +81,9 @@ const getSerialNum = (r) => {
   return NaN;
 };
 
-/* House No */
-const getHouseNo = (r) =>
-  pick(r, ["House No", "House", "HouseNumber"]) ||
-  pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
-  "";
-
-/* Age & Gender */
+/* Optional fields kept for future use */
 const getAge = (r) =>
-  pick(r, ["Age", "age"]) ||
-  pick(r?.__raw, ["Age", "age", "वय"]) ||
-  "";
+  pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
 
 const getGender = (r) => {
   const g =
@@ -101,31 +97,7 @@ const getGender = (r) => {
   return s.toUpperCase();
 };
 
-/* Care-of (father/husband/guardian) */
-const getCareOf = (r) =>
-  pick(r, [
-    "Father Name",
-    "Husband Name",
-    "Guardian Name",
-    "CareOf",
-    "C_O",
-    "C/O",
-  ]) ||
-  pick(r?.__raw, [
-    "वडिलांचे नाव",
-    "वडिलांचे नांव",
-    "पतीचे नाव",
-    "पतीचे नांव",
-    "Guardians Name",
-    "Guardian Name",
-    "Father Name",
-    "Father's Name",
-    "Husband Name",
-    "Husband's Name",
-  ]) ||
-  "";
-
-/* Phone (only DB fields, not guessed from __raw) */
+/* Phone (DB fields only) */
 const getMobile = (r) =>
   pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
 const normalizePhone = (raw) => {
@@ -146,12 +118,19 @@ function MobileEditModal({ open, voter, onClose }) {
     <div className="sx-modal" onClick={() => onClose(false)}>
       <div className="sx-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="sx-dialog-head">
-          <div className="sx-title">{getMobile(voter) ? "Edit mobile" : "Add mobile"}</div>
-          <button className="sx-icon" onClick={() => onClose(false)}>✕</button>
+          <div className="sx-title">
+            {getMobile(voter) ? "Edit mobile" : "Add mobile"}
+          </div>
+          <button className="sx-icon" onClick={() => onClose(false)}>
+            ✕
+          </button>
         </div>
         <div className="sx-dialog-body">
           <div className="sx-sub">{getName(voter)}</div>
-          <div className="sx-row"><span className="sx-k">EPIC</span><span className="sx-v">{getEPIC(voter)}</span></div>
+          <div className="sx-row">
+            <span className="sx-k">EPIC</span>
+            <span className="sx-v">{getEPIC(voter)}</span>
+          </div>
           <input
             className="sx-input"
             value={mobile}
@@ -161,7 +140,9 @@ function MobileEditModal({ open, voter, onClose }) {
           />
         </div>
         <div className="sx-dialog-foot">
-          <button className="sx-btn ghost" onClick={() => onClose(false)}>Cancel</button>
+          <button className="sx-btn ghost" onClick={() => onClose(false)}>
+            Cancel
+          </button>
           <button
             className="sx-btn primary"
             onClick={async () => {
@@ -230,14 +211,16 @@ export default function Search() {
       const aNaN = Number.isNaN(sa);
       const bNaN = Number.isNaN(sb);
       if (aNaN && bNaN) return 0;
-      if (aNaN) return 1;     // NaNs go to the end
+      if (aNaN) return 1; // NaNs to end
       if (bNaN) return -1;
       return sa - sb;
     });
     setAllRows(arr);
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // Filter locally by name/epic/mobile (order preserved after filter)
   const filtered = useMemo(() => {
@@ -270,7 +253,9 @@ export default function Search() {
     const el = sentinelRef.current;
     const io = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
-        setVisibleCount((c) => Math.min(c + 300, filtered.length || c + 300));
+        setVisibleCount((c) =>
+          Math.min(c + 300, filtered.length || c + 300)
+        );
       }
     });
     io.observe(el);
@@ -296,6 +281,7 @@ export default function Search() {
 
   return (
     <div className="sx-page">
+      {/* Top Appbar — titles removed */}
       <header className="sx-appbar">
         <div className="sx-appbar__brand">
           <button
@@ -306,31 +292,56 @@ export default function Search() {
           >
             ☰
           </button>
-          <div className="sx-appbar__titles">
-            <h1 className="sx-appbar__title">Voter Explorer</h1>
-            <span className="sx-appbar__meta">Offline • IndexedDB</span>
-          </div>
         </div>
+
         <div className="sx-appbar__actions">
           <button
             className="sx-appbar__action"
             type="button"
-            aria-label="Refresh local records"
+            aria-label="Pull"
             disabled={busy}
             onClick={async () => {
               setBusy(true);
               try {
+                const c = await pullAll();
+                alert(`Pulled ${c} changes from server.`);
                 await loadAll();
+              } catch (e) {
+                alert("Pull failed: " + (e?.message || e));
               } finally {
                 setBusy(false);
               }
             }}
           >
-            ⟳
+            ⬇
+          </button>
+          <button
+            className="sx-appbar__action"
+            type="button"
+            aria-label="Push"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const res = await pushOutbox();
+                alert(
+                  `Pushed: ${res.pushed}${
+                    res.failed?.length ? `, Failed: ${res.failed.length}` : ""
+                  }`
+                );
+              } catch (e) {
+                alert("Push failed: " + (e?.message || e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            ⬆
           </button>
         </div>
       </header>
 
+      {/* Slide-down settings sheet */}
       {menuOpen && (
         <div ref={menuRef} className="sx-menu-sheet">
           <label className="field">
@@ -353,97 +364,88 @@ export default function Search() {
         </div>
       )}
 
-      <main className="sx-body">
-        <section className="sx-glance">
-          <article className="sx-glance-card">
-            <span className="sx-glance-card__label">Visible now</span>
-            <span className="sx-glance-card__value">{visibleTotal.toLocaleString()}</span>
-          </article>
-          <article className="sx-glance-card">
-            <span className="sx-glance-card__label">Matches</span>
-            <span className="sx-glance-card__value">{matchedTotal.toLocaleString()}</span>
-          </article>
-          <article className="sx-glance-card">
-            <span className="sx-glance-card__label">Synced offline</span>
-            <span className="sx-glance-card__value">{syncedTotal.toLocaleString()}</span>
-          </article>
-        </section>
+      {/* Search bar below navbar */}
+      <div className="sx-toolbar">
+        <input
+          className="sx-search-input"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by name, EPIC, booth or phone"
+          autoComplete="off"
+        />
+        <VoiceSearchButton
+          onResult={setQ}
+          lang={voiceLang}
+          className="sx-search-action"
+          disabled={busy}
+          title="Voice search"
+        />
+        <button
+          className="sx-search-action"
+          aria-label="Clear search"
+          onClick={() => setQ("")}
+          disabled={!q}
+          type="button"
+        >
+          ✕
+        </button>
+      </div>
 
+      {/* Content */}
+      <main className="sx-body sx-body--with-footer">
         <section className="sx-content">
-          <div className="sx-cards">
+          <div className="sx-cards sx-cards--compact">
             {visible.map((r, i) => {
               const name = getName(r);
-              const epic = getEPIC(r);
-              const rps = getRPS(r);
-              const part = getPart(r);
               const serialTxt = getSerialText(r);
               const serialNum = getSerialNum(r);
-              const house = getHouseNo(r);
               const age = getAge(r);
               const gender = getGender(r);
               const mob = getMobile(r);
 
-              const topRight = [
-                epic || null,
-                rps || (part && !Number.isNaN(serialNum) ? `${part}/${serialNum}` : part || null),
-              ]
-                .filter(Boolean)
-                .join("   ");
-
               return (
-                <div className="sx-card" key={r._id || `${i}-${epic}`}>
-                  <div className="sx-card-top">
-                    <div className="sx-serial-badge">{!Number.isNaN(serialNum) ? serialNum : serialTxt || "—"}</div>
-                    <div className="sx-topline">{topRight}</div>
+                <div className="sx-card sx-card--tiny" key={r._id || `${i}-${serialTxt}`}>
+                  {/* Row 1: Serial · Age · Sex · Edit */}
+                  <div className="sx-row-compact">
+                    <div className="sx-serial-pill">
+                      {!Number.isNaN(serialNum) ? serialNum : serialTxt || "—"}
+                    </div>
+                    <div className="sx-mini">{age ? `Age ${age}` : "Age —"}</div>
+                    <div className="sx-mini">{gender || "—"}</div>
+                    <button
+                      className="sx-mini-btn"
+                      onClick={() => setSelected(r)}
+                      title={mob ? "Edit mobile" : "Add mobile"}
+                      type="button"
+                    >
+                      ✎
+                    </button>
                   </div>
 
-                  <div className="sx-card-head">
-                    <div className="sx-name" title={name}>{name}</div>
-                    <div className="sx-chip-group">
-                      {mob ? (
-                        <a
-                          className="sx-chip"
-                          href={`tel:${mob}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title={`Call ${mob}`}
-                        >
-                          📞
-                        </a>
-                      ) : null}
+                  {/* Row 2: Name ...................... phone/+ */}
+                  <div className="sx-row-compact">
+                    <div className="sx-name-compact" title={name}>
+                      {name}
+                    </div>
+                    {mob ? (
+                      <a
+                        className="sx-mini-btn"
+                        href={`tel:${mob}`}
+                        onClick={(e) => e.stopPropagation()}
+                        title={`Call ${mob}`}
+                      >
+                        📞
+                      </a>
+                    ) : (
                       <button
-                        className="sx-chip"
+                        className="sx-mini-btn"
+                        title="Add mobile"
                         onClick={() => setSelected(r)}
-                        title={mob ? "Edit mobile" : "Add mobile"}
                         type="button"
                       >
-                        ✎
+                        ＋
                       </button>
-                    </div>
-                  </div>
-
-                  <div className="sx-row"><span className="sx-k">वय</span><span className="sx-v">{age || "—"}</span></div>
-                  <div className="sx-row"><span className="sx-k">लिंग</span><span className="sx-v">{gender || "—"}</span></div>
-                  <div className="sx-row"><span className="sx-k">C/O</span><span className="sx-v">{getCareOf(r) || "—"}</span></div>
-
-                  <div className="sx-row">
-                    <span className="sx-k">EPIC</span>
-                    <span className="sx-v">{epic}</span>
-                  </div>
-                  {rps ? (
-                    <div className="sx-row">
-                      <span className="sx-k">R/P/S</span>
-                      <span className="sx-v">{rps}</span>
-                    </div>
-                  ) : null}
-                  {house ? (
-                    <div className="sx-row">
-                      <span className="sx-k">House</span>
-                      <span className="sx-v">{house}</span>
-                    </div>
-                  ) : null}
-                  <div className="sx-row">
-                    <span className="sx-k">Mobile</span>
-                    <span className="sx-v">{mob ? `📱 ${mob}` : <i>—</i>}</span>
+                    )}
                   </div>
                 </div>
               );
@@ -454,45 +456,33 @@ export default function Search() {
         </section>
       </main>
 
-      <div className="sx-fab-wrap">
-        <button
-          className="sx-fab"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const c = await pullAll();
-              alert(`Pulled ${c} changes from server.`);
-              await loadAll();
-            } catch (e) {
-              alert("Pull failed: " + (e?.message || e));
-            } finally {
-              setBusy(false);
-            }
-          }}
-          type="button"
-        >
-          ⬇ Pull
-        </button>
-        <button
-          className="sx-fab"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const res = await pushOutbox();
-              alert(`Pushed: ${res.pushed}${res.failed?.length ? `, Failed: ${res.failed.length}` : ""}`);
-            } catch (e) {
-              alert("Push failed: " + (e?.message || e));
-            } finally {
-              setBusy(false);
-            }
-          }}
-          type="button"
-        >
-          ⬆ Push
-        </button>
-      </div>
+      {/* Fixed bottom footer stats (mobile responsive) */}
+      <footer className="sx-footer-stats">
+        <div className="sx-footer-stat">
+          <span className="k">Visible</span>
+          <strong className="v">{visibleTotal.toLocaleString()}</strong>
+        </div>
+        <div className="sx-footer-stat">
+          <span className="k">Matches</span>
+          <strong className="v">{matchedTotal.toLocaleString()}</strong>
+        </div>
+        <div className="sx-footer-stat">
+          <span className="k">Synced</span>
+          <strong className="v">{syncedTotal.toLocaleString()}</strong>
+        </div>
+        <div className="sx-footer-stat">
+          <span className="k">Male</span>
+          <strong className="v">{male.toLocaleString()}</strong>
+        </div>
+        <div className="sx-footer-stat">
+          <span className="k">Female</span>
+          <strong className="v">{female.toLocaleString()}</strong>
+        </div>
+        <div className="sx-footer-stat">
+          <span className="k">Total</span>
+          <strong className="v">{total.toLocaleString()}</strong>
+        </div>
+      </footer>
 
       <MobileEditModal
         open={!!selected}
@@ -503,46 +493,8 @@ export default function Search() {
         }}
       />
 
-      <PWAInstallPrompt bottom={150} />
-
-      <footer className="sx-bottom-bar">
-        <div className="sx-bottom-bar__stats">
-          <div className="sx-bottom-bar__stat">
-            Male<strong>{male.toLocaleString()}</strong>
-          </div>
-          <div className="sx-bottom-bar__stat">
-            Female<strong>{female.toLocaleString()}</strong>
-          </div>
-          <div className="sx-bottom-bar__stat">
-            Total<strong>{total.toLocaleString()}</strong>
-          </div>
-        </div>
-        <div className="sx-bottom-bar__search">
-          <input
-            className="sx-search-input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by name, EPIC, booth or phone"
-            autoComplete="off"
-          />
-          <VoiceSearchButton
-            onResult={setQ}
-            lang={voiceLang}
-            className="sx-search-action"
-            disabled={busy}
-            title="Voice search"
-          />
-          <button
-            className="sx-search-action"
-            aria-label="Clear search"
-            onClick={() => setQ("")}
-            disabled={!q}
-            type="button"
-          >
-            ✕
-          </button>
-        </div>
-      </footer>
+      {/* Lift it a bit so it doesn't clash with the fixed footer */}
+      <PWAInstallPrompt bottom={90} />
     </div>
   );
 }
