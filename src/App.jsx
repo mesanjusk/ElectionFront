@@ -25,7 +25,7 @@ export default function App() {
         path="/admin"
         element={(
           <ProtectedRoute requiredRole="admin">
-            <AdminHome />
+         
           </ProtectedRoute>
         )}
       />
@@ -33,6 +33,7 @@ export default function App() {
         path="/search"
         element={(
           <ProtectedRoute>
+            <AdminHome />
             <Search />
           </ProtectedRoute>
         )}

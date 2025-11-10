@@ -592,13 +592,13 @@ export default function Search() {
 
       {/* Fixed bottom footer stats: all 6 in ONE row */}
       <footer className="sx-footer-stats sx-footer--one-row">
-        <div className="sx-footer-stat"><span className="k">Visible</span><strong className="v">{visibleTotal.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Matches</span><strong className="v">{matchedTotal.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Synced</span><strong className="v">{syncedTotal.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Male</span><strong className="v">{male.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Female</span><strong className="v">{female.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Total</span><strong className="v">{total.toLocaleString()}</strong></div>
-      </footer>
+      <div className="sx-footer-stat"><span className="k">Visible</span><strong className="v">{visibleTotal.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Matches</span><strong className="v">{matchedTotal.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Synced</span><strong className="v">{syncedTotal.toLocaleString()}</strong></div>
+        </footer>
 
       {/* Modals */}
       <MobileEditModal
