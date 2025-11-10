@@ -1,27 +1,46 @@
 // client/src/services/sync.js
-import { db, getLastSync, setLastSync } from '../db/indexedDb';
+import { db, getLastSync, setLastSync, clearLastSync } from '../db/indexedDb';
 import { apiExport, apiBulkUpsert } from './api';
+import { getActiveDatabase } from '../auth';
 
-export async function pullAll({ onProgress } = {}) {
-  let since = await getLastSync();
+export async function pullAll({ onProgress, databaseId: explicitDatabaseId } = {}) {
+  const activeDatabase = explicitDatabaseId || getActiveDatabase();
+  const syncKey = activeDatabase ? `lastSync:${activeDatabase}` : 'lastSync';
+
+  let since = await getLastSync(syncKey);
   let page = 1;
   const limit = 5000;
   let total = 0;
 
   while (true) {
-    const { items = [], hasMore = false, serverTime } = await apiExport({ page, limit, since });
+    const { items = [], hasMore = false, serverTime } = await apiExport({
+      page,
+      limit,
+      since,
+      databaseId: activeDatabase || undefined,
+    });
     if (items.length) {
       await db.voters.bulkPut(items);
       total += items.length;
       onProgress?.({ page, batch: items.length, total });
     }
     if (!hasMore) {
-      if (serverTime) await setLastSync(serverTime);
+      if (serverTime) await setLastSync(serverTime, syncKey);
       break;
     }
     page += 1;
   }
   return total;
+}
+
+export async function resetSyncState(databaseId) {
+  await db.voters.clear();
+  await db.outbox.clear();
+  if (databaseId) {
+    await clearLastSync(`lastSync:${databaseId}`);
+  } else {
+    await clearLastSync('lastSync');
+  }
 }
 
 export async function pushOutbox() {

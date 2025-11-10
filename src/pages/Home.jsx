@@ -1,10 +1,52 @@
 // src/pages/Home.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  getUser,
+  getAvailableDatabases,
+  getActiveDatabase,
+  setActiveDatabase,
+} from '../auth';
+import { pullAll, resetSyncState } from '../services/sync';
 
 export default function Home() {
   const [q, setQ] = useState('');
+  const [databases, setDatabases] = useState(() => getAvailableDatabases());
+  const [activeDb, setActiveDb] = useState(() => getActiveDatabase());
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
   const navigate = useNavigate();
+
+  const user = useMemo(() => getUser(), []);
+
+  useEffect(() => {
+    setDatabases(getAvailableDatabases());
+    setActiveDb(getActiveDatabase());
+  }, []);
+
+  const onDatabaseChange = (id) => {
+    setActiveDatabase(id);
+    setActiveDb(id);
+    setSyncMessage('');
+  };
+
+  const syncAssigned = async () => {
+    if (!activeDb) {
+      alert('Select a voter database first.');
+      return;
+    }
+    setSyncing(true);
+    setSyncMessage('');
+    try {
+      await resetSyncState(activeDb);
+      const total = await pullAll({ databaseId: activeDb });
+      setSyncMessage(`Synced ${total} voter records from database ${activeDb}.`);
+    } catch (e) {
+      setSyncMessage(`Sync failed: ${e?.message || e}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const goSearch = (booth = '') => {
     const params = new URLSearchParams();
@@ -25,6 +67,45 @@ export default function Home() {
             <p className="help-text">Field-ready voter lookup</p>
           </div>
         </div>
+        {databases.length > 0 && (
+          <section className="panel" style={{ textAlign: 'left', gap: '1rem' }}>
+            <div className="panel__header">
+              <h2 className="panel__title">Assigned voter access</h2>
+              <p className="panel__subtitle">
+                {user?.role === 'admin'
+                  ? 'Preview your assigned voter databases or switch to test specific regions.'
+                  : 'Choose the voter database assigned to you and pull only those records to your device.'}
+              </p>
+            </div>
+            <label className="field">
+              <span className="field__label">Voter database</span>
+              <select
+                className="select"
+                value={activeDb || ''}
+                onChange={(e) => onDatabaseChange(e.target.value)}
+                disabled={syncing}
+              >
+                <option value="" disabled>
+                  Select a database
+                </option>
+                {databases.map((db) => {
+                  const id = db.id || db._id;
+                  const name = db.name || db.title || db.label || `Database ${id}`;
+                  return (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <button className="btn btn--primary" type="button" onClick={syncAssigned} disabled={syncing}>
+              {syncing ? 'Syncing…' : 'Sync assigned voters'}
+            </button>
+            {syncMessage && <p className="help-text">{syncMessage}</p>}
+          </section>
+        )}
+
         <div className="panel__header">
           <h1 className="panel__title">Find voters instantly</h1>
           <p className="panel__subtitle">

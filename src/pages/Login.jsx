@@ -1,11 +1,12 @@
 // client/src/pages/Login.jsx
 import React, { useState } from 'react';
 import { apiLogin, setAuthToken } from '../services/api';
-import { pullAll } from '../services/sync';
+import { pullAll, resetSyncState } from '../services/sync';
+import { setSession, setActiveDatabase, getActiveDatabase, getAvailableDatabases } from '../auth';
 
 export default function Login() {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -13,18 +14,29 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { token } = await apiLogin({ email, password });
-      localStorage.setItem('token', token);
+      const { token, user, databases = [], activeDatabaseId } = await apiLogin({ email, password });
+      const available = databases.length ? databases : user?.databases || [];
+      setSession({ token, user, databases: available });
       setAuthToken(token);
+      if (activeDatabaseId) setActiveDatabase(activeDatabaseId);
+      const activeDatabase = activeDatabaseId || getActiveDatabase();
+      const storedDatabases = getAvailableDatabases();
+      const firstDatabase = storedDatabases[0];
+      const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
+      if (effectiveDatabase) setActiveDatabase(effectiveDatabase);
+      await resetSyncState(effectiveDatabase);
       let total = 0;
       await pullAll({
+        databaseId: effectiveDatabase,
         onProgress: ({ total: t }) => {
           total = t;
           setProgress(t);
         },
       });
-      alert(`Synced ${total} records to your device. You can now work fully offline.`);
-      window.location.href = '/search';
+      const target = user?.role === 'admin' ? '/admin' : '/';
+      const databaseLabel = effectiveDatabase ? ` from database ${effectiveDatabase}` : '';
+      alert(`Synced ${total} records${databaseLabel} to your device. You can now work fully offline.`);
+      window.location.href = target;
     } catch (err) {
       alert('Login or Sync failed: ' + err.message);
     } finally {

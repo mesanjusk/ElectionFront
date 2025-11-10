@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-export default function AdminUsers() {
+export default function AdminUsers({ onCreated = () => {} }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('operator');
@@ -17,6 +17,7 @@ export default function AdminUsers() {
       setStatus({ type: 'success', text: `Created ${data.user.email} (${data.user.role})` });
       setEmail('');
       setPassword('');
+      onCreated?.(data.user);
     } catch (e) {
       const message = e?.response?.data?.error || 'Unable to create user right now.';
       setStatus({ type: 'error', text: message });

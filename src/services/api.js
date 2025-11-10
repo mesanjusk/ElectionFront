@@ -2,6 +2,10 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 let authToken = null;
+
+const stored = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+if (stored) authToken = stored;
+
 export function setAuthToken(token) {
   authToken = token;
 }
@@ -23,11 +27,18 @@ export async function apiLogin({ email, password }) {
   return http('POST', '/api/auth/login', { email, password });
 }
 
-export async function apiExport({ page = 1, limit = 5000, since = null, signal } = {}) {
+export async function apiExport({
+  page = 1,
+  limit = 5000,
+  since = null,
+  databaseId = null,
+  signal,
+} = {}) {
   const qs = new URLSearchParams();
   qs.set('page', String(page));
   qs.set('limit', String(limit));
   if (since) qs.set('since', since);
+  if (databaseId) qs.set('databaseId', databaseId);
   return http('GET', `/api/voters/export?${qs}`, null, { signal });
 }
 

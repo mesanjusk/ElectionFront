@@ -27,11 +27,15 @@ db.version(1).stores({
   `,
 });
 
-export async function getLastSync() {
-  const row = await db.meta.get('lastSync');
+export async function getLastSync(key = 'lastSync') {
+  const row = await db.meta.get(key);
   return row?.value || null;
 }
 
-export async function setLastSync(value) {
-  await db.meta.put({ key: 'lastSync', value });
+export async function setLastSync(value, key = 'lastSync') {
+  await db.meta.put({ key, value });
+}
+
+export async function clearLastSync(key = 'lastSync') {
+  await db.meta.delete(key);
 }
