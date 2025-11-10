@@ -13,7 +13,9 @@
     "dexie": "^4.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.23.1"
+    "react-router-dom": "^6.23.1",
+    "react-virtualized-auto-sizer": "^1.0.26",
+    "react-window": "^1.8.9"
   },
   "devDependencies": {
     "vite": "^5.4.8"
