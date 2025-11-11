@@ -1,23 +1,83 @@
-import React, { useState } from 'react';
+// client/src/pages/AdminUsers.jsx
+import React, { useEffect, useState } from 'react';
 import api from '../api';
 
 export default function AdminUsers({ onCreated = () => {} }) {
-  const [email, setEmail] = useState('');
+  // no email — use username instead
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('operator');
+
+  // allow assigning DBs at creation
+  const [databases, setDatabases] = useState([]);
+  const [selectedDbIds, setSelectedDbIds] = useState([]);
+
   const [status, setStatus] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
+  const [loadingDbs, setLoadingDbs] = useState(true);
+
+  useEffect(() => {
+    // load available databases (collections like "Gondia 01", "Gondia 02", ...)
+    const load = async () => {
+      try {
+        const { data } = await api.get('/api/admin/databases');
+        setDatabases(data?.databases || []);
+      } catch (e) {
+        setStatus({
+          type: 'error',
+          text: e?.response?.data?.error || 'Unable to load voter databases.',
+        });
+      } finally {
+        setLoadingDbs(false);
+      }
+    };
+    load();
+  }, []);
+
+  const toggleDb = (id, checked) => {
+    setSelectedDbIds((prev) => {
+      const s = new Set(prev);
+      checked ? s.add(id) : s.delete(id);
+      return Array.from(s);
+    });
+  };
 
   const create = async (e) => {
     e.preventDefault();
     setStatus({ type: '', text: '' });
+
+    if (!username.trim()) {
+      setStatus({ type: 'error', text: 'Username is required.' });
+      return;
+    }
+    if (!password || password.length < 6) {
+      setStatus({ type: 'error', text: 'Password must be at least 6 characters.' });
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data } = await api.post('/api/admin/users', { email, password, role });
-      setStatus({ type: 'success', text: `Created ${data.user.email} (${data.user.role})` });
-      setEmail('');
+      // Backend should accept username + password + role + databaseIds
+      const payload = {
+        username: username.trim(),
+        password,
+        role,
+        databaseIds: selectedDbIds,
+      };
+      const { data } = await api.post('/api/admin/users', payload);
+
+      setStatus({
+        type: 'success',
+        text: `Created ${data?.user?.username || username} (${data?.user?.role || role})`,
+      });
+
+      // reset form
+      setUsername('');
       setPassword('');
-      onCreated?.(data.user);
+      setRole('operator');
+      setSelectedDbIds([]);
+
+      onCreated?.(data?.user);
     } catch (e) {
       const message = e?.response?.data?.error || 'Unable to create user right now.';
       setStatus({ type: 'error', text: message });
@@ -26,35 +86,42 @@ export default function AdminUsers({ onCreated = () => {} }) {
     }
   };
 
-  const alertClass = status.type === 'error' ? 'alert alert--error' : 'alert alert--success';
+  const alertClass =
+    status.type === 'error' ? 'alert alert--error' : 'alert alert--success';
+
+  const dbLabel = (db) =>
+    db?.name || db?.title || db?.label || `Database ${db?._id || db?.id}`;
 
   return (
     <section className="panel admin-panel" aria-labelledby="admin-panel-title">
       <div className="panel__header">
         <h2 className="panel__title" id="admin-panel-title">Team access</h2>
         <p className="panel__subtitle">
-          Invite trusted teammates to collaborate on voter operations with role-based access.
+          Create users with a username (no email needed), choose a role, and assign allowed databases.
         </p>
       </div>
+
       {status.text && (
         <div className={alertClass} role="status">
           <span aria-hidden>{status.type === 'error' ? '⚠️' : '✅'}</span>
           <span>{status.text}</span>
         </div>
       )}
+
       <form className="form-grid" onSubmit={create}>
         <label className="field">
-          <span className="field__label">User email</span>
+          <span className="field__label">Username</span>
           <input
             className="input"
-            placeholder="operator@example.com"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            placeholder="e.g., operator01"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
             required
           />
         </label>
+
         <label className="field">
           <span className="field__label">Temporary password</span>
           <input
@@ -68,6 +135,7 @@ export default function AdminUsers({ onCreated = () => {} }) {
             required
           />
         </label>
+
         <label className="field">
           <span className="field__label">Role</span>
           <select
@@ -79,12 +147,42 @@ export default function AdminUsers({ onCreated = () => {} }) {
             <option value="admin">Administrator</option>
           </select>
         </label>
+
+        <div className="field" style={{ gridColumn: '1 / -1' }}>
+          <span className="field__label">Allowed databases</span>
+          {loadingDbs ? (
+            <div className="help-text">Loading databases…</div>
+          ) : databases.length === 0 ? (
+            <div className="help-text">No voter databases available.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '0.4rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+              {databases.map((db) => {
+                const id = db?._id || db?.id;
+                return (
+                  <label key={id} className="checkbox" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedDbIds.includes(id)}
+                      onChange={(e) => toggleDb(id, e.target.checked)}
+                    />
+                    <span>{dbLabel(db)}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <p className="help-text" style={{ marginTop: 6 }}>
+            Tip: Your collections like <b>“Gondia 01”</b>, <b>“Gondia 02”</b>, etc., will appear here for selection.
+          </p>
+        </div>
+
         <button className="btn btn--primary" type="submit" disabled={loading}>
           {loading ? 'Creating user…' : 'Create user'}
         </button>
       </form>
+
       <p className="panel__subtitle">
-        New users will receive instructions on how to sign in and reset their password on first login.
+        Users can change their password after first login.
       </p>
     </section>
   );
