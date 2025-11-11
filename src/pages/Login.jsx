@@ -110,20 +110,51 @@ export default function Login() {
     const storedDatabases = getAvailableDatabases();
     const firstDatabase = storedDatabases[0];
     const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
-    if (effectiveDatabase) {
+    let pushResult = null;
+    let pushError = null;
+    let pullError = null;
+    let total = 0;
+
+    setProgress(0);
+    setProgressLabel('Uploading offline updates…');
+    try {
+      pushResult = await pushOutbox();
+    } catch (err) {
+      pushError = err;
+    }
+
+    if (!pushError) {
       await resetSyncState(effectiveDatabase);
+    }
+
+    if (effectiveDatabase) {
+      setProgress(0);
       setProgressLabel('Downloading latest records…');
-      let total = 0;
-      await pullAll({
-        databaseId: effectiveDatabase,
-        onProgress: ({ total: t }) => {
-          total = t;
-          setProgress(t);
-          setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
-        },
-      });
+      try {
+        await pullAll({
+          databaseId: effectiveDatabase,
+          onProgress: ({ total: t }) => {
+            total = t;
+            setProgress(t);
+            setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
+          },
+        });
+      } catch (err) {
+        pullError = err;
+      }
+    }
+
+    if (pushError || pullError) {
+      const messages = [];
+      if (pushError) messages.push(`push failed: ${pushError?.message || pushError}`);
+      if (pullError) messages.push(`pull failed: ${pullError?.message || pullError}`);
+      alert(`Login completed with limited sync — ${messages.join(' and ')}.`);
+    } else if (effectiveDatabase) {
       const databaseLabel = effectiveDatabase ? ` from database ${effectiveDatabase}` : '';
-      alert(`Synced ${total} records${databaseLabel} to your device. You can now work fully offline.`);
+      const pushed = pushResult?.pushed || 0;
+      alert(
+        `Synced ${total.toLocaleString()} records${databaseLabel} to your device after uploading ${pushed} offline updates.`,
+      );
     } else {
       alert('Activation complete. Your account is ready once a voter database is assigned.');
     }
