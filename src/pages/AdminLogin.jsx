@@ -84,7 +84,7 @@ export default function AdminLogin() {
             </div>
           </div>
           <p className="login-card__subtitle">
-            Sign in with administrator credentials to manage candidates, users and dashboards.
+            
           </p>
         </header>
 
