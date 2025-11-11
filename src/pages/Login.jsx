@@ -53,7 +53,8 @@ export default function Login() {
   // ✅ default to 'volunteer' if nothing stored
   const [userType, setUserType] = useState(() => activation?.userType || 'volunteer');
 
-  const [email, setEmail] = useState(() => activation?.email || '');
+  // 🔄 replaced email with username everywhere
+  const [username, setUsername] = useState(() => activation?.username || '');
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -69,6 +70,10 @@ export default function Login() {
     if (storedLanguage && storedLanguage !== language) setLanguage(storedLanguage);
     const storedType = activation?.userType;
     if (storedType && storedType !== userType) setUserType(storedType);
+    // ensure username is loaded from activation (for re-open)
+    if (activation?.username && activation?.username !== username) {
+      setUsername(activation.username);
+    }
   }, [activation]);
 
   useEffect(() => {
@@ -81,7 +86,7 @@ export default function Login() {
       setMode('activate');
       setInfoMessage(
         activation?.revokedMessage ||
-          'This device was signed out because your account was activated elsewhere. Reactivate to continue.',
+          'This device was signed out because your account was activated elsewhere. Reactivate to continue.'
       );
     } else if (infoMessage) {
       setInfoMessage('');
@@ -152,7 +157,7 @@ export default function Login() {
       const databaseLabel = effectiveDatabase ? ` from database ${effectiveDatabase}` : '';
       const pushed = pushResult?.pushed || 0;
       alert(
-        `Synced ${total.toLocaleString()} records${databaseLabel} to your device after uploading ${pushed} offline updates.`,
+        `Synced ${total.toLocaleString()} records${databaseLabel} to your device after uploading ${pushed} offline updates.`
       );
     } else {
       alert('Activation complete. Your account is ready once a voter database is assigned.');
@@ -165,6 +170,14 @@ export default function Login() {
     setError('');
     setInfoMessage('');
 
+    if (!username || username.trim().length < 3) {
+      setError('Enter a valid username (at least 3 characters).');
+      return;
+    }
+    if (!password || password.length < 4) {
+      setError('Password must be at least 4 characters long.');
+      return;
+    }
     if (!PIN_REGEX.test(pin)) {
       setError('Choose a 4 digit numeric PIN for quick logins.');
       return;
@@ -180,10 +193,12 @@ export default function Login() {
 
     try {
       const deviceId = getDeviceId(); // keep as-is if your util returns sync ID
-      const response = await apiLogin({ email, password, deviceId, userType });
+      // ⬇️ switched to username
+      const response = await apiLogin({ username, password, deviceId, userType });
       const { user } = await completeLogin(response);
 
-      const stored = await storeActivation({ email, language, userType, pin });
+      // ⬇️ store username instead of email
+      const stored = await storeActivation({ username, language, userType, pin });
       const cleaned = clearRevocationFlag();
       setActivation(cleaned || stored);
 
@@ -213,7 +228,7 @@ export default function Login() {
     }
     if (!getToken()) {
       setMode('activate');
-      setError('Your secure token has expired. Reactivate with your email and password.');
+      setError('Your secure token has expired. Reactivate with your username and password.');
       return;
     }
 
@@ -291,7 +306,7 @@ export default function Login() {
     setPinInput('');
     setPassword('');
     setError('');
-    setInfoMessage('Reactivate this device with your email, password and a new PIN.');
+    setInfoMessage('Reactivate this device with your username, password and a new PIN.');
   };
 
   const showActivation = mode === 'activate';
@@ -332,14 +347,13 @@ export default function Login() {
         {showActivation ? (
           <form className="form-grid" onSubmit={handleActivationSubmit}>
             <label className="field">
-              <span className="field__label">Work email</span>
+              <span className="field__label">Username</span>
               <input
                 className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@campaign.org"
-                type="email"
-                autoComplete="email"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. priyal.ramani"
+                autoComplete="username"
                 required
               />
             </label>

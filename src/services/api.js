@@ -1,11 +1,12 @@
 // client/src/services/api.js
 import { clearToken, lockSession } from '../auth';
-import { markActivationRevoked, getDeviceId } from './activation'; // ⬅️ add getDeviceId
+import { markActivationRevoked, getDeviceId } from './activation';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 let authToken = null;
 
+// pick up token if app stored it earlier
 const stored = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (stored) authToken = stored;
 
@@ -17,7 +18,7 @@ async function http(method, path, body, { signal } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
-  // ⬇️ Always include device header
+  // Always include device header
   try {
     const deviceId = getDeviceId();
     if (deviceId) headers['X-Device-Id'] = deviceId;
@@ -42,21 +43,17 @@ async function http(method, path, body, { signal } = {}) {
       clearToken();
       lockSession();
       markActivationRevoked('Your session expired. Reactivate with your credentials.');
-    }
-    if (res.status === 409) {
+    } else if (res.status === 409) {
       authToken = null;
       clearToken();
       lockSession();
       markActivationRevoked('You signed in on another device. Reactivate here to resume.');
-    }
-    // ⬇️ New: device-bound account locked on a different device
-    if (res.status === 423) {
+    } else if (res.status === 423) {
+      // device-bound on another device
       authToken = null;
       clearToken();
       lockSession();
-      markActivationRevoked(
-        'This account is activated on another device. Ask admin to reset device binding.'
-      );
+      markActivationRevoked('This account is activated on another device. Ask admin to reset device binding.');
     }
 
     throw new Error(message);
@@ -64,8 +61,10 @@ async function http(method, path, body, { signal } = {}) {
   return res.json();
 }
 
-export async function apiLogin({ email, password, deviceId, userType }) {
-  return http('POST', '/api/auth/login', { email, password, deviceId, userType });
+// ⬇️ Updated: use username (not email)
+export async function apiLogin({ username, password, deviceId, userType }) {
+  // deviceId is optional here; header already carries X-Device-Id
+  return http('POST', '/api/auth/login', { username, password, deviceId, userType });
 }
 
 export async function apiExport({ page = 1, limit = 5000, since = null, databaseId = null, signal } = {}) {
