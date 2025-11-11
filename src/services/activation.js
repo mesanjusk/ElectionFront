@@ -1,0 +1,129 @@
+const ACTIVATION_KEY = 'activationState';
+
+function safeParse(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to parse activation state', err);
+    return null;
+  }
+}
+
+function safeStringify(value) {
+  try {
+    return JSON.stringify(value);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to serialise activation state', err);
+    return null;
+  }
+}
+
+function readActivation() {
+  if (typeof window === 'undefined') return null;
+  return safeParse(window.localStorage.getItem(ACTIVATION_KEY));
+}
+
+function writeActivation(state) {
+  if (typeof window === 'undefined') return;
+  const payload = safeStringify(state);
+  if (!payload) {
+    window.localStorage.removeItem(ACTIVATION_KEY);
+    return;
+  }
+  window.localStorage.setItem(ACTIVATION_KEY, payload);
+}
+
+function simpleFallbackHash(pin) {
+  let hash = 0;
+  for (let i = 0; i < pin.length; i += 1) {
+    hash = (hash << 5) - hash + pin.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  return `fallback-${Math.abs(hash)}`;
+}
+
+export async function hashPin(pin) {
+  if (typeof window !== 'undefined' && window.crypto?.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  return simpleFallbackHash(pin);
+}
+
+export function getActivationState() {
+  const state = readActivation();
+  if (!state) return null;
+  return state;
+}
+
+export function setActivationState(nextState) {
+  const current = getActivationState() || {};
+  const state = { ...current, ...nextState };
+  if (nextState && Object.prototype.hasOwnProperty.call(nextState, 'revoked')) {
+    state.revoked = Boolean(nextState.revoked);
+  } else if (Object.prototype.hasOwnProperty.call(state, 'revoked')) {
+    state.revoked = Boolean(state.revoked);
+  }
+  if (!state.revoked) {
+    delete state.revokedMessage;
+  }
+  writeActivation(state);
+  return state;
+}
+
+export function clearActivationState() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(ACTIVATION_KEY);
+}
+
+export async function storeActivation({ email, language, userType, pin }) {
+  const pinHash = await hashPin(pin);
+  const payload = {
+    email,
+    language,
+    userType,
+    pinHash,
+    revoked: false,
+    activatedAt: Date.now(),
+  };
+  writeActivation(payload);
+  return payload;
+}
+
+export async function verifyPin(pin) {
+  const state = getActivationState();
+  if (!state?.pinHash) return false;
+  const hashed = await hashPin(pin);
+  return hashed === state.pinHash;
+}
+
+export function markActivationRevoked(message = '') {
+  const state = getActivationState() || {};
+  state.revoked = true;
+  state.revokedMessage = message;
+  writeActivation(state);
+  return state;
+}
+
+export function isActivationRevoked() {
+  const state = getActivationState();
+  return Boolean(state?.revoked);
+}
+
+export function clearRevocationFlag() {
+  const state = getActivationState();
+  if (!state) return;
+  if (!state.revoked && !state.revokedMessage) return state;
+  const next = { ...state };
+  delete next.revoked;
+  delete next.revokedMessage;
+  writeActivation(next);
+  return next;
+}

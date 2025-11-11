@@ -1,29 +1,114 @@
 // client/src/pages/Login.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiLogin, setAuthToken } from '../services/api';
 import { pullAll, resetSyncState } from '../services/sync';
-import { setSession, setActiveDatabase, getActiveDatabase, getAvailableDatabases } from '../auth';
+import {
+  setSession,
+  setActiveDatabase,
+  getActiveDatabase,
+  getAvailableDatabases,
+  unlockSession,
+  getToken,
+  isSessionUnlocked,
+  lockSession,
+  clearToken,
+} from '../auth';
+import {
+  clearActivationState,
+  clearRevocationFlag,
+  getActivationState,
+  setActivationState,
+  storeActivation,
+  verifyPin,
+} from '../services/activation';
+
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'हिन्दी' },
+  { value: 'mr', label: 'मराठी' },
+];
+
+const USER_TYPES = [
+  { value: 'field', label: 'Field team' },
+  { value: 'candidate', label: 'Candidate' },
+];
+
+const PIN_REGEX = /^\d{4}$/;
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const navigate = useNavigate();
+  const [activation, setActivation] = useState(() => getActivationState());
+  const [mode, setMode] = useState(() => {
+    if (!activation?.pinHash) return 'activate';
+    if (activation?.revoked) return 'activate';
+    if (!getToken()) return 'activate';
+    return 'pin';
+  });
+  const [language, setLanguage] = useState(() => activation?.language || 'en');
+  const [userType, setUserType] = useState(() => activation?.userType || 'field');
+  const [email, setEmail] = useState(() => activation?.email || '');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinInput, setPinInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const { token, user, databases = [], activeDatabaseId } = await apiLogin({ email, password });
-      const available = databases.length ? databases : user?.databases || [];
-      setSession({ token, user, databases: available });
-      setAuthToken(token);
-      if (activeDatabaseId) setActiveDatabase(activeDatabaseId);
-      const activeDatabase = activeDatabaseId || getActiveDatabase();
-      const storedDatabases = getAvailableDatabases();
-      const firstDatabase = storedDatabases[0];
-      const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
-      if (effectiveDatabase) setActiveDatabase(effectiveDatabase);
+  useEffect(() => {
+    const storedLanguage = activation?.language;
+    if (storedLanguage && storedLanguage !== language) {
+      setLanguage(storedLanguage);
+    }
+    const storedType = activation?.userType;
+    if (storedType && storedType !== userType) {
+      setUserType(storedType);
+    }
+  }, [activation]);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
+    }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('appLanguage', language);
+    }
+  }, [language]);
+
+  useEffect(() => {
+    if (activation?.revoked) {
+      setMode('activate');
+      setInfoMessage(
+        activation?.revokedMessage ||
+          'This device was signed out because your account was activated elsewhere. Reactivate to continue.',
+      );
+    } else if (infoMessage) {
+      setInfoMessage('');
+    }
+  }, [activation, infoMessage]);
+
+  useEffect(() => {
+    if (getToken() && isSessionUnlocked()) {
+      const destination = activation?.userType === 'candidate' ? '/search' : '/';
+      navigate(destination, { replace: true });
+    }
+  }, [navigate, activation]);
+
+  const availableLanguages = useMemo(() => LANGUAGES, []);
+  const availableUserTypes = useMemo(() => USER_TYPES, []);
+
+  const completeLogin = async ({ token, user, databases = [], activeDatabaseId }) => {
+    const available = databases.length ? databases : user?.databases || [];
+    setSession({ token, user, databases: available });
+    setAuthToken(token);
+    if (activeDatabaseId) setActiveDatabase(activeDatabaseId);
+    const activeDatabase = activeDatabaseId || getActiveDatabase();
+    const storedDatabases = getAvailableDatabases();
+    const firstDatabase = storedDatabases[0];
+    const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
+    if (effectiveDatabase) {
       await resetSyncState(effectiveDatabase);
       let total = 0;
       await pullAll({
@@ -33,16 +118,89 @@ export default function Login() {
           setProgress(t);
         },
       });
-      const target = user?.role === 'admin' ? '/admin' : '/';
       const databaseLabel = effectiveDatabase ? ` from database ${effectiveDatabase}` : '';
       alert(`Synced ${total} records${databaseLabel} to your device. You can now work fully offline.`);
-      window.location.href = target;
+    } else {
+      alert('Activation complete. Your account is ready once a voter database is assigned.');
+    }
+    return { user };
+  };
+
+  const handleActivationSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setInfoMessage('');
+    if (!PIN_REGEX.test(pin)) {
+      setError('Choose a 4 digit numeric PIN for quick logins.');
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError('PIN values do not match.');
+      return;
+    }
+    setLoading(true);
+    setProgress(0);
+    try {
+      const response = await apiLogin({ email, password });
+      const { user } = await completeLogin(response);
+      const stored = await storeActivation({ email, language, userType, pin });
+      const cleaned = clearRevocationFlag();
+      setActivation(cleaned || stored);
+      unlockSession();
+      setMode('pin');
+      setPin('');
+      setConfirmPin('');
+      setPassword('');
+      const target = userType === 'candidate' ? '/search' : user?.role === 'admin' ? '/admin' : '/';
+      navigate(target, { replace: true });
     } catch (err) {
-      alert('Login or Sync failed: ' + err.message);
+      setError(`Activation failed: ${err?.message || err}`);
     } finally {
       setLoading(false);
     }
-  }
+  };
+
+  const handlePinSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    if (!PIN_REGEX.test(pinInput)) {
+      setError('Enter the 4 digit PIN you created during activation.');
+      return;
+    }
+    if (!getToken()) {
+      setMode('activate');
+      setError('Your secure token has expired. Reactivate with your email and password.');
+      return;
+    }
+    const valid = await verifyPin(pinInput);
+    if (!valid) {
+      setError('Incorrect PIN. Try again or reactivate to set a new one.');
+      return;
+    }
+    const updated = setActivationState({ language, userType, revoked: false });
+    setActivation(updated);
+    unlockSession();
+    setAuthToken(getToken());
+    setPinInput('');
+    const target = userType === 'candidate' ? '/search' : '/';
+    navigate(target, { replace: true });
+  };
+
+  const startReactivation = () => {
+    lockSession();
+    clearToken();
+    clearActivationState();
+    setActivation(null);
+    setMode('activate');
+    setPin('');
+    setConfirmPin('');
+    setPinInput('');
+    setPassword('');
+    setError('');
+    setInfoMessage('Reactivate this device with your email, password and a new PIN.');
+  };
+
+  const showActivation = mode === 'activate';
 
   return (
     <div className="page page--center">
@@ -55,43 +213,184 @@ export default function Login() {
               <p className="login-card__tagline">Manage Voters Data</p>
             </div>
           </div>
-          
+
           <p className="login-card__subtitle">
-          
+            {showActivation
+              ? 'Activate this device with your credentials and create a secure PIN for quick access.'
+              : 'Unlock with your offline PIN to continue where you left off.'}
           </p>
         </header>
 
-        <form className="form-grid" onSubmit={onSubmit}>
-          <label className="field">
-            <span className="field__label">Work email</span>
-            <input
-              className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@campaign.org"
-              type="email"
-              autoComplete="email"
-              required
-            />
-          </label>
+        {infoMessage && (
+          <div className="alert alert--warning" role="status" style={{ marginBottom: '1rem' }}>
+            <span aria-hidden>⚠️</span>
+            <span>{infoMessage}</span>
+          </div>
+        )}
 
-          <label className="field">
-            <span className="field__label">Password</span>
-            <input
-              className="input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
+        {error && (
+          <div className="alert alert--error" role="alert" style={{ marginBottom: '1rem' }}>
+            <span aria-hidden>⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
 
-          <button className="btn btn--primary" disabled={loading} type="submit">
-            {loading ? 'Syncing data…' : 'Sign in & sync'}
-          </button>
-        </form>
+        {showActivation ? (
+          <form className="form-grid" onSubmit={handleActivationSubmit}>
+            <label className="field">
+              <span className="field__label">Work email</span>
+              <input
+                className="input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@campaign.org"
+                type="email"
+                autoComplete="email"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span className="field__label">Password</span>
+              <input
+                className="input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span className="field__label">Language preference</span>
+              <select
+                className="select"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                {availableLanguages.map((lang) => (
+                  <option key={lang.value} value={lang.value}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <fieldset className="field" style={{ border: 'none', padding: 0 }}>
+              <legend className="field__label">How will you use this login?</legend>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {availableUserTypes.map((type) => (
+                  <label key={type.value} className="chip">
+                    <input
+                      type="radio"
+                      name="userType"
+                      value={type.value}
+                      checked={userType === type.value}
+                      onChange={(e) => setUserType(e.target.value)}
+                    />
+                    <span>{type.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="field">
+              <span className="field__label">Create a 4 digit PIN</span>
+              <input
+                className="input"
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="••••"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span className="field__label">Confirm PIN</span>
+              <input
+                className="input"
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={confirmPin}
+                onChange={(e) => setConfirmPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="••••"
+                required
+              />
+            </label>
+
+            <button className="btn btn--primary" disabled={loading} type="submit">
+              {loading ? 'Syncing data…' : 'Activate & sync'}
+            </button>
+
+            <button className="btn btn--ghost" type="button" onClick={() => setMode('pin')}>
+              Already activated? Unlock with PIN
+            </button>
+          </form>
+        ) : (
+          <form className="form-grid" onSubmit={handlePinSubmit}>
+            <label className="field">
+              <span className="field__label">Language</span>
+              <select
+                className="select"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                {availableLanguages.map((lang) => (
+                  <option key={lang.value} value={lang.value}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <fieldset className="field" style={{ border: 'none', padding: 0 }}>
+              <legend className="field__label">Login type</legend>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {availableUserTypes.map((type) => (
+                  <label key={type.value} className="chip">
+                    <input
+                      type="radio"
+                      name="quickUserType"
+                      value={type.value}
+                      checked={userType === type.value}
+                      onChange={(e) => setUserType(e.target.value)}
+                    />
+                    <span>{type.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="field">
+              <span className="field__label">4 digit PIN</span>
+              <input
+                className="input"
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="••••"
+                autoFocus
+                required
+              />
+            </label>
+
+            <button className="btn btn--primary" type="submit">
+              Unlock
+            </button>
+
+            <button className="btn btn--ghost" type="button" onClick={startReactivation}>
+              Reactivate this device
+            </button>
+          </form>
+        )}
 
         {loading ? (
           <div className="login-progress" role="status" aria-live="polite">
@@ -101,7 +400,7 @@ export default function Login() {
             <span className="login-progress__label">Downloading {progress.toLocaleString()} records…</span>
           </div>
         ) : (
-          <p className="login-card__hint"></p>
+          <p className="login-card__hint">Keep your PIN secret. You can reactivate anytime to change it.</p>
         )}
       </div>
     </div>

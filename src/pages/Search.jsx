@@ -1,7 +1,7 @@
 // client/src/pages/Search.jsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { setAuthToken } from "../services/api";
-import { clearToken } from "../auth";
+import { lockSession } from "../auth";
 import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -305,7 +305,7 @@ export default function Search() {
   const sentinelRef = useRef(null);
 
   const logout = () => {
-    clearToken();
+    lockSession();
     location.href = "/login";
   };
 

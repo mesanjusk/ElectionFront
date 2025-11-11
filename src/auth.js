@@ -1,6 +1,16 @@
 const USER_KEY = 'user';
 const DATABASES_KEY = 'databases';
 const ACTIVE_DATABASE_KEY = 'activeDatabaseId';
+const SESSION_UNLOCK_KEY = 'sessionUnlockedAt';
+
+function getSessionStorage() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage;
+  } catch (err) {
+    return null;
+  }
+}
 
 export function setToken(token) {
   if (token) localStorage.setItem('token', token);
@@ -76,10 +86,11 @@ export function clearToken() {
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(DATABASES_KEY);
   localStorage.removeItem(ACTIVE_DATABASE_KEY);
+  lockSession();
 }
 
 export function isLoggedIn() {
-  return !!getToken();
+  return !!getToken() && isSessionUnlocked();
 }
 
 export function isAdmin() {
@@ -91,4 +102,22 @@ export function setSession({ token, user, databases }) {
   if (token) setToken(token);
   setUser(user || null);
   setAvailableDatabases(databases || []);
+}
+
+export function unlockSession() {
+  const storage = getSessionStorage();
+  if (!storage) return;
+  storage.setItem(SESSION_UNLOCK_KEY, String(Date.now()));
+}
+
+export function lockSession() {
+  const storage = getSessionStorage();
+  if (!storage) return;
+  storage.removeItem(SESSION_UNLOCK_KEY);
+}
+
+export function isSessionUnlocked() {
+  const storage = getSessionStorage();
+  if (!storage) return false;
+  return Boolean(storage.getItem(SESSION_UNLOCK_KEY));
 }

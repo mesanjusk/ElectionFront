@@ -1,4 +1,7 @@
 // client/src/services/api.js
+import { clearToken, lockSession } from '../auth';
+import { markActivationRevoked } from './activation';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 let authToken = null;
@@ -19,7 +22,28 @@ async function http(method, path, body, { signal } = {}) {
     body: body ? JSON.stringify(body) : undefined,
     signal,
   });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) {
+    let message = `${res.status}`;
+    try {
+      const data = await res.json();
+      message = data?.error || data?.message || message;
+    } catch (err) {
+      // swallow JSON parse errors and keep fallback message
+    }
+    if (res.status === 401 || res.status === 403) {
+      authToken = null;
+      clearToken();
+      lockSession();
+      markActivationRevoked('Your session expired. Reactivate with your credentials.');
+    }
+    if (res.status === 409) {
+      authToken = null;
+      clearToken();
+      lockSession();
+      markActivationRevoked('You signed in on another device. Reactivate here to resume.');
+    }
+    throw new Error(message);
+  }
   return res.json();
 }
 

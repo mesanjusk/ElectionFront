@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login.jsx';
+import AdminLogin from './pages/AdminLogin.jsx';
 import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
 import AdminHome from './pages/AdminHome.jsx';
@@ -11,6 +12,7 @@ export default function App() {
     <Routes>
       {/* Public route */}
       <Route path="/login" element={<Login />} />
+      <Route path="/adminlogin" element={<AdminLogin />} />
 
       {/* Protected routes */}
       <Route
@@ -25,7 +27,7 @@ export default function App() {
         path="/admin"
         element={(
           <ProtectedRoute requiredRole="admin">
-         
+            <AdminHome />
           </ProtectedRoute>
         )}
       />
@@ -33,7 +35,6 @@ export default function App() {
         path="/search"
         element={(
           <ProtectedRoute>
-            <AdminHome />
             <Search />
           </ProtectedRoute>
         )}

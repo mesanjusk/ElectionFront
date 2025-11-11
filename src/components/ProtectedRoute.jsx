@@ -3,7 +3,10 @@ import { Navigate } from 'react-router-dom';
 import { isLoggedIn, getUser } from '../auth';
 
 export default function ProtectedRoute({ children, requiredRole }) {
-  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+  if (!isLoggedIn()) {
+    const destination = requiredRole === 'admin' ? '/adminlogin' : '/login';
+    return <Navigate to={destination} replace />;
+  }
   if (requiredRole) {
     const user = getUser();
     const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
