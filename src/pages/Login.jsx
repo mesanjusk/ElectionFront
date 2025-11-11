@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiLogin, setAuthToken } from '../services/api';
-import { pullAll, resetSyncState } from '../services/sync';
+import { pullAll, pushOutbox, resetSyncState } from '../services/sync';
 import {
   setSession,
   setActiveDatabase,
@@ -18,6 +18,7 @@ import {
   clearActivationState,
   clearRevocationFlag,
   getActivationState,
+  getDeviceId,
   setActivationState,
   storeActivation,
   verifyPin,
@@ -54,6 +55,7 @@ export default function Login() {
   const [pinInput, setPinInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
 
@@ -110,12 +112,14 @@ export default function Login() {
     const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
     if (effectiveDatabase) {
       await resetSyncState(effectiveDatabase);
+      setProgressLabel('Downloading latest records…');
       let total = 0;
       await pullAll({
         databaseId: effectiveDatabase,
         onProgress: ({ total: t }) => {
           total = t;
           setProgress(t);
+          setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
         },
       });
       const databaseLabel = effectiveDatabase ? ` from database ${effectiveDatabase}` : '';
@@ -140,8 +144,10 @@ export default function Login() {
     }
     setLoading(true);
     setProgress(0);
+    setProgressLabel('');
     try {
-      const response = await apiLogin({ email, password });
+      const deviceId = getDeviceId();
+      const response = await apiLogin({ email, password, deviceId, userType });
       const { user } = await completeLogin(response);
       const stored = await storeActivation({ email, language, userType, pin });
       const cleaned = clearRevocationFlag();
@@ -157,6 +163,7 @@ export default function Login() {
       setError(`Activation failed: ${err?.message || err}`);
     } finally {
       setLoading(false);
+      setProgressLabel('');
     }
   };
 
@@ -177,13 +184,61 @@ export default function Login() {
       setError('Incorrect PIN. Try again or reactivate to set a new one.');
       return;
     }
-    const updated = setActivationState({ language, userType, revoked: false });
-    setActivation(updated);
-    unlockSession();
-    setAuthToken(getToken());
-    setPinInput('');
-    const target = userType === 'candidate' ? '/search' : '/';
-    navigate(target, { replace: true });
+    const token = getToken();
+    setLoading(true);
+    setProgress(0);
+    setProgressLabel('Uploading offline updates…');
+    setAuthToken(token);
+
+    let pushResult = null;
+    let pushError = null;
+    let pulled = 0;
+    let pullError = null;
+
+    try {
+      try {
+        pushResult = await pushOutbox();
+      } catch (err) {
+        pushError = err;
+      }
+
+      setProgress(0);
+      setProgressLabel('Downloading latest records…');
+
+      try {
+        pulled = await pullAll({
+          onProgress: ({ total: t }) => {
+            pulled = t;
+            setProgress(t);
+            setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
+          },
+        });
+      } catch (err) {
+        pullError = err;
+      }
+
+      const updated = setActivationState({ language, userType, revoked: false });
+      setActivation(updated);
+      unlockSession();
+      setPinInput('');
+
+      if (pushError || pullError) {
+        const parts = [];
+        if (pushError) parts.push(`push failed: ${pushError?.message || pushError}`);
+        if (pullError) parts.push(`pull failed: ${pullError?.message || pullError}`);
+        alert(`Unlocked with limited sync — ${parts.join(' and ')}.`);
+      } else {
+        const pushed = pushResult?.pushed || 0;
+        alert(`Sync complete. Uploaded ${pushed} changes and downloaded ${pulled} updates.`);
+      }
+
+      const target = userType === 'candidate' ? '/search' : '/';
+      navigate(target, { replace: true });
+    } finally {
+      setLoading(false);
+      setProgress(0);
+      setProgressLabel('');
+    }
   };
 
   const startReactivation = () => {
@@ -397,7 +452,9 @@ export default function Login() {
             <div className="login-progress__bar">
               <span className="login-progress__fill" style={{ width: `${Math.min(progress, 100)}%` }} />
             </div>
-            <span className="login-progress__label">Downloading {progress.toLocaleString()} records…</span>
+            <span className="login-progress__label">
+              {progressLabel || `Downloading ${progress.toLocaleString()} records…`}
+            </span>
           </div>
         ) : (
           <p className="login-card__hint">Keep your PIN secret. You can reactivate anytime to change it.</p>

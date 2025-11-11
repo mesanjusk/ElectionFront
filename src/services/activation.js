@@ -1,4 +1,24 @@
 const ACTIVATION_KEY = 'activationState';
+const DEVICE_ID_KEY = 'activationDeviceId';
+
+function generateDeviceId() {
+  if (typeof window !== 'undefined' && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  const random = Math.random().toString(36).slice(2, 10);
+  const timestamp = Date.now().toString(36);
+  return `dev-${timestamp}-${random}`;
+}
+
+function ensureDeviceId() {
+  if (typeof window === 'undefined') return null;
+  let deviceId = window.localStorage.getItem(DEVICE_ID_KEY);
+  if (!deviceId) {
+    deviceId = generateDeviceId();
+    window.localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+  return deviceId;
+}
 
 function safeParse(value) {
   if (!value) return null;
@@ -60,6 +80,12 @@ export async function hashPin(pin) {
 export function getActivationState() {
   const state = readActivation();
   if (!state) return null;
+  const deviceId = ensureDeviceId();
+  if (deviceId && state.deviceId !== deviceId) {
+    const next = { ...state, deviceId };
+    writeActivation(next);
+    return next;
+  }
   return state;
 }
 
@@ -70,6 +96,10 @@ export function setActivationState(nextState) {
     state.revoked = Boolean(nextState.revoked);
   } else if (Object.prototype.hasOwnProperty.call(state, 'revoked')) {
     state.revoked = Boolean(state.revoked);
+  }
+  if (!state.deviceId) {
+    const deviceId = ensureDeviceId();
+    if (deviceId) state.deviceId = deviceId;
   }
   if (!state.revoked) {
     delete state.revokedMessage;
@@ -85,6 +115,7 @@ export function clearActivationState() {
 
 export async function storeActivation({ email, language, userType, pin }) {
   const pinHash = await hashPin(pin);
+  const deviceId = ensureDeviceId();
   const payload = {
     email,
     language,
@@ -92,6 +123,7 @@ export async function storeActivation({ email, language, userType, pin }) {
     pinHash,
     revoked: false,
     activatedAt: Date.now(),
+    deviceId,
   };
   writeActivation(payload);
   return payload;
@@ -126,4 +158,8 @@ export function clearRevocationFlag() {
   delete next.revokedMessage;
   writeActivation(next);
   return next;
+}
+
+export function getDeviceId() {
+  return ensureDeviceId();
 }

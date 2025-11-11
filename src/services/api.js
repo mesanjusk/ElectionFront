@@ -47,8 +47,8 @@ async function http(method, path, body, { signal } = {}) {
   return res.json();
 }
 
-export async function apiLogin({ email, password }) {
-  return http('POST', '/api/auth/login', { email, password });
+export async function apiLogin({ email, password, deviceId, userType }) {
+  return http('POST', '/api/auth/login', { email, password, deviceId, userType });
 }
 
 export async function apiExport({
