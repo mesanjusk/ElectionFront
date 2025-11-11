@@ -488,6 +488,10 @@ export default function AdminHome() {
           </section>
         )}
       </div>
+      <div className="admin-grid">
+  {/* ...other cards/sections... */}
+  <AdminUsers />
+</div>
     </div>
   );
 }

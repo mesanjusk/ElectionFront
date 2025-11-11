@@ -10,12 +10,13 @@ if (!baseURL) {
   console.warn('VITE_API_URL is not set. API calls will fail.');
 }
 
+/** Axios instance */
 const api = axios.create({
   baseURL, // e.g. https://electionserver.onrender.com
   withCredentials: false,
 });
 
-// Attach bearer + device header
+/** Attach bearer + device headers */
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -27,7 +28,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401/403/409/423 consistently
+/** Centralized auth/device error handling */
 api.interceptors.response.use(
   (resp) => resp,
   (error) => {
@@ -48,5 +49,64 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/* ============================
+   ADMIN API HELPERS
+   ============================ */
+
+/** List manageable voter databases */
+export async function adminListDatabases() {
+  const { data } = await api.get('/api/admin/databases');
+  return data?.databases || [];
+}
+
+/** List users (username, role, allowedDatabaseIds, timestamps) */
+export async function adminListUsers() {
+  const { data } = await api.get('/api/admin/users');
+  return data?.users || [];
+}
+
+/**
+ * Create user
+ * @param {{username:string, password:string, role?:'user'|'operator'|'candidate'|'admin', allowedDatabaseIds?:string[], email?:string}} payload
+ */
+export async function adminCreateUser(payload) {
+  const { data } = await api.post('/api/admin/users', payload);
+  return data?.user;
+}
+
+/** Delete user by id */
+export async function adminDeleteUser(userId) {
+  await api.delete(`/api/admin/users/${userId}`);
+  return true;
+}
+
+/** Update user role */
+export async function adminUpdateUserRole(userId, role) {
+  const { data } = await api.patch(`/api/admin/users/${userId}/role`, { role });
+  return data?.user;
+}
+
+/** Update user password */
+export async function adminUpdateUserPassword(userId, password) {
+  await api.patch(`/api/admin/users/${userId}/password`, { password });
+  return true;
+}
+
+/** Update user database access */
+export async function adminUpdateUserDatabases(userId, allowedDatabaseIds) {
+  const { data } = await api.patch(`/api/admin/users/${userId}/databases`, { allowedDatabaseIds });
+  return data?.user;
+}
+
+/* ============================
+   (Optional) AUTH HELPERS
+   ============================ */
+
+/** Login (username OR email; deviceId auto-sent via interceptor) */
+export async function apiLogin({ username, email, password, userType }) {
+  const { data } = await api.post('/api/auth/login', { username, email, password, userType });
+  return data;
+}
 
 export default api;
