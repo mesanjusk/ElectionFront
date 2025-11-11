@@ -39,7 +39,20 @@
 /* DO NOT include any dark-mode @media blocks. We stay light-only. */
 
 /* page bg + base text */
-.sx-page { background: var(--sx-bg); color: var(--sx-text); }
+.sx-page { background: var(--sx-bg); color: var(--sx-text); min-height: 100vh; display: flex; flex-direction: column; }
+
+.sx-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  background: var(--sx-bg);
+}
+
+.sx-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
 /* ============================= APPBAR ============================= */
 .sx-appbar.sx-appbar--single {
@@ -162,6 +175,10 @@ a.sx-mini-btn[title*="Share"] {
 .sx-btn.primary {
   background: var(--sx-primary); color: var(--sx-primary-contrast); border-color: transparent;
 }
+.sx-btn.ghost {
+  background: transparent;
+  color: var(--sx-text);
+}
 .sx-btn.primary:hover { filter: brightness(1.05); }
 .sx-btn.ghost:hover { background: rgba(15,23,42,.05); border-color: rgba(15,23,42,.15); }
 .sx-btn:focus-visible { outline: none; box-shadow: var(--sx-focus); }
@@ -176,6 +193,10 @@ a.sx-mini-btn[title*="Share"] {
   background: var(--sx-footer-bg); border-top: 1px solid var(--sx-border);
   overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
+.sx-footer--one-row {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(80px, 1fr);
+}
 .sx-footer-stats::-webkit-scrollbar { display: none; }
 
 .sx-footer-stat {
@@ -184,6 +205,10 @@ a.sx-mini-btn[title*="Share"] {
 }
 .sx-footer-stat .k { color: var(--sx-subtext); }
 .sx-footer-stat .v { font-size: 12px; color: var(--sx-text); }
+
+.sx-sentinel {
+  height: 24px;
+}
 
 /* ============================= SELECTS / MENU SHEET ============================= */
 .sx-menu-sheet { background: var(--sx-card); color: var(--sx-text); border-top: 1px solid var(--sx-border); }
@@ -228,6 +253,17 @@ a.sx-mini-btn[title*="Share"] {
   padding: 12px;
   display: grid;
   gap: 10px;
+}
+
+.sx-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sx-text);
+}
+
+.sx-sub {
+  font-size: 13px;
+  color: var(--sx-subtext);
 }
 
 /* small icon button in dialog header */
