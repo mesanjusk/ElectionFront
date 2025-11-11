@@ -1,6 +1,6 @@
 // client/src/services/api.js
 import { clearToken, lockSession } from '../auth';
-import { markActivationRevoked } from './activation';
+import { markActivationRevoked, getDeviceId } from './activation'; // ⬅️ add getDeviceId
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -16,20 +16,27 @@ export function setAuthToken(token) {
 async function http(method, path, body, { signal } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
+  // ⬇️ Always include device header
+  try {
+    const deviceId = getDeviceId();
+    if (deviceId) headers['X-Device-Id'] = deviceId;
+  } catch (_) { /* ignore */ }
+
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
     signal,
   });
+
   if (!res.ok) {
     let message = `${res.status}`;
     try {
       const data = await res.json();
       message = data?.error || data?.message || message;
-    } catch (err) {
-      // swallow JSON parse errors and keep fallback message
-    }
+    } catch (_) {}
+
     if (res.status === 401 || res.status === 403) {
       authToken = null;
       clearToken();
@@ -42,6 +49,16 @@ async function http(method, path, body, { signal } = {}) {
       lockSession();
       markActivationRevoked('You signed in on another device. Reactivate here to resume.');
     }
+    // ⬇️ New: device-bound account locked on a different device
+    if (res.status === 423) {
+      authToken = null;
+      clearToken();
+      lockSession();
+      markActivationRevoked(
+        'This account is activated on another device. Ask admin to reset device binding.'
+      );
+    }
+
     throw new Error(message);
   }
   return res.json();
@@ -51,13 +68,7 @@ export async function apiLogin({ email, password, deviceId, userType }) {
   return http('POST', '/api/auth/login', { email, password, deviceId, userType });
 }
 
-export async function apiExport({
-  page = 1,
-  limit = 5000,
-  since = null,
-  databaseId = null,
-  signal,
-} = {}) {
+export async function apiExport({ page = 1, limit = 5000, since = null, databaseId = null, signal } = {}) {
   const qs = new URLSearchParams();
   qs.set('page', String(page));
   qs.set('limit', String(limit));

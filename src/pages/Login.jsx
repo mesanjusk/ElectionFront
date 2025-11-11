@@ -30,8 +30,9 @@ const LANGUAGES = [
   { value: 'mr', label: 'मराठी' },
 ];
 
+// ✅ Align with backend roles
 const USER_TYPES = [
-  { value: 'field', label: 'Field team' },
+  { value: 'operator', label: 'Field team (Operator)' },
   { value: 'candidate', label: 'Candidate' },
 ];
 
@@ -47,7 +48,8 @@ export default function Login() {
     return 'pin';
   });
   const [language, setLanguage] = useState(() => activation?.language || 'en');
-  const [userType, setUserType] = useState(() => activation?.userType || 'field');
+  // ✅ default to 'operator' (was 'field')
+  const [userType, setUserType] = useState(() => activation?.userType || 'operator');
   const [email, setEmail] = useState(() => activation?.email || '');
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
@@ -387,7 +389,8 @@ export default function Login() {
               <input
                 className="input"
                 inputMode="numeric"
-                pattern="\d{4}"
+                // ✅ HTML pattern needs explicit character class
+                pattern="[0-9]{4}"
                 maxLength={4}
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
@@ -401,7 +404,7 @@ export default function Login() {
               <input
                 className="input"
                 inputMode="numeric"
-                pattern="\d{4}"
+                pattern="[0-9]{4}"
                 maxLength={4}
                 value={confirmPin}
                 onChange={(e) => setConfirmPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
@@ -458,7 +461,7 @@ export default function Login() {
               <input
                 className="input"
                 inputMode="numeric"
-                pattern="\d{4}"
+                pattern="[0-9]{4}"  // ✅ fix
                 maxLength={4}
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
