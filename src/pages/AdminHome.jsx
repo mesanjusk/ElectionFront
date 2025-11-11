@@ -7,6 +7,7 @@ import {
   getAvailableDatabases,
   setAvailableDatabases,
 } from '../auth';
+import './Admin.css';
 
 function resolveId(entity) {
   return entity?.id || entity?._id;
@@ -18,40 +19,35 @@ function databaseDisplayName(db) {
 }
 
 function StatCard({ title, value, hint, onClick, href, icon = '📊' }) {
-  const content = (
-    <div
-      className="stat-card"
-      style={{
-        border: '1px solid rgba(0,0,0,0.08)',
-        borderRadius: 16,
-        padding: '1rem',
-        background: '#fff',
-        display: 'grid',
-        gap: '0.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        cursor: onClick || href ? 'pointer' : 'default',
-        transition: 'transform 120ms ease',
-      }}
-      onClick={onClick}
-      onKeyDown={(e) => (onClick && (e.key === 'Enter' || e.key === ' ')) && onClick()}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-    >
-      <div style={{ fontSize: 22, lineHeight: 1 }}>{icon}</div>
-      <div style={{ fontWeight: 600, color: '#111827' }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: '#065f46' }}>{value}</div>
-      {hint && <div style={{ color: '#6b7280', fontSize: 13 }}>{hint}</div>}
-    </div>
-  );
+  const Component = href ? 'a' : 'div';
 
-  if (href) {
-    return (
-      <a href={href} style={{ textDecoration: 'none', color: 'inherit' }}>
-        {content}
-      </a>
-    );
-  }
-  return content;
+  const interactiveProps = (() => {
+    if (href) return { href };
+    if (!onClick) return {};
+    const handleKeyDown = (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onClick();
+      }
+    };
+    return {
+      role: 'button',
+      tabIndex: 0,
+      onClick,
+      onKeyDown: handleKeyDown,
+    };
+  })();
+
+  return (
+    <Component className="admin-stat-card" {...interactiveProps}>
+      <div className="admin-stat-card__icon" aria-hidden>
+        {icon}
+      </div>
+      <div className="admin-stat-card__title">{title}</div>
+      <div className="admin-stat-card__value">{value}</div>
+      {hint && <div className="admin-stat-card__hint">{hint}</div>}
+    </Component>
+  );
 }
 
 export default function AdminHome() {
@@ -152,42 +148,23 @@ export default function AdminHome() {
   const totalDatabases = databases.length;
 
   const Toolbar = (
-    <div
-      style={{
-        display: 'flex',
-        gap: '0.5rem',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
-    >
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className="badge" style={{ background: '#e6f7ef', color: '#065f46', padding: '6px 10px', borderRadius: 999 }}>
-          Admin
-        </span>
+    <div className="admin-toolbar">
+      <div className="admin-toolbar__group">
+        <span className="admin-badge">Admin</span>
         {(currentUser?.email || currentUser?.username) && (
-          <span className="help-text" style={{ color: '#6b7280' }}>
+          <span className="help-text">
             Signed in as{' '}
-            <b style={{ color: '#111827' }}>
-              {currentUser?.username || currentUser?.email}
-            </b>
+            <b>{currentUser?.username || currentUser?.email}</b>
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div className="admin-toolbar__group">
         <button
-          className="btn"
+          className="btn btn--primary"
           type="button"
           onClick={() => {
             loadDatabases();
             loadUsers();
-          }}
-          style={{
-            background: '#065f46',
-            color: 'white',
-            borderRadius: 10,
-            padding: '8px 12px',
-            border: 'none',
           }}
         >
           ⟳ Refresh
@@ -197,17 +174,7 @@ export default function AdminHome() {
   );
 
   const TabBar = (
-    <div
-      role="tablist"
-      aria-label="Admin tabs"
-      style={{
-        display: 'flex',
-        gap: '0.5rem',
-        flexWrap: 'wrap',
-        borderBottom: '1px solid rgba(0,0,0,0.08)',
-        paddingBottom: '0.5rem',
-      }}
-    >
+    <div role="tablist" aria-label="Admin tabs" className="admin-tabs">
       {[
         ['overview', 'Overview'],
         ['team', 'Team'],
@@ -216,17 +183,11 @@ export default function AdminHome() {
       ].map(([key, label]) => (
         <button
           key={key}
+          type="button"
           role="tab"
           aria-selected={tab === key}
-          className="btn btn--ghost"
+          className="admin-tab"
           onClick={() => setTab(key)}
-          style={{
-            borderRadius: 999,
-            padding: '6px 12px',
-            border: tab === key ? '1px solid #065f46' : '1px solid transparent',
-            background: tab === key ? '#e6f7ef' : 'transparent',
-            color: tab === key ? '#065f46' : '#111827',
-          }}
         >
           {label}
         </button>
@@ -235,54 +196,54 @@ export default function AdminHome() {
   );
 
   return (
-    <div className="page" style={{ padding: '2rem 1rem', background: '#f8fafc' }}>
-      <div
-        className="page__content"
-        style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: '1.25rem' }}
-      >
-        <header
-          className="panel"
-          style={{
-            background: '#ffffff',
-            border: '1px solid rgba(0,0,0,0.06)',
-            borderRadius: 16,
-            padding: '1.25rem',
-          }}
-        >
-          <div className="panel__header" style={{ display: 'grid', gap: '0.25rem' }}>
-            <h1 className="panel__title" style={{ margin: 0 }}>Admin Dashboard</h1>
-            <p className="panel__subtitle" style={{ margin: 0, color: '#6b7280' }}>
+    <div className="page admin-page">
+      <div className="admin-page__content">
+        <header className="admin-surface admin-surface--header">
+          <div className="admin-surface__header">
+            <h1 className="panel__title">Admin Dashboard</h1>
+            <p className="panel__subtitle">
               Manage users, assign voter databases, and jump to common actions.
             </p>
           </div>
-          <div style={{ marginTop: '0.75rem' }}>{Toolbar}</div>
-          <div style={{ marginTop: '1rem' }}>{TabBar}</div>
+          {Toolbar}
+          {TabBar}
         </header>
 
         {/* Overview */}
         {tab === 'overview' && (
-          <section aria-labelledby="overview" className="panel" style={{ background: 'transparent' }}>
-            <div
-              style={{
-                display: 'grid',
-                gap: '1rem',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-              }}
-            >
-              <StatCard title="Total Users" value={totalUsers} hint="All teammates" icon="👥" onClick={() => setTab('team')} />
-              <StatCard title="Admins" value={totalAdmins} hint="Full access" icon="🛡️" onClick={() => setTab('team')} />
-              <StatCard title="Operators" value={totalOperators} hint="Limited access" icon="🧑‍💻" onClick={() => setTab('team')} />
-              <StatCard title="Voter Databases" value={totalDatabases} hint="Available lists" icon="🗃️" onClick={() => setTab('databases')} />
+          <section aria-labelledby="overview" className="admin-surface">
+            <div className="admin-grid admin-grid--stats">
+              <StatCard
+                title="Total Users"
+                value={totalUsers}
+                hint="All teammates"
+                icon="👥"
+                onClick={() => setTab('team')}
+              />
+              <StatCard
+                title="Admins"
+                value={totalAdmins}
+                hint="Full access"
+                icon="🛡️"
+                onClick={() => setTab('team')}
+              />
+              <StatCard
+                title="Operators"
+                value={totalOperators}
+                hint="Limited access"
+                icon="🧑‍💻"
+                onClick={() => setTab('team')}
+              />
+              <StatCard
+                title="Voter Databases"
+                value={totalDatabases}
+                hint="Available lists"
+                icon="🗃️"
+                onClick={() => setTab('databases')}
+              />
             </div>
 
-            <div
-              style={{
-                marginTop: '1.25rem',
-                display: 'grid',
-                gap: '1rem',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              }}
-            >
+            <div className="admin-grid admin-grid--actions">
               <StatCard
                 title="Open Voter Search"
                 value="Search & Filter"
@@ -317,9 +278,11 @@ export default function AdminHome() {
         {/* Team */}
         {tab === 'team' && (
           <>
-            <section className="panel" aria-labelledby="create-user">
-              <div className="panel__header">
-                <h2 className="panel__title" id="create-user">Team management</h2>
+            <section className="admin-surface" aria-labelledby="create-user">
+              <div className="admin-surface__header">
+                <h2 className="panel__title" id="create-user">
+                  Team management
+                </h2>
                 <p className="panel__subtitle">
                   Add teammates (username only — email optional), choose a role, and assign databases.
                 </p>
@@ -327,9 +290,11 @@ export default function AdminHome() {
               <AdminUsers onCreated={onUserCreated} />
             </section>
 
-            <section className="panel" aria-labelledby="user-access">
-              <div className="panel__header">
-                <h3 className="panel__title" id="user-access">User access & databases</h3>
+            <section className="admin-surface" aria-labelledby="user-access">
+              <div className="admin-surface__header">
+                <h3 className="panel__title" id="user-access">
+                  User access & databases
+                </h3>
                 <p className="panel__subtitle">
                   Toggle which voter databases each user can access.
                 </p>
@@ -339,17 +304,6 @@ export default function AdminHome() {
                 <div
                   className={`alert ${status.type === 'error' ? 'alert--error' : 'alert--success'}`}
                   role="status"
-                  style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    padding: '0.75rem 1rem',
-                    borderRadius: 10,
-                    background: status.type === 'error' ? '#fef2f2' : '#ecfdf5',
-                    color: status.type === 'error' ? '#991b1b' : '#065f46',
-                    border: `1px solid ${status.type === 'error' ? '#fecaca' : '#a7f3d0'}`,
-                    marginBottom: '0.75rem',
-                  }}
                 >
                   <span aria-hidden>{status.type === 'error' ? '⚠️' : '✅'}</span>
                   <span>{status.text}</span>
@@ -357,18 +311,18 @@ export default function AdminHome() {
               )}
 
               {loading ? (
-                <p className="help-text">Loading users…</p>
+                <p className="help-text admin-loading">Loading users…</p>
               ) : users.length === 0 ? (
-                <p className="help-text">No team members found yet.</p>
+                <p className="help-text admin-empty">No team members found yet.</p>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="admin-table-wrapper">
+                  <table className="admin-table">
                     <thead>
                       <tr>
-                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>User</th>
-                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Role</th>
-                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Allowed databases</th>
-                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Actions</th>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Allowed databases</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -376,16 +330,14 @@ export default function AdminHome() {
                         const userId = resolveId(user);
                         const assigned = new Set(user.databaseIds || []);
                         return (
-                          <tr key={userId} style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                            <td style={{ padding: '0.5rem' }}>
-                              <div style={{ display: 'grid', lineHeight: 1.25 }}>
+                          <tr key={userId}>
+                            <td data-label="User">
+                              <div className="admin-user-meta">
                                 <b>{user.username || '—'}</b>
-                                {user.email && (
-                                  <span style={{ color: '#6b7280', fontSize: 12 }}>{user.email}</span>
-                                )}
+                                {user.email && <span className="admin-user-email">{user.email}</span>}
                               </div>
                             </td>
-                            <td style={{ padding: '0.5rem' }}>
+                            <td data-label="Role">
                               <select
                                 className="select"
                                 value={user.role}
@@ -395,12 +347,12 @@ export default function AdminHome() {
                                 <option value="admin">Administrator</option>
                               </select>
                             </td>
-                            <td style={{ padding: '0.5rem' }}>
-                              <div style={{ display: 'grid', gap: '0.4rem' }}>
+                            <td data-label="Allowed databases">
+                              <div className="admin-checkbox-list">
                                 {databases.map((db) => {
                                   const id = resolveId(db);
                                   return (
-                                    <label key={id} className="checkbox" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <label key={id} className="admin-checkbox">
                                       <input
                                         type="checkbox"
                                         checked={assigned.has(id)}
@@ -415,17 +367,12 @@ export default function AdminHome() {
                                 )}
                               </div>
                             </td>
-                            <td style={{ padding: '0.5rem' }}>
+                            <td data-label="Actions">
                               <button
                                 className="btn btn--ghost"
                                 type="button"
                                 onClick={() => saveUser(user)}
                                 disabled={savingId === userId}
-                                style={{
-                                  borderRadius: 10,
-                                  border: '1px solid rgba(0,0,0,0.1)',
-                                  padding: '6px 10px',
-                                }}
                               >
                                 {savingId === userId ? 'Saving…' : 'Save'}
                               </button>
@@ -443,44 +390,30 @@ export default function AdminHome() {
 
         {/* Databases */}
         {tab === 'databases' && (
-          <section className="panel" aria-labelledby="database-panel">
-            <div className="panel__header">
-              <h2 className="panel__title" id="database-panel">Voter databases</h2>
+          <section className="admin-surface" aria-labelledby="database-panel">
+            <div className="admin-surface__header">
+              <h2 className="panel__title" id="database-panel">
+                Voter databases
+              </h2>
               <p className="panel__subtitle">
                 Your available lists. Assign them to team members from the <b>Team</b> tab.
               </p>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gap: '0.75rem',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              }}
-            >
+            <div className="admin-database-grid">
               {databases.length === 0 ? (
-                <p className="help-text">No voter databases available.</p>
+                <p className="help-text admin-empty">No voter databases available.</p>
               ) : (
                 databases.map((db) => {
                   const label = databaseDisplayName(db);
                   return (
-                    <div
-                      key={resolveId(db)}
-                      style={{
-                        background: '#fff',
-                        border: '1px solid rgba(0,0,0,0.06)',
-                        borderRadius: 14,
-                        padding: '0.9rem',
-                        display: 'grid',
-                        gap: 6,
-                      }}
-                    >
-                      <div style={{ fontWeight: 600 }}>{label}</div>
-                      <div style={{ color: '#6b7280', fontSize: 13 }}>
+                    <div key={resolveId(db)} className="admin-database-card">
+                      <div className="admin-section-title">{label}</div>
+                      <div className="help-text">
                         ID: <code>{resolveId(db)}</code>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                        <a className="btn btn--ghost" href="/search" style={{ borderRadius: 10, padding: '6px 10px' }}>
+                      <div className="admin-card-actions">
+                        <a className="btn btn--ghost" href="/search">
                           Open in Search
                         </a>
                       </div>
@@ -494,55 +427,32 @@ export default function AdminHome() {
 
         {/* Settings */}
         {tab === 'settings' && (
-          <section className="panel" aria-labelledby="settings">
-            <div className="panel__header">
-              <h2 className="panel__title" id="settings">Settings</h2>
+          <section className="admin-surface" aria-labelledby="settings">
+            <div className="admin-surface__header">
+              <h2 className="panel__title" id="settings">
+                Settings
+              </h2>
               <p className="panel__subtitle">General admin preferences.</p>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gap: '0.75rem',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              }}
-            >
-              <div
-                style={{
-                  background: '#fff',
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  borderRadius: 14,
-                  padding: '0.9rem',
-                  display: 'grid',
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>Theme</div>
-                <div className="help-text" style={{ color: '#6b7280' }}>
+            <div className="admin-database-grid">
+              <div className="admin-settings-card">
+                <div className="admin-section-title">Theme</div>
+                <div className="help-text">
                   Using a light, professional palette (green / grey / black / white).
                 </div>
               </div>
 
-              <div
-                style={{
-                  background: '#fff',
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  borderRadius: 14,
-                  padding: '0.9rem',
-                  display: 'grid',
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>Shortcuts</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <a href="/search" className="btn btn--ghost" style={{ borderRadius: 10, padding: '6px 10px' }}>
+              <div className="admin-settings-card">
+                <div className="admin-section-title">Shortcuts</div>
+                <div className="admin-card-actions">
+                  <a href="/search" className="btn btn--ghost">
                     Go to Search
                   </a>
                   <button
                     type="button"
                     className="btn btn--ghost"
                     onClick={() => setTab('team')}
-                    style={{ borderRadius: 10, padding: '6px 10px' }}
                   >
                     Manage Users
                   </button>

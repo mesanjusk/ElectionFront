@@ -1,6 +1,7 @@
 // client/src/pages/AdminUsers.jsx
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import './Admin.css';
 
 export default function AdminUsers({ onCreated = () => {} }) {
   // no email — use username instead
@@ -93,14 +94,7 @@ export default function AdminUsers({ onCreated = () => {} }) {
     db?.name || db?.title || db?.label || `Database ${db?._id || db?.id}`;
 
   return (
-    <section className="panel admin-panel" aria-labelledby="admin-panel-title">
-      <div className="panel__header">
-        <h2 className="panel__title" id="admin-panel-title">Team access</h2>
-        <p className="panel__subtitle">
-          Create users with a username (no email needed), choose a role, and assign allowed databases.
-        </p>
-      </div>
-
+    <div className="admin-users">
       {status.text && (
         <div className={alertClass} role="status">
           <span aria-hidden>{status.type === 'error' ? '⚠️' : '✅'}</span>
@@ -148,18 +142,18 @@ export default function AdminUsers({ onCreated = () => {} }) {
           </select>
         </label>
 
-        <div className="field" style={{ gridColumn: '1 / -1' }}>
+        <div className="field admin-field--full">
           <span className="field__label">Allowed databases</span>
           {loadingDbs ? (
-            <div className="help-text">Loading databases…</div>
+            <div className="help-text admin-loading">Loading databases…</div>
           ) : databases.length === 0 ? (
-            <div className="help-text">No voter databases available.</div>
+            <div className="help-text admin-empty">No voter databases available.</div>
           ) : (
-            <div style={{ display: 'grid', gap: '0.4rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <div className="admin-checkbox-list">
               {databases.map((db) => {
                 const id = db?._id || db?.id;
                 return (
-                  <label key={id} className="checkbox" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <label key={id} className="admin-checkbox">
                     <input
                       type="checkbox"
                       checked={selectedDbIds.includes(id)}
@@ -171,7 +165,7 @@ export default function AdminUsers({ onCreated = () => {} }) {
               })}
             </div>
           )}
-          <p className="help-text" style={{ marginTop: 6 }}>
+          <p className="help-text admin-tip">
             Tip: Your collections like <b>“Gondia 01”</b>, <b>“Gondia 02”</b>, etc., will appear here for selection.
           </p>
         </div>
@@ -184,6 +178,6 @@ export default function AdminUsers({ onCreated = () => {} }) {
       <p className="panel__subtitle">
         Users can change their password after first login.
       </p>
-    </section>
+    </div>
   );
 }
