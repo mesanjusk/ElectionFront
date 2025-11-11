@@ -1,42 +1,18 @@
 // client/src/main.jsx
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import {
-  createBrowserRouter,
-  RouterProvider,
-  redirect,
-} from 'react-router-dom';
-import Login from './pages/Login.jsx';
-import Search from './pages/Search.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App.jsx';
 import './styles/theme.css';
 
-const router = createBrowserRouter(
-  [
-    { path: '/login', element: <Login /> },
-    {
-      path: '/',
-      element: (
-        <ProtectedRoute>
-          <Search />
-        </ProtectedRoute>
-      ),
-    },
-    { path: '*', loader: () => redirect('/') },
-  ],
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true,
-    },
-  }
-);
-
-
-
 function RootApp() {
- 
-  return <RouterProvider router={router} />;
+  return (
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <App />
+    </BrowserRouter>
+  );
 }
 
 createRoot(document.getElementById('root')).render(<RootApp />);
