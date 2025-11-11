@@ -30,10 +30,10 @@ const LANGUAGES = [
   { value: 'mr', label: 'मराठी' },
 ];
 
-// ✅ Align with backend roles
+// ✅ Login types: Candidate & Volunteer only
 const USER_TYPES = [
-  { value: 'operator', label: 'Field team (Operator)' },
   { value: 'candidate', label: 'Candidate' },
+  { value: 'volunteer', label: 'Volunteer' },
 ];
 
 const PIN_REGEX = /^\d{4}$/;
@@ -47,9 +47,12 @@ export default function Login() {
     if (!getToken()) return 'activate';
     return 'pin';
   });
+
   const [language, setLanguage] = useState(() => activation?.language || 'en');
-  // ✅ default to 'operator' (was 'field')
-  const [userType, setUserType] = useState(() => activation?.userType || 'operator');
+
+  // ✅ default to 'volunteer' if nothing stored
+  const [userType, setUserType] = useState(() => activation?.userType || 'volunteer');
+
   const [email, setEmail] = useState(() => activation?.email || '');
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
@@ -63,22 +66,14 @@ export default function Login() {
 
   useEffect(() => {
     const storedLanguage = activation?.language;
-    if (storedLanguage && storedLanguage !== language) {
-      setLanguage(storedLanguage);
-    }
+    if (storedLanguage && storedLanguage !== language) setLanguage(storedLanguage);
     const storedType = activation?.userType;
-    if (storedType && storedType !== userType) {
-      setUserType(storedType);
-    }
+    if (storedType && storedType !== userType) setUserType(storedType);
   }, [activation]);
 
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.lang = language;
-    }
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('appLanguage', language);
-    }
+    if (typeof document !== 'undefined') document.documentElement.lang = language;
+    if (typeof window !== 'undefined') window.localStorage.setItem('appLanguage', language);
   }, [language]);
 
   useEffect(() => {
@@ -108,10 +103,12 @@ export default function Login() {
     setSession({ token, user, databases: available });
     setAuthToken(token);
     if (activeDatabaseId) setActiveDatabase(activeDatabaseId);
+
     const activeDatabase = activeDatabaseId || getActiveDatabase();
     const storedDatabases = getAvailableDatabases();
     const firstDatabase = storedDatabases[0];
     const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
+
     let pushResult = null;
     let pushError = null;
     let pullError = null;
@@ -167,6 +164,7 @@ export default function Login() {
     event.preventDefault();
     setError('');
     setInfoMessage('');
+
     if (!PIN_REGEX.test(pin)) {
       setError('Choose a 4 digit numeric PIN for quick logins.');
       return;
@@ -175,21 +173,26 @@ export default function Login() {
       setError('PIN values do not match.');
       return;
     }
+
     setLoading(true);
     setProgress(0);
     setProgressLabel('');
+
     try {
-      const deviceId = getDeviceId();
+      const deviceId = getDeviceId(); // keep as-is if your util returns sync ID
       const response = await apiLogin({ email, password, deviceId, userType });
       const { user } = await completeLogin(response);
+
       const stored = await storeActivation({ email, language, userType, pin });
       const cleaned = clearRevocationFlag();
       setActivation(cleaned || stored);
+
       unlockSession();
       setMode('pin');
       setPin('');
       setConfirmPin('');
       setPassword('');
+
       const target = userType === 'candidate' ? '/search' : user?.role === 'admin' ? '/admin' : '/';
       navigate(target, { replace: true });
     } catch (err) {
@@ -203,6 +206,7 @@ export default function Login() {
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError('');
+
     if (!PIN_REGEX.test(pinInput)) {
       setError('Enter the 4 digit PIN you created during activation.');
       return;
@@ -212,11 +216,13 @@ export default function Login() {
       setError('Your secure token has expired. Reactivate with your email and password.');
       return;
     }
+
     const valid = await verifyPin(pinInput);
     if (!valid) {
       setError('Incorrect PIN. Try again or reactivate to set a new one.');
       return;
     }
+
     const token = getToken();
     setLoading(true);
     setProgress(0);
@@ -389,7 +395,6 @@ export default function Login() {
               <input
                 className="input"
                 inputMode="numeric"
-                // ✅ HTML pattern needs explicit character class
                 pattern="[0-9]{4}"
                 maxLength={4}
                 value={pin}
@@ -461,7 +466,7 @@ export default function Login() {
               <input
                 className="input"
                 inputMode="numeric"
-                pattern="[0-9]{4}"  // ✅ fix
+                pattern="[0-9]{4}"
                 maxLength={4}
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}

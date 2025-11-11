@@ -142,9 +142,12 @@ export default function AdminHome() {
     }
   };
 
+  // ---- Stats (separate counts as requested) ----
   const totalUsers = users.length;
   const totalAdmins = users.filter((u) => (u.role || '').toLowerCase() === 'admin').length;
-  const totalOperators = totalUsers - totalAdmins;
+  const totalVolunteers = users.filter((u) => (u.role || '').toLowerCase() === 'volunteer').length;
+  const totalCandidates = users.filter((u) => (u.role || '').toLowerCase() === 'candidate').length;
+  const totalPlainUsers = users.filter((u) => (u.role || '').toLowerCase() === 'user').length;
   const totalDatabases = databases.length;
 
   const Toolbar = (
@@ -214,9 +217,9 @@ export default function AdminHome() {
           <section aria-labelledby="overview" className="admin-surface">
             <div className="admin-grid admin-grid--stats">
               <StatCard
-                title="Total Users"
+                title="Total Accounts"
                 value={totalUsers}
-                hint="All teammates"
+                hint="All members"
                 icon="👥"
                 onClick={() => setTab('team')}
               />
@@ -228,10 +231,24 @@ export default function AdminHome() {
                 onClick={() => setTab('team')}
               />
               <StatCard
-                title="Operators"
-                value={totalOperators}
-                hint="Limited access"
-                icon="🧑‍💻"
+                title="Volunteers"
+                value={totalVolunteers}
+                hint="On-ground users"
+                icon="🤝"
+                onClick={() => setTab('team')}
+              />
+              <StatCard
+                title="Candidates"
+                value={totalCandidates}
+                hint="Candidate logins"
+                icon="🎯"
+                onClick={() => setTab('team')}
+              />
+              <StatCard
+                title="Users"
+                value={totalPlainUsers}
+                hint="General role"
+                icon="🧑‍💼"
                 onClick={() => setTab('team')}
               />
               <StatCard
@@ -329,6 +346,7 @@ export default function AdminHome() {
                       {users.map((user) => {
                         const userId = resolveId(user);
                         const assigned = new Set(user.databaseIds || []);
+                        const isAdmin = (user.role || '').toLowerCase() === 'admin';
                         return (
                           <tr key={userId}>
                             <td data-label="User">
@@ -341,10 +359,18 @@ export default function AdminHome() {
                               <select
                                 className="select"
                                 value={user.role}
+                                disabled={isAdmin} // lock admins
                                 onChange={(e) => onRoleChange(userId, e.target.value)}
                               >
-                                <option value="operator">Operator</option>
-                                <option value="admin">Administrator</option>
+                                {isAdmin ? (
+                                  <option value="admin">Admin</option>
+                                ) : (
+                                  <>
+                                    <option value="user">User</option>
+                                    <option value="candidate">Candidate</option>
+                                    <option value="volunteer">Volunteer</option>
+                                  </>
+                                )}
                               </select>
                             </td>
                             <td data-label="Allowed databases">

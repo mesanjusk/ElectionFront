@@ -7,7 +7,8 @@ export default function AdminUsers({ onCreated = () => {} }) {
   // no email — use username instead
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('operator');
+  // ✅ default role is "user"
+  const [role, setRole] = useState('user');
 
   // allow assigning DBs at creation
   const [databases, setDatabases] = useState([]);
@@ -55,6 +56,10 @@ export default function AdminUsers({ onCreated = () => {} }) {
       setStatus({ type: 'error', text: 'Password must be at least 6 characters.' });
       return;
     }
+    if (!['user', 'candidate', 'volunteer'].includes(role)) {
+      setStatus({ type: 'error', text: 'Pick a valid role.' });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -62,7 +67,7 @@ export default function AdminUsers({ onCreated = () => {} }) {
       const payload = {
         username: username.trim(),
         password,
-        role,
+        role,                 // ✅ user | candidate | volunteer
         databaseIds: selectedDbIds,
       };
       const { data } = await api.post('/api/admin/users', payload);
@@ -75,7 +80,7 @@ export default function AdminUsers({ onCreated = () => {} }) {
       // reset form
       setUsername('');
       setPassword('');
-      setRole('operator');
+      setRole('user');       // ✅ reset to user
       setSelectedDbIds([]);
 
       onCreated?.(data?.user);
@@ -107,7 +112,7 @@ export default function AdminUsers({ onCreated = () => {} }) {
           <span className="field__label">Username</span>
           <input
             className="input"
-            placeholder="e.g., operator01"
+            placeholder="e.g., volunteer01"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -137,8 +142,10 @@ export default function AdminUsers({ onCreated = () => {} }) {
             value={role}
             onChange={(e) => setRole(e.target.value)}
           >
-            <option value="operator">Operator</option>
-            <option value="admin">Administrator</option>
+            {/* ✅ As requested: User / Candidate / Volunteer */}
+            <option value="user">User</option>
+            <option value="candidate">Candidate</option>
+            <option value="volunteer">Volunteer</option>
           </select>
         </label>
 
