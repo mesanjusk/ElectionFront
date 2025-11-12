@@ -99,13 +99,28 @@ export async function adminUpdateUserDatabases(userId, allowedDatabaseIds) {
   return data?.user;
 }
 
+/** Reset device binding (for candidate re-activation) */
+export async function adminResetUserDevice(userId) {
+  const { data } = await api.patch(`/api/admin/users/${userId}/reset-device`);
+  return data?.user;
+}
+
 /* ============================
-   (Optional) AUTH HELPERS
+   AUTH HELPERS
    ============================ */
 
-/** Login (username OR email; deviceId auto-sent via interceptor) */
+/**
+ * Login (username-only on the backend).
+ * We accept username OR email from the UI and map it to the `username` field, lowercased.
+ * `userType` should be 'candidate' or 'volunteer' (volunteer = user/operator).
+ */
 export async function apiLogin({ username, email, password, userType }) {
-  const { data } = await api.post('/api/auth/login', { username, email, password, userType });
+  const userKey = (username || email || '').trim().toLowerCase();
+  const { data } = await api.post('/api/auth/login', {
+    username: userKey,
+    password,
+    userType,
+  });
   return data;
 }
 
