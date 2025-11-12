@@ -85,6 +85,15 @@ const getHouseNo = (r) =>
 const getAge = (r) =>
   pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
 
+// 💡 numeric age (null if not parseable)
+const getAgeNum = (r) => {
+  const raw = getAge(r);
+  const m = String(raw || "").match(/\d+/);
+  if (!m) return null;
+  const n = parseInt(m[0], 10);
+  return Number.isNaN(n) ? null : n;
+};
+
 const getGender = (r) => {
   const g =
     pick(r, ["gender", "Gender"]) ||
@@ -109,6 +118,7 @@ const getCareOf = (r) =>
   pick(r?.__raw, [
     "वडिलांचे नाव",
     "वडिलांचे नांव",
+    "পতির নাম",
     "पतीचे नाव",
     "पतीचे नांव",
     "Guardians Name",
@@ -283,7 +293,6 @@ export default function Search() {
 
   const [userName, setUserName] = useState("User");
   useEffect(() => {
-    // flexible sources; adjust to your app if needed
     const u = localStorage.getItem("userName") ||
               localStorage.getItem("name") ||
               JSON.parse(localStorage.getItem("user") || "{}").name;
@@ -296,6 +305,7 @@ export default function Search() {
   useClickOutside(menuRef, () => setMenuOpen(false));
 
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState("all"); // ⭐ new filter tab: all | male | female | 18-35 | 35+
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -326,10 +336,27 @@ export default function Search() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Apply text filter + tab filter together
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return allRows;
-    return allRows.filter((r) => {
+
+    const passesTab = (r) => {
+      if (tab === "all") return true;
+      if (tab === "male") return getGender(r) === "M";
+      if (tab === "female") return getGender(r) === "F";
+      if (tab === "18-35") {
+        const a = getAgeNum(r);
+        return a !== null && a >= 18 && a <= 35;
+      }
+      if (tab === "35+") {
+        const a = getAgeNum(r);
+        return a !== null && a >= 36;
+      }
+      return true;
+    };
+
+    const textMatch = (r) => {
+      if (!term) return true;
       const name = getName(r).toLowerCase();
       const epic = getEPIC(r).toLowerCase();
       const mob = (getMobile(r) || "").toLowerCase();
@@ -344,10 +371,13 @@ export default function Search() {
         part.includes(term) ||
         serialTxt.includes(term)
       );
-    });
-  }, [q, allRows]);
+    };
 
-  useEffect(() => setVisibleCount(200), [q]);
+    return allRows.filter((r) => textMatch(r) && passesTab(r));
+  }, [q, tab, allRows]);
+
+  // Reset window on search or tab change
+  useEffect(() => setVisibleCount(200), [q, tab]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -380,67 +410,66 @@ export default function Search() {
 
   return (
     <div className="sx-page">
-      {/* Top Appbar: username after toggle, then pull+push */}
+      {/* Top Appbar */}
       <header className="sx-appbar sx-appbar--single">
-  <div className="sx-left">
-    <button
-      className="sx-appbar__icon"
-      onClick={() => setMenuOpen((v) => !v)}
-      aria-label="Menu"
-      type="button"
-    >
-      ☰
-    </button>
-    <span className="sx-username" title={userName}>{userName}</span>
-  </div>
+        <div className="sx-left">
+          <button
+            className="sx-appbar__icon"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Menu"
+            type="button"
+          >
+            ☰
+          </button>
+          <span className="sx-username" title={userName}>{userName}</span>
+        </div>
 
-  <div className="sx-right">
-    <button
-      className="sx-appbar__action"
-      type="button"
-      aria-label="Pull"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const c = await pullAll();
-          alert(`Pulled ${c} changes from server.`);
-          await loadAll();
-        } catch (e) {
-          alert("Pull failed: " + (e?.message || e));
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      ⬇
-    </button>
-    <button
-      className="sx-appbar__action"
-      type="button"
-      aria-label="Push"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const res = await pushOutbox();
-          alert(
-            `Pushed: ${res.pushed}${
-              res.failed?.length ? `, Failed: ${res.failed.length}` : ""
-            }`
-          );
-        } catch (e) {
-          alert("Push failed: " + (e?.message || e));
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      ⬆
-    </button>
-  </div>
-</header>
-
+        <div className="sx-right">
+          <button
+            className="sx-appbar__action"
+            type="button"
+            aria-label="Pull"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const c = await pullAll();
+                alert(`Pulled ${c} changes from server.`);
+                await loadAll();
+              } catch (e) {
+                alert("Pull failed: " + (e?.message || e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            ⬇
+          </button>
+          <button
+            className="sx-appbar__action"
+            type="button"
+            aria-label="Push"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const res = await pushOutbox();
+                alert(
+                  `Pushed: ${res.pushed}${
+                    res.failed?.length ? `, Failed: ${res.failed.length}` : ""
+                  }`
+                );
+              } catch (e) {
+                alert("Push failed: " + (e?.message || e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            ⬆
+          </button>
+        </div>
+      </header>
 
       {menuOpen && (
         <div ref={menuRef} className="sx-menu-sheet">
@@ -491,7 +520,49 @@ export default function Search() {
         </button>
       </div>
 
-      {/* Content, with bottom padding for fixed footer */}
+      {/* ⭐ Tab row (WhatsApp-style) */}
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          padding: "8px 12px",
+          borderBottom: "1px solid #eee",
+          background: "#fff",
+          position: "sticky",
+          top: 56, // just below the appbar height
+          zIndex: 5,
+        }}
+      >
+        {[
+          { key: "all", label: "All" },
+          { key: "male", label: "Male" },
+          { key: "female", label: "Female" },
+          { key: "18-35", label: "18–35" },
+          { key: "35+", label: "35+" },
+        ].map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              style={{
+                border: "none",
+                background: active ? "#e8f0ff" : "transparent",
+                color: active ? "#1f4cff" : "#374151",
+                fontWeight: active ? 700 : 500,
+                padding: "8px 12px",
+                borderRadius: 999,
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content */}
       <main className="sx-body sx-body--with-footer">
         <section className="sx-content">
           <div className="sx-cards sx-cards--compact">
@@ -527,7 +598,7 @@ export default function Search() {
                     </button>
                   </div>
 
-                  {/* Row 2: Name ...................... phone / whatsapp / + */}
+                  {/* Row 2: Name + actions */}
                   <div className="sx-row-compact">
                     <button
                       className="sx-name-compact sx-name-button"
@@ -561,7 +632,6 @@ export default function Search() {
                       </>
                     ) : (
                       <>
-                        {/* WhatsApp without number → open composer to pick a contact */}
                         <a
                           className="sx-mini-btn"
                           href={waHref}
@@ -590,15 +660,15 @@ export default function Search() {
         </section>
       </main>
 
-      {/* Fixed bottom footer stats: all 6 in ONE row */}
+      {/* Fixed bottom footer stats */}
       <footer className="sx-footer-stats sx-footer--one-row">
         <div className="sx-footer-stat"><span className="k">Male</span><strong className="v">{male.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Female</span><strong className="v">{female.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Total</span><strong className="v">{total.toLocaleString()}</strong></div>
-      <div className="sx-footer-stat"><span className="k">Visible</span><strong className="v">{visibleTotal.toLocaleString()}</strong></div>
+        <div className="sx-footer-stat"><span className="k">Visible</span><strong className="v">{visibleTotal.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Matches</span><strong className="v">{matchedTotal.toLocaleString()}</strong></div>
         <div className="sx-footer-stat"><span className="k">Synced</span><strong className="v">{syncedTotal.toLocaleString()}</strong></div>
-        </footer>
+      </footer>
 
       {/* Modals */}
       <MobileEditModal
