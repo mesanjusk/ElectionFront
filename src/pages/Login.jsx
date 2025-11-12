@@ -38,6 +38,26 @@ const USER_TYPES = [
 
 const PIN_REGEX = /^\d{4}$/;
 
+/** ------------------------------------------------------------------------
+ * Choose a concrete database id to use for syncing.
+ * Priority:
+ *  1) activeDatabaseId from server or previously stored active DB
+ *  2) first database from stored list (setSession -> getAvailableDatabases)
+ *  3) first allowedDatabaseIds on user
+ * ------------------------------------------------------------------------ */
+function chooseEffectiveDatabase({ activeDatabaseId, user } = {}) {
+  const active = activeDatabaseId || getActiveDatabase();
+  if (active) return active;
+
+  const stored = getAvailableDatabases();
+  if (stored && stored.length) return stored[0].id || stored[0]._id;
+
+  const allowed = user?.allowedDatabaseIds;
+  if (allowed && allowed.length) return allowed[0];
+
+  return null;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [activation, setActivation] = useState(() => getActivationState());
@@ -107,12 +127,10 @@ export default function Login() {
     const available = databases.length ? databases : user?.databases || [];
     setSession({ token, user, databases: available });
     setAuthToken(token);
-    if (activeDatabaseId) setActiveDatabase(activeDatabaseId);
 
-    const activeDatabase = activeDatabaseId || getActiveDatabase();
-    const storedDatabases = getAvailableDatabases();
-    const firstDatabase = storedDatabases[0];
-    const effectiveDatabase = activeDatabase || firstDatabase?.id || firstDatabase?._id || null;
+    // Decide an effective DB, persist it, and use it for sync.
+    let effectiveDatabase = chooseEffectiveDatabase({ activeDatabaseId, user });
+    if (effectiveDatabase) setActiveDatabase(effectiveDatabase);
 
     let pushResult = null;
     let pushError = null;
@@ -127,7 +145,7 @@ export default function Login() {
       pushError = err;
     }
 
-    if (!pushError) {
+    if (!pushError && effectiveDatabase) {
       await resetSyncState(effectiveDatabase);
     }
 
@@ -136,7 +154,7 @@ export default function Login() {
       setProgressLabel('Downloading latest records…');
       try {
         await pullAll({
-          databaseId: effectiveDatabase,
+          databaseId: effectiveDatabase,   // ✅ IMPORTANT: always send DB id
           onProgress: ({ total: t }) => {
             total = t;
             setProgress(t);
@@ -244,6 +262,10 @@ export default function Login() {
     setProgressLabel('Uploading offline updates…');
     setAuthToken(token);
 
+    // ✅ pick/restore a DB to use in this session
+    let effectiveDatabase = chooseEffectiveDatabase({});
+    if (effectiveDatabase) setActiveDatabase(effectiveDatabase);
+
     let pushResult = null;
     let pushError = null;
     let pulled = 0;
@@ -260,7 +282,9 @@ export default function Login() {
       setProgressLabel('Downloading latest records…');
 
       try {
+        // ✅ IMPORTANT: include databaseId here too
         pulled = await pullAll({
+          databaseId: effectiveDatabase,   // <-- this was missing earlier
           onProgress: ({ total: t }) => {
             pulled = t;
             setProgress(t);
