@@ -14,7 +14,7 @@ import {
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -58,7 +58,7 @@ export default function AdminLogin() {
     setLoading(true);
     setProgress(0);
     try {
-      const response = await apiLogin({ email, password });
+      const response = await apiLogin({ username, password });
       if (response?.user?.role !== 'admin') {
         throw new Error('Admin access required.');
       }
@@ -83,9 +83,6 @@ export default function AdminLogin() {
               <p className="login-card__tagline">Control centre access</p>
             </div>
           </div>
-          <p className="login-card__subtitle">
-            
-          </p>
         </header>
 
         {error && (
@@ -97,14 +94,14 @@ export default function AdminLogin() {
 
         <form className="form-grid" onSubmit={onSubmit}>
           <label className="field">
-            <span className="field__label">Admin email</span>
+            <span className="field__label">Username</span>
             <input
               className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@campaign.org"
-              type="email"
-              autoComplete="email"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
+              type="text"
+              autoComplete="username"
               required
             />
           </label>
@@ -130,12 +127,17 @@ export default function AdminLogin() {
         {loading ? (
           <div className="login-progress" role="status" aria-live="polite">
             <div className="login-progress__bar">
-              <span className="login-progress__fill" style={{ width: `${Math.min(progress, 100)}%` }} />
+              <span
+                className="login-progress__fill"
+                style={{ width: `${Math.min(progress, 100)}%` }}
+              />
             </div>
             <span className="login-progress__label">Preparing admin workspace…</span>
           </div>
         ) : (
-          <p className="login-card__hint">Need field access instead? Go back to the regular login page.</p>
+          <p className="login-card__hint">
+            Need field access instead? Go back to the regular login page.
+          </p>
         )}
       </div>
     </div>

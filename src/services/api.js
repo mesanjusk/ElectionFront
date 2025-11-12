@@ -61,12 +61,17 @@ async function http(method, path, body, { signal } = {}) {
   return res.json();
 }
 
-// ⬇️ Updated: use username (not email)
+/* =========================
+   AUTH (username-only)
+   ========================= */
+// deviceId is optional here; header already carries X-Device-Id
 export async function apiLogin({ username, password, deviceId, userType }) {
-  // deviceId is optional here; header already carries X-Device-Id
   return http('POST', '/api/auth/login', { username, password, deviceId, userType });
 }
 
+/* =========================
+   VOTERS
+   ========================= */
 export async function apiExport({ page = 1, limit = 5000, since = null, databaseId = null, signal } = {}) {
   const qs = new URLSearchParams();
   qs.set('page', String(page));
@@ -78,4 +83,37 @@ export async function apiExport({ page = 1, limit = 5000, since = null, database
 
 export async function apiBulkUpsert(changes) {
   return http('POST', '/api/voters/bulk-upsert', { changes });
+}
+
+/* =========================
+   ADMIN – USERS & DBs
+   ========================= */
+export async function adminListUsers() {
+  const res = await http('GET', '/api/admin/users');
+  return res?.users || [];
+}
+
+export async function adminCreateUser({ username, password, role = 'user', allowedDatabaseIds = [] }) {
+  return http('POST', '/api/admin/users', { username, password, role, allowedDatabaseIds });
+}
+
+export async function adminDeleteUser(id) {
+  return http('DELETE', `/api/admin/users/${id}`);
+}
+
+export async function adminUpdateUserRole(id, role) {
+  return http('PATCH', `/api/admin/users/${id}/role`, { role });
+}
+
+export async function adminUpdateUserPassword(id, password) {
+  return http('PATCH', `/api/admin/users/${id}/password`, { password });
+}
+
+export async function adminUpdateUserDatabases(id, allowedDatabaseIds) {
+  return http('PATCH', `/api/admin/users/${id}/databases`, { allowedDatabaseIds });
+}
+
+export async function adminListDatabases() {
+  const res = await http('GET', '/api/admin/databases');
+  return res?.databases || [];
 }

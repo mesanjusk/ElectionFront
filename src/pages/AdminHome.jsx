@@ -85,7 +85,6 @@ export default function AdminHome() {
   };
 
   const onRoleChange = (id, role) => {
-    // normalize in UI if someone still selects 'volunteer'
     const normalized = role === 'volunteer' ? 'operator' : role;
     updateUserField(id, (u) => ({ ...u, role: normalized }));
   };
@@ -106,13 +105,13 @@ export default function AdminHome() {
     showStatus('', '');
     try {
       const payload = {
-        role: user.role, // 'operator'|'candidate'|'user'|'admin'
+        role: user.role,
         allowedDatabaseIds: user.allowedDatabaseIds || [],
       };
       const { data } = await api.put(`/api/admin/users/${userId}`, payload);
       const saved = data?.user || user;
       updateUserField(userId, () => saved);
-      showStatus('success', `Updated ${saved.username || user.username || saved.email || user.email || 'user'}`);
+      showStatus('success', `Updated ${saved.username || user.username || 'user'}`);
     } catch (e) {
       showStatus('error', e?.response?.data?.error || 'Failed to update user.');
     } finally {
@@ -120,7 +119,6 @@ export default function AdminHome() {
     }
   };
 
-  // ---- Stats
   const roleOf = (u) => (u?.role || '').toLowerCase();
   const totalUsers = users.length;
   const totalAdmins = users.filter((u) => roleOf(u) === 'admin').length;
@@ -133,8 +131,8 @@ export default function AdminHome() {
     <div className="admin-toolbar">
       <div className="admin-toolbar__group">
         <span className="admin-badge">Admin</span>
-        {(currentUser?.email || currentUser?.username) && (
-          <span className="help-text">Signed in as <b>{currentUser?.username || currentUser?.email}</b></span>
+        {currentUser?.username && (
+          <span className="help-text">Signed in as <b>{currentUser.username}</b></span>
         )}
       </div>
       <div className="admin-toolbar__group">
@@ -249,7 +247,6 @@ export default function AdminHome() {
                             <td data-label="User">
                               <div className="admin-user-meta">
                                 <b>{user?.username || '—'}</b>
-                                {user?.email && <span className="admin-user-email">{user.email}</span>}
                               </div>
                             </td>
                             <td data-label="Role">
