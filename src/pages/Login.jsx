@@ -87,9 +87,7 @@ export default function Login() {
   const [language] = useState(DEFAULT_LANGUAGE);
 
   // Username/password only for activation
-  const [username, setUsername] = useState(
-    () => activation?.username || ""
-  );
+  const [username, setUsername] = useState(() => activation?.username || "");
   const [password, setPassword] = useState("");
 
   // PIN entry for unlock (2-digit)
@@ -144,6 +142,7 @@ export default function Login() {
     user,
     databases = [],
     activeDatabaseId,
+    skipSync = false, // NEW FLAG
   }) => {
     const available = databases.length ? databases : user?.databases || [];
     setSession({ token, user, databases: available });
@@ -170,8 +169,10 @@ export default function Login() {
     let pullError = null;
     let total = 0;
 
-    // Always push + (attempt to) pull on login
-    if (effectiveDatabase) {
+    const shouldSync = !skipSync && effectiveDatabase;
+
+    // 🔁 Only sync when NOT skipping (i.e., on activation login, NOT on PIN unlock)
+    if (shouldSync) {
       setProgress(0);
       setProgressLabel("Uploading offline updates…");
       try {
@@ -179,19 +180,15 @@ export default function Login() {
       } catch (err) {
         pushError = err;
       }
-    } else {
-      pushResult = { pushed: 0 };
-    }
 
-    // For first-time activation, reset cursors for a clean pull
-    if (!pushError && effectiveDatabase) {
-      await resetSyncState(effectiveDatabase);
-    }
+      // For first-time activation, reset cursors for a clean pull
+      if (!pushError && effectiveDatabase) {
+        await resetSyncState(effectiveDatabase);
+      }
 
-    setProgress(0);
-    setProgressLabel("Downloading latest records…");
-    try {
-      if (effectiveDatabase) {
+      setProgress(0);
+      setProgressLabel("Downloading latest records…");
+      try {
         await pullAll({
           databaseId: effectiveDatabase,
           onProgress: ({ total: t }) => {
@@ -200,29 +197,27 @@ export default function Login() {
             setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
           },
         });
-      } else {
-        total = 0;
+      } catch (err) {
+        pullError = err;
       }
-    } catch (err) {
-      pullError = err;
-    }
 
-    if (pushError || pullError) {
-      const messages = [];
-      if (pushError)
-        messages.push(`push failed: ${pushError?.message || pushError}`);
-      if (pullError)
-        messages.push(`pull failed: ${pullError?.message || pullError}`);
-      alert(
-        `Login completed with limited sync — ${messages.join(" and ")}.`
-      );
-    } else {
-      const pushed = pushResult?.pushed || 0;
-      alert(
-        effectiveDatabase
-          ? `Sync complete. Uploaded ${pushed} changes and downloaded ${total} records.`
-          : `Login complete. No database assigned yet — ask admin to assign one.`
-      );
+      if (pushError || pullError) {
+        const messages = [];
+        if (pushError)
+          messages.push(`push failed: ${pushError?.message || pushError}`);
+        if (pullError)
+          messages.push(`pull failed: ${pullError?.message || pullError}`);
+        alert(
+          `Login completed with limited sync — ${messages.join(" and ")}.`
+        );
+      } else {
+        const pushed = pushResult?.pushed || 0;
+        alert(
+          effectiveDatabase
+            ? `Sync complete. Uploaded ${pushed} changes and downloaded ${total} records.`
+            : `Login complete. No database assigned yet — ask admin to assign one.`
+        );
+      }
     }
 
     const updatedActivation = setActivationState({
@@ -267,6 +262,7 @@ export default function Login() {
         userType: res?.user?.userType,
       });
 
+      // For full login (activation) => do sync
       await completeLogin(res);
     } catch (err) {
       setError(err?.message || "Activation failed.");
@@ -278,7 +274,7 @@ export default function Login() {
     }
   };
 
-  // PIN unlock submit
+  // PIN unlock submit (NO SYNC HERE)
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -301,10 +297,16 @@ export default function Login() {
         return;
       }
 
-      unlockSession();
       const user = activation?.user;
       const activeDatabaseId = getActiveDatabase();
-      await completeLogin({ token, user, activeDatabaseId });
+
+      // ✅ QUICK UNLOCK: skipSync = true → NO push/pull
+      await completeLogin({
+        token,
+        user,
+        activeDatabaseId,
+        skipSync: true,
+      });
     } catch (err) {
       setError(err?.message || "PIN verification failed.");
       setLoading(false);
