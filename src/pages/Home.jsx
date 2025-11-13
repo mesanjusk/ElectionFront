@@ -209,44 +209,7 @@ export default function Home() {
       <Container maxWidth="lg">
         <Stack spacing={4}>
           {/* Header + user card */}
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={3}
-            alignItems={{ xs: "flex-start", md: "center" }}
-            justifyContent="space-between"
-          >
-            <Stack spacing={0.5}>
-              <Typography
-                variant="overline"
-                color="text.secondary"
-                sx={{ letterSpacing: 2 }}
-              >
-                Smart Book
-              </Typography>
-              <Typography variant="h4" fontWeight={700}>
-                Candidate dashboard
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Monitor sync health and jump into key flows.
-              </Typography>
-            </Stack>
-            <Card sx={{ minWidth: 260 }}>
-              <CardContent>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Signed in as
-                </Typography>
-                <Typography variant="h6">
-                  {user?.username || "User"}
-                </Typography>
-                <Chip
-                  sx={{ mt: 1 }}
-                  label={`DB · ${assignedName || "Unassigned"}`}
-                  color="primary"
-                  variant="outlined"
-                />
-              </CardContent>
-            </Card>
-          </Stack>
+          
 
           {/* Main metrics + sync button on left */}
           <Grid container spacing={3}>

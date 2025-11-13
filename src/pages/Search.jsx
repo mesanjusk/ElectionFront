@@ -664,6 +664,65 @@ export default function Search() {
         onPush={handlePush}
       />
 
+      {/* Sticky filters bar just below TopNavbar */}
+      <Box
+        sx={(theme) => ({
+          position: "sticky",
+          top: theme.mixins.toolbar.minHeight || 72,
+          zIndex: theme.zIndex.appBar - 1,
+          bgcolor: "background.paper",
+          borderBottom: "1px solid rgba(15,23,42,0.08)",
+        })}
+      >
+        <Container maxWidth="lg" sx={{ py: 1 }}>
+          <Stack spacing={1.5}>
+            <TextField
+              label="Search voters"
+              placeholder="Search by name, EPIC or phone"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <VoiceSearchButton
+                      onResult={(text) => setQ(text)}
+                      lang={voiceLang}
+                      disabled={busy}
+                    />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Tabs
+              value={tab}
+              onChange={(_, value) => setTab(value)}
+              variant="scrollable"
+              allowScrollButtonsMobile
+            >
+              {filterTabs.map((filter) => (
+                <Tab
+                  key={filter.key}
+                  label={filter.label}
+                  value={filter.key}
+                />
+              ))}
+            </Tabs>
+            <ToggleButtonGroup
+              value={ageBand}
+              exclusive
+              onChange={(_, value) => value && setAgeBand(value)}
+              size="small"
+            >
+              {ageFilters.map((filter) => (
+                <ToggleButton key={filter.key} value={filter.key}>
+                  {filter.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Stack>
+        </Container>
+      </Box>
+
       {/* Menu for logout */}
       <Menu
         anchorEl={menuAnchorEl}
@@ -684,59 +743,8 @@ export default function Search() {
         </Box>
       </Menu>
 
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 3 }}>
         <Stack spacing={3}>
-          {/* Search + filters card */}
-          <Card>
-            <CardContent>
-              <Stack spacing={2}>
-                <TextField
-                  label="Search voters"
-                  placeholder="Search by name, EPIC or phone"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <VoiceSearchButton
-                          onResult={(text) => setQ(text)}
-                          lang={voiceLang}
-                          disabled={busy}
-                        />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                <Tabs
-                  value={tab}
-                  onChange={(_, value) => setTab(value)}
-                  variant="scrollable"
-                  allowScrollButtonsMobile
-                >
-                  {filterTabs.map((filter) => (
-                    <Tab
-                      key={filter.key}
-                      label={filter.label}
-                      value={filter.key}
-                    />
-                  ))}
-                </Tabs>
-                <ToggleButtonGroup
-                  value={ageBand}
-                  exclusive
-                  onChange={(_, value) => value && setAgeBand(value)}
-                  size="small"
-                >
-                  {ageFilters.map((filter) => (
-                    <ToggleButton key={filter.key} value={filter.key}>
-                      {filter.label}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
-              </Stack>
-            </CardContent>
-          </Card>
-
           {/* Results list */}
           <Card>
             <CardContent>
@@ -827,7 +835,7 @@ export default function Search() {
                           {name}
                         </Typography>
 
-                        {/* EPIC is hidden here as requested (shown only in details modal) */}
+                        {/* EPIC hidden here; shown only in details modal */}
 
                         {/* Row 3: Actions - Call, Share, Edit icon in one row */}
                         <Stack
