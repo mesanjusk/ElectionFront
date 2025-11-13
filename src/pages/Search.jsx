@@ -639,12 +639,12 @@ export default function Search() {
   const syncedTotal = allRows.length;
 
   const filterTabs = [
-    { key: "all", label: "All" },
-    { key: "male", label: "Male" },
-    { key: "female", label: "Female" },
+    { key: "all", label: "ALL" },
+    { key: "male", label: "MALE" },
+    { key: "female", label: "FEMALE" },
   ];
   const ageFilters = [
-    { key: "all", label: "All" },
+    { key: "all", label: "ALL" },
     { key: "18-30", label: "18–30" },
     { key: "30-45", label: "30–45" },
     { key: "45-60", label: "45–60" },
@@ -652,7 +652,7 @@ export default function Search() {
   ];
 
   return (
-    <Box sx={{ minHeight: "100vh", pb: 14 }}>
+    <Box sx={{ minHeight: "100vh", pb: 8 }}>
       {/* Reusable top navbar */}
       <TopNavbar
         collectionName={collectionName}
@@ -663,7 +663,7 @@ export default function Search() {
         onPush={handlePush}
       />
 
-      {/* Sticky search bar just below TopNavbar */}
+      {/* Sticky block: filters (tabs + age + totals) + search, just under navbar */}
       <Box
         sx={(theme) => ({
           position: "sticky",
@@ -674,47 +674,119 @@ export default function Search() {
         })}
       >
         <Container maxWidth="lg" sx={{ py: 0.75 }}>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            sx={{ width: "100%" }}
-          >
-            <TextField
-              size="small"
-              fullWidth
-              label="Search voters"
-              placeholder="Search by name, EPIC or phone"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRoundedIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <VoiceSearchButton
-                      onResult={(text) => setQ(text)}
-                      lang={voiceLang}
-                      disabled={busy}
-                    />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                maxWidth: { xs: "100%", sm: 420 },
-              }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setQ("")}
-              disabled={!q}
+          <Stack spacing={0.75}>
+            {/* Row 1: ALL/MALE/FEMALE tabs + stacked totals on right */}
+            <Stack
+              direction="row"
+              alignItems="flex-end"
+              justifyContent="space-between"
+              spacing={1}
             >
-              Clear
-            </Button>
+              <Tabs
+                value={tab}
+                onChange={(_, value) => setTab(value)}
+                variant="scrollable"
+                allowScrollButtonsMobile
+                sx={{
+                  minHeight: 32,
+                  "& .MuiTab-root": {
+                    minHeight: 32,
+                    paddingY: 0,
+                  },
+                }}
+              >
+                {filterTabs.map((filter) => (
+                  <Tab
+                    key={filter.key}
+                    label={filter.label}
+                    value={filter.key}
+                  />
+                ))}
+              </Tabs>
+
+              <Stack
+                spacing={0}
+                sx={{
+                  ml: 1,
+                  minWidth: 90,
+                  textAlign: "right",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  M {male.toLocaleString()} ·
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  F {female.toLocaleString()}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Total {total.toLocaleString()}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Synced {syncedTotal.toLocaleString()}
+                </Typography>
+              </Stack>
+            </Stack>
+
+            {/* Row 2: age filter pill group */}
+            <ToggleButtonGroup
+              value={ageBand}
+              exclusive
+              onChange={(_, value) => value && setAgeBand(value)}
+              size="small"
+              sx={{
+                alignSelf: "flex-start",
+              }}
+            >
+              {ageFilters.map((filter) => (
+                <ToggleButton key={filter.key} value={filter.key}>
+                  {filter.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+
+            {/* Row 3: search + clear button */}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ width: "100%", pt: 0.25 }}
+            >
+              <TextField
+                size="small"
+                fullWidth
+                label="Search voters"
+                placeholder="Search by name, EPIC or phone"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <VoiceSearchButton
+                        onResult={(text) => setQ(text)}
+                        lang={voiceLang}
+                        disabled={busy}
+                      />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  maxWidth: { xs: "100%", sm: 420 },
+                }}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setQ("")}
+                disabled={!q}
+              >
+                Clear
+              </Button>
+            </Stack>
           </Stack>
         </Container>
       </Box>
@@ -895,75 +967,6 @@ export default function Search() {
         voter={detail}
         onClose={() => setDetail(null)}
       />
-
-      {/* Fixed narrow footer: gender tabs, age filters, totals */}
-      <Box
-        sx={(theme) => ({
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: theme.zIndex.appBar,
-          bgcolor: "background.paper",
-          borderTop: "1px solid rgba(15,23,42,0.12)",
-        })}
-      >
-        <Container maxWidth="lg" sx={{ py: 0.5 }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={0.5}
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            justifyContent="space-between"
-          >
-            {/* All / Male / Female tabs */}
-            <Tabs
-              value={tab}
-              onChange={(_, value) => setTab(value)}
-              variant="scrollable"
-              allowScrollButtonsMobile
-              sx={{
-                minHeight: 32,
-                "& .MuiTab-root": {
-                  minHeight: 32,
-                  paddingY: 0,
-                },
-              }}
-            >
-              {filterTabs.map((filter) => (
-                <Tab
-                  key={filter.key}
-                  label={filter.label}
-                  value={filter.key}
-                />
-              ))}
-            </Tabs>
-
-            {/* Age filters */}
-            <ToggleButtonGroup
-              value={ageBand}
-              exclusive
-              onChange={(_, value) => value && setAgeBand(value)}
-              size="small"
-            >
-              {ageFilters.map((filter) => (
-                <ToggleButton key={filter.key} value={filter.key}>
-                  {filter.label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-
-            {/* Totals (narrow text) */}
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
-              {total.toLocaleString()} | Synced {syncedTotal.toLocaleString()}
-            </Typography>
-          </Stack>
-        </Container>
-      </Box>
 
       <PWAInstallPrompt bottom={120} />
     </Box>
