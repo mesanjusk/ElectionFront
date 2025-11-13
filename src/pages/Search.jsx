@@ -7,7 +7,6 @@ import React, {
   useCallback,
 } from "react";
 import {
-  AppBar,
   Box,
   Button,
   Card,
@@ -28,19 +27,16 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Toolbar,
   Tooltip,
   Typography,
 } from "@mui/material";
-import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import CloudDownloadRoundedIcon from "@mui/icons-material/CloudDownloadRounded";
-import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+
 import { setAuthToken } from "../services/api";
 import {
   lockSession,
@@ -54,9 +50,6 @@ import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
 import TopNavbar from "../components/TopNavbar.jsx";
-
-
-
 
 /* ---------------- helpers (EN + MR + __raw fallbacks) ---------------- */
 const pick = (obj, keys) => {
@@ -190,6 +183,75 @@ const normalizePhone = (raw) => {
   if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
   if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
   return d.length === 10 ? d : "";
+};
+
+/* Simple transliteration: Devanagari to Latin (approx) */
+const DEV_TO_LATIN = {
+  अ: "a",
+  आ: "aa",
+  इ: "i",
+  ई: "ii",
+  उ: "u",
+  ऊ: "uu",
+  ए: "e",
+  ऐ: "ai",
+  ओ: "o",
+  औ: "au",
+  क: "k",
+  ख: "kh",
+  ग: "g",
+  घ: "gh",
+  च: "ch",
+  छ: "chh",
+  ज: "j",
+  झ: "jh",
+  ट: "t",
+  ठ: "th",
+  ड: "d",
+  ढ: "dh",
+  त: "t",
+  थ: "th",
+  द: "d",
+  ध: "dh",
+  न: "n",
+  प: "p",
+  फ: "ph",
+  ब: "b",
+  भ: "bh",
+  म: "m",
+  य: "y",
+  र: "r",
+  ल: "l",
+  व: "v",
+  स: "s",
+  श: "sh",
+  ष: "sh",
+  ह: "h",
+  ङ: "n",
+  ञ: "n",
+  ऱ: "r",
+  "्": "",
+  "ा": "a",
+  "ि": "i",
+  "ी": "i",
+  "ु": "u",
+  "ू": "u",
+  "े": "e",
+  "ै": "ai",
+  "ो": "o",
+  "ौ": "au",
+  "ं": "n",
+  "ँ": "n",
+};
+
+const transliterate = (text) => {
+  const s = String(text || "");
+  let out = "";
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    out += DEV_TO_LATIN[ch] || ch.toLowerCase();
+  }
+  return out;
 };
 
 /* Share text for WhatsApp */
@@ -350,17 +412,6 @@ function RecordModal({ open, voter, onClose }) {
   );
 }
 
-/* ---------------- Reusable Top Navbar component ---------------- */
-<TopNavbar
-  collectionName={collectionName}
-  userName={userName}
-  busy={busy}
-  onMenuOpen={handleMenuOpen}
-  onPull={handlePull}
-  onPush={handlePush}
-/>
-
-
 /* ================================== PAGE ================================== */
 export default function Search() {
   // auth for server Pull/Push
@@ -453,7 +504,10 @@ export default function Search() {
 
   const handlePull = async () => {
     const id = getActiveDatabase();
-    if (!id) return alert("No database selected.");
+    if (!id) {
+      alert("No database selected.");
+      return;
+    }
     if (id !== activeDb) {
       setActiveDatabase(id);
       setActiveDbState(id);
@@ -472,7 +526,10 @@ export default function Search() {
 
   const handlePush = async () => {
     const id = getActiveDatabase();
-    if (!id) return alert("No database selected.");
+    if (!id) {
+      alert("No database selected.");
+      return;
+    }
     if (id !== activeDb) {
       setActiveDatabase(id);
       setActiveDbState(id);
@@ -492,9 +549,10 @@ export default function Search() {
     }
   };
 
-  // Combined filter: text + tab + age band (no transliteration, exact match)
+  // Combined filter: text + tab + age band with transliteration
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const termTrans = transliterate(term);
 
     const inAgeBand = (r) => {
       if (ageBand === "all") return true;
@@ -530,13 +588,18 @@ export default function Search() {
       const partL = part.toLowerCase();
       const serialL = serialTxt.toLowerCase();
 
+      const nameT = transliterate(nameL);
+      const partT = transliterate(partL);
+
       return (
         nameL.includes(term) ||
         epicL.includes(term) ||
         mobL.includes(term) ||
         rpsL.includes(term) ||
         partL.includes(term) ||
-        serialL.includes(term)
+        serialL.includes(term) ||
+        nameT.includes(termTrans) ||
+        partT.includes(termTrans)
       );
     };
 
@@ -591,6 +654,7 @@ export default function Search() {
 
   return (
     <Box sx={{ minHeight: "100vh", pb: 8 }}>
+      {/* Reusable top navbar */}
       <TopNavbar
         collectionName={collectionName}
         userName={userName}
@@ -600,6 +664,7 @@ export default function Search() {
         onPush={handlePush}
       />
 
+      {/* Menu for logout */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -621,12 +686,13 @@ export default function Search() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={3}>
+          {/* Search + filters card */}
           <Card>
             <CardContent>
               <Stack spacing={2}>
                 <TextField
                   label="Search voters"
-                  placeholder="Type name in Marathi/Hindi, or EPIC / phone"
+                  placeholder="Search by name, EPIC or phone"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   InputProps={{
@@ -667,11 +733,11 @@ export default function Search() {
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
-                {/* Visible / Matches / Synced chips hidden as requested */}
               </Stack>
             </CardContent>
           </Card>
 
+          {/* Results list */}
           <Card>
             <CardContent>
               <Stack spacing={1.25}>
@@ -711,30 +777,37 @@ export default function Search() {
                           gap: 0.5,
                         }}
                       >
-                        {/* Row 1: Serial · Part · Age · Sex + + button on right */}
+                        {/* Row 1: Serial · Part · Age · Sex + + button */}
                         <Stack
                           direction="row"
                           spacing={1}
                           alignItems="center"
+                          justifyContent="space-between"
                           flexWrap="wrap"
                         >
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            flexWrap="wrap"
                           >
-                            Serial {serialDisplay} · Part {part}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            · Age {age || "—"} · {gender || "—"}
-                          </Typography>
-                          <Box sx={{ flexGrow: 1 }} />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Serial {serialDisplay} · Part {part}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              · Age {age || "—"} · {gender || "—"}
+                            </Typography>
+                          </Stack>
                           <IconButton
                             size="small"
-                            color="primary"
                             onClick={() => setSelected(r)}
+                            sx={{ ml: 1 }}
                           >
                             <AddRoundedIcon fontSize="small" />
                           </IconButton>
@@ -747,18 +820,16 @@ export default function Search() {
                           sx={{
                             cursor: "pointer",
                             textDecoration: "none",
-                            "&:hover": {
-                              textDecoration: "underline",
-                            },
+                            "&:hover": { textDecoration: "underline" },
                           }}
                           onClick={() => setDetail(r)}
                         >
                           {name}
                         </Typography>
 
-                        {/* Row 3: EPIC removed from list card */}                        
+                        {/* EPIC is hidden here as requested (shown only in details modal) */}
 
-                        {/* Row 4: Actions - Call, Share, Edit icon in one row */}
+                        {/* Row 3: Actions - Call, Share, Edit icon in one row */}
                         <Stack
                           direction="row"
                           spacing={1}
@@ -805,6 +876,7 @@ export default function Search() {
             </CardContent>
           </Card>
 
+          {/* Totals */}
           <Card>
             <CardContent>
               <Typography variant="h6">Totals</Typography>

@@ -34,7 +34,11 @@ export default function TopNavbar({
       <Toolbar sx={{ justifyContent: "space-between", minHeight: 72 }}>
         {/* Left: Menu + Collection name + User name */}
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <IconButton onClick={onMenuOpen} color="inherit">
+          <IconButton
+            onClick={onMenuOpen || (() => {})}
+            color="inherit"
+            edge="start"
+          >
             <MenuRoundedIcon />
           </IconButton>
           <Box>
@@ -52,7 +56,7 @@ export default function TopNavbar({
               <IconButton
                 color="primary"
                 onClick={onPull}
-                disabled={busy}
+                disabled={busy || !onPull}
               >
                 <CloudDownloadRoundedIcon />
               </IconButton>
@@ -63,7 +67,7 @@ export default function TopNavbar({
               <IconButton
                 color="primary"
                 onClick={onPush}
-                disabled={busy}
+                disabled={busy || !onPush}
               >
                 <CloudUploadRoundedIcon />
               </IconButton>
