@@ -6,7 +6,6 @@ import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
-import "./Search.css";
 
 /* ---------------- helpers (EN + MR + __raw fallbacks) ---------------- */
 const pick = (obj, keys) => {
@@ -172,42 +171,57 @@ function MobileEditModal({ open, voter, onClose }) {
 
   if (!open) return null;
   return (
-    <div className="sx-modal" onClick={() => onClose(false)}>
-      <div className="sx-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="sx-dialog-head">
-          <div className="sx-title">
-            {getMobile(voter) ? "Edit mobile" : "Add mobile"}
-          </div>
-          <button className="sx-icon" onClick={() => onClose(false)}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4 py-8"
+      onClick={() => onClose(false)}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-6 shadow-2xl shadow-emerald-900/10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <p className="text-lg font-semibold text-slate-900">
+            {getMobile(voter) ? 'Edit mobile' : 'Add mobile'}
+          </p>
+          <button
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+            onClick={() => onClose(false)}
+            type="button"
+          >
             ✕
           </button>
         </div>
-        <div className="sx-dialog-body">
-          <div className="sx-sub">{getName(voter)}</div>
-          <div className="sx-row">
-            <span className="sx-k">EPIC</span>
-            <span className="sx-v">{getEPIC(voter)}</span>
+        <div className="mt-4 space-y-3 text-sm text-slate-600">
+          <div className="text-base font-semibold text-slate-900">{getName(voter)}</div>
+          <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
+            <span className="text-xs uppercase tracking-wide text-slate-500">EPIC</span>
+            <span className="font-mono text-sm text-slate-800">{getEPIC(voter)}</span>
           </div>
           <input
-            className="sx-input"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             value={mobile}
             onChange={(e) => setMobile(e.target.value)}
             placeholder="10-digit mobile"
             inputMode="numeric"
           />
         </div>
-        <div className="sx-dialog-foot">
-          <button className="sx-btn ghost" onClick={() => onClose(false)}>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+            onClick={() => onClose(false)}
+            type="button"
+          >
             Cancel
           </button>
           <button
-            className="sx-btn primary"
+            className="inline-flex flex-1 items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-500/30"
             onClick={async () => {
               const n = normalizePhone(mobile);
-              if (!n) return alert("Enter a valid 10-digit mobile.");
+              if (!n) return alert('Enter a valid 10-digit mobile.');
               await updateVoterLocal(voter._id, { mobile: n });
               onClose(true);
             }}
+            type="button"
           >
             Save (Local)
           </button>
@@ -221,16 +235,16 @@ function MobileEditModal({ open, voter, onClose }) {
 function RecordModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
   const fields = [
-    ["Name", getName(voter)],
-    ["EPIC", getEPIC(voter)],
-    ["R/P/S", getRPS(voter) || "—"],
-    ["Part", getPart(voter) || "—"],
-    ["Serial", !Number.isNaN(getSerialNum(voter)) ? getSerialNum(voter) : (getSerialText(voter) || "—")],
-    ["Age", getAge(voter) || "—"],
-    ["Sex", getGender(voter) || "—"],
-    ["House", getHouseNo(voter) || "—"],
-    ["C/O", getCareOf(voter) || "—"],
-    ["Mobile", getMobile(voter) || "—"],
+    ['Name', getName(voter)],
+    ['EPIC', getEPIC(voter)],
+    ['R/P/S', getRPS(voter) || '—'],
+    ['Part', getPart(voter) || '—'],
+    ['Serial', !Number.isNaN(getSerialNum(voter)) ? getSerialNum(voter) : getSerialText(voter) || '—'],
+    ['Age', getAge(voter) || '—'],
+    ['Sex', getGender(voter) || '—'],
+    ['House', getHouseNo(voter) || '—'],
+    ['C/O', getCareOf(voter) || '—'],
+    ['Mobile', getMobile(voter) || '—'],
   ];
   const shareText = buildShareText(voter);
 
@@ -240,26 +254,53 @@ function RecordModal({ open, voter, onClose }) {
     : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
   return (
-    <div className="sx-modal" onClick={() => onClose(false)}>
-      <div className="sx-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="sx-dialog-head">
-          <div className="sx-title">Record details</div>
-          <button className="sx-icon" onClick={() => onClose(false)}>✕</button>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4 py-8"
+      onClick={() => onClose(false)}
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl border border-emerald-100 bg-white p-6 shadow-2xl shadow-emerald-900/10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <p className="text-lg font-semibold text-slate-900">Record details</p>
+          <button
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+            onClick={() => onClose(false)}
+            type="button"
+          >
+            ✕
+          </button>
         </div>
-        <div className="sx-dialog-body">
+        <div className="mt-4 space-y-3 text-sm text-slate-600">
           {fields.map(([k, v]) => (
-            <div className="sx-row" key={k}>
-              <span className="sx-k">{k}</span>
-              <span className="sx-v">{String(v)}</span>
+            <div key={k} className="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{k}</span>
+              <span className="text-slate-900">{String(v)}</span>
             </div>
           ))}
-          <textarea className="sx-textarea" readOnly value={shareText} />
+          <textarea
+            className="h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+            readOnly
+            value={shareText}
+          />
         </div>
-        <div className="sx-dialog-foot">
-          <a className="sx-btn primary" href={waUrl} target="_blank" rel="noreferrer">
+        <div className="mt-5 flex flex-wrap gap-3">
+          <a
+            className="inline-flex flex-1 items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-500/30"
+            href={waUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
             Share on WhatsApp
           </a>
-          <button className="sx-btn ghost" onClick={() => onClose(false)}>Close</button>
+          <button
+            className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+            onClick={() => onClose(false)}
+            type="button"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -435,211 +476,177 @@ export default function Search() {
   const matchedTotal = filtered.length;
   const syncedTotal = allRows.length;
 
+  const iconButton =
+    'inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-100 bg-white/80 text-lg text-emerald-600 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:opacity-50';
+  const filterTabClass = (active) =>
+    `rounded-full px-4 py-2 text-sm font-semibold transition ${
+      active
+        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+        : 'border border-transparent text-slate-600 hover:border-emerald-100'
+    }`;
+  const ageChipClass = (active) =>
+    `rounded-full border px-3 py-1 text-sm font-semibold transition ${
+      active
+        ? 'border-emerald-200 bg-white text-emerald-700'
+        : 'border-slate-200 text-slate-600 hover:border-emerald-100'
+    }`;
+  const cardClass = 'rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-emerald-900/5';
+  const tinyBtn =
+    'inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700';
+
   return (
-    <div className="sx-page">
-      {/* Top Appbar */}
-      <header className="sx-appbar sx-appbar--single">
-        <div className="sx-left">
-          <button
-            className="sx-appbar__icon"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Menu"
-            type="button"
-          >
-            ☰
-          </button>
-          <span className="sx-username" title={userName}>Hello, {userName}</span>
-        </div>
-
-        <div className="sx-right">
-          <button
-            className="sx-appbar__action"
-            type="button"
-            aria-label="Pull"
-            disabled={busy}
-            onClick={async () => {
-              if (!activeDb) return alert("No database selected.");
-              setBusy(true);
-              try {
-                const c = await pullAll({ databaseId: activeDb }); // ✅ pass DB id
-                alert(`Pulled ${c} changes from server.`);
-                await loadAll();
-              } catch (e) {
-                alert("Pull failed: " + (e?.message || e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            ⬇
-          </button>
-          <button
-            className="sx-appbar__action"
-            type="button"
-            aria-label="Push"
-            disabled={busy}
-            onClick={async () => {
-              if (!activeDb) return alert("No database selected.");
-              setBusy(true);
-              try {
-                const res = await pushOutbox({ databaseId: activeDb }); // ✅ pass DB id
-                alert(
-                  `Pushed: ${res.pushed}${
-                    res.failed?.length ? `, Failed: ${res.failed.length}` : ""
-                  }`
-                );
-              } catch (e) {
-                alert("Push failed: " + (e?.message || e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            ⬆
-          </button>
-        </div>
-      </header>
-
-      {menuOpen && (
-        <div ref={menuRef} className="sx-menu-sheet">
-          <label className="field">
-            <span className="field__label">Voice language</span>
-            <select
-              className="select"
-              value={voiceLang}
-              onChange={(e) => setVoiceLang(e.target.value)}
+    <div className="flex min-h-screen flex-col bg-emerald-50/40">
+      <header className="sticky top-0 z-30 border-b border-emerald-100 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              className={iconButton}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Menu"
+              type="button"
             >
-              <option value="mr-IN">Marathi (mr-IN)</option>
-              <option value="hi-IN">Hindi (hi-IN)</option>
-              <option value="en-IN">English (en-IN)</option>
-            </select>
-          </label>
-          <div className="sx-menu-sheet__actions">
-            <button className="btn btn--ghost" onClick={logout} type="button">
-              Logout ⎋
+              ☰
+            </button>
+            <span className="text-sm font-semibold text-slate-700" title={userName}>
+              Hello, {userName}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className={iconButton}
+              type="button"
+              aria-label="Pull"
+              disabled={busy}
+              onClick={async () => {
+                if (!activeDb) return alert('No database selected.');
+                setBusy(true);
+                try {
+                  const c = await pullAll({ databaseId: activeDb });
+                  alert(`Pulled ${c} changes from server.`);
+                  await loadAll();
+                } catch (e) {
+                  alert('Pull failed: ' + (e?.message || e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              ⬇
+            </button>
+            <button
+              className={iconButton}
+              type="button"
+              aria-label="Push"
+              disabled={busy}
+              onClick={async () => {
+                if (!activeDb) return alert('No database selected.');
+                setBusy(true);
+                try {
+                  const res = await pushOutbox({ databaseId: activeDb });
+                  alert(`Pushed: ${res.pushed}${res.failed?.length ? `, Failed: ${res.failed.length}` : ''}`);
+                } catch (e) {
+                  alert('Push failed: ' + (e?.message || e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              ⬆
             </button>
           </div>
         </div>
-      )}
 
-      {/* Search bar */}
-      <div className="sx-toolbar">
-        <input
-          className="sx-search-input"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={tab === "surname" ? "Type surname (last name)" : "Search by name, EPIC, booth or phone"}
-          autoComplete="off"
-        />
-        <VoiceSearchButton
-          onResult={setQ}
-          lang={voiceLang}
-          className="sx-search-action"
-          disabled={busy}
-          title="Voice search"
-        />
-        <button
-          className="sx-search-action"
-          aria-label="Clear search"
-          onClick={() => setQ("")}
-          disabled={!q}
-          type="button"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "10px",
-          padding: "8px 12px",
-          borderBottom: "1px solid #eee",
-          background: "#fff",
-          position: "sticky",
-          top: 56,
-          zIndex: 5,
-        }}
-      >
-        {[
-          { key: "all", label: "All" },
-          { key: "male", label: "Male" },
-          { key: "female", label: "Female" },
-          { key: "surname", label: "Surname" },
-        ].map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              style={{
-                border: "none",
-                background: active ? "#e8f0ff" : "transparent",
-                color: active ? "#1f4cff" : "#374151",
-                fontWeight: active ? 700 : 500,
-                padding: "8px 12px",
-                borderRadius: 999,
-                cursor: "pointer",
-              }}
+        {menuOpen && (
+          <div className="border-t border-emerald-100 bg-white/95">
+            <div
+              ref={menuRef}
+              className="mx-auto w-full max-w-5xl rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-900/10"
             >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+              <label className="block text-sm font-semibold text-slate-600">
+                Voice language
+                <select
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900"
+                  value={voiceLang}
+                  onChange={(e) => setVoiceLang(e.target.value)}
+                >
+                  <option value="mr-IN">Marathi (mr-IN)</option>
+                  <option value="hi-IN">Hindi (hi-IN)</option>
+                  <option value="en-IN">English (en-IN)</option>
+                </select>
+              </label>
+              <div className="mt-4 flex justify-end">
+                <button
+                  className="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                  onClick={logout}
+                  type="button"
+                >
+                  Logout ⎋
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Age sub-menu */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          padding: "8px 12px",
-          borderBottom: "1px solid #f1f1f1",
-          background: "#fff",
-          position: "sticky",
-          top: 56 + 41, // below tabs (approx height)
-          zIndex: 4,
-        }}
-      >
-        {[
-          { key: "all",   label: "All" },
-          { key: "18-30", label: "18–30" },
-          { key: "30-45", label: "30–45" },
-          { key: "45-60", label: "45–60" },
-          { key: "60+",   label: "60+" },
-        ].map((a) => {
-          const active = ageBand === a.key;
-          return (
+        <div className="border-t border-emerald-100 bg-white/95">
+          <div className="mx-auto flex w-full max-w-5xl gap-2 px-4 py-3">
+            <input
+              className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-base text-slate-900 shadow-inner focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={tab === 'surname' ? 'Type surname (last name)' : 'Search by name, EPIC, booth or phone'}
+              autoComplete="off"
+            />
+            <VoiceSearchButton onResult={setQ} lang={voiceLang} className={iconButton} disabled={busy} title="Voice search" />
             <button
-              key={a.key}
+              className={iconButton}
+              aria-label="Clear search"
+              onClick={() => setQ('')}
+              disabled={!q}
               type="button"
-              onClick={() => setAgeBand(a.key)}
-              style={{
-                border: "1px solid #e5e7eb",
-                background: active ? "#eef2ff" : "#fff",
-                color: active ? "#1f4cff" : "#374151",
-                fontWeight: active ? 700 : 500,
-                padding: "6px 10px",
-                borderRadius: 999,
-                cursor: "pointer",
-              }}
             >
-              {a.label}
+              ✕
             </button>
-          );
-        })}
-      </div>
+          </div>
+        </div>
 
-      {/* Content */}
-      <main className="sx-body sx-body--with-footer">
-        <section className="sx-content">
-          <div className="sx-cards sx-cards--compact">
-            {visible.map((r, i) => {
-              const name = getName(r);
-              const serialTxt = getSerialText(r);
-              const serialNum = getSerialNum(r);
+        <div className="border-t border-emerald-100 bg-white/95">
+          <div className="mx-auto flex w-full max-w-5xl flex-wrap gap-2 px-4 py-2">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'male', label: 'Male' },
+              { key: 'female', label: 'Female' },
+              { key: 'surname', label: 'Surname' },
+            ].map((t) => (
+              <button key={t.key} type="button" onClick={() => setTab(t.key)} className={filterTabClass(tab === t.key)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-emerald-100 bg-white/95">
+          <div className="mx-auto flex w-full max-w-5xl flex-wrap gap-2 px-4 py-2">
+            {[
+              { key: 'all', label: 'All' },
+              { key: '18-30', label: '18–30' },
+              { key: '30-45', label: '30–45' },
+              { key: '45-60', label: '45–60' },
+              { key: '60+', label: '60+' },
+            ].map((a) => (
+              <button key={a.key} type="button" onClick={() => setAgeBand(a.key)} className={ageChipClass(ageBand === a.key)}>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <div className="mx-auto w-full max-w-5xl space-y-3 px-4 py-5">
+          {visible.map((r, i) => {
+            const name = getName(r);
+            const serialTxt = getSerialText(r);
+            const serialNum = getSerialNum(r);
               const age = getAge(r);
               const gender = getGender(r);
               const mob = getMobile(r);
@@ -650,26 +657,29 @@ export default function Search() {
                 : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
               return (
-                <div className="sx-card sx-card--readable" key={r._id || `${i}-${serialTxt}`}>
-                  <div className="sx-row-compact">
-                    <div className="sx-serial-pill">
-                      {!Number.isNaN(serialNum) ? serialNum : serialTxt || "—"}
-                    </div>
-                    <div className="sx-mini">{age ? `Age ${age}` : "Age —"}</div>
-                    <div className="sx-mini">{gender || "—"}</div>
+                <div className={cardClass} key={r._id || `${i}-${serialTxt}`}>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                      {!Number.isNaN(serialNum) ? serialNum : serialTxt || '—'}
+                    </span>
+                    <span>{age ? `Age ${age}` : 'Age —'}</span>
+                    <span>{gender || '—'}</span>
                     <button
-                      className="sx-mini-btn"
-                      onClick={(e) => { e.stopPropagation(); setSelected(r); }}
-                      title={mob ? "Edit mobile" : "Add mobile"}
+                      className={tinyBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelected(r);
+                      }}
+                      title={mob ? 'Edit mobile' : 'Add mobile'}
                       type="button"
                     >
                       ✎
                     </button>
                   </div>
 
-                  <div className="sx-row-compact">
+                  <div className="mt-3 flex items-center gap-3">
                     <button
-                      className="sx-name-compact sx-name-button"
+                      className="flex-1 text-left text-base font-semibold text-slate-900"
                       title={name}
                       onClick={() => setDetail(r)}
                       type="button"
@@ -680,7 +690,7 @@ export default function Search() {
                     {mob ? (
                       <>
                         <a
-                          className="sx-mini-btn"
+                          className={tinyBtn}
                           href={`tel:${mob}`}
                           onClick={(e) => e.stopPropagation()}
                           title={`Call ${mob}`}
@@ -688,7 +698,7 @@ export default function Search() {
                           📞
                         </a>
                         <a
-                          className="sx-mini-btn"
+                          className={`${tinyBtn} border-emerald-200 text-emerald-700`}
                           href={waHref}
                           onClick={(e) => e.stopPropagation()}
                           title="WhatsApp"
@@ -701,7 +711,7 @@ export default function Search() {
                     ) : (
                       <>
                         <a
-                          className="sx-mini-btn"
+                          className={`${tinyBtn} border-emerald-200 text-emerald-700`}
                           href={waHref}
                           onClick={(e) => e.stopPropagation()}
                           title="Share to WhatsApp"
@@ -709,9 +719,12 @@ export default function Search() {
                           🟢
                         </a>
                         <button
-                          className="sx-mini-btn"
+                          className={tinyBtn}
                           title="Add mobile"
-                          onClick={(e) => { e.stopPropagation(); setSelected(r); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(r);
+                          }}
                           type="button"
                         >
                           ＋
@@ -722,20 +735,38 @@ export default function Search() {
                 </div>
               );
             })}
-          </div>
 
-          <div ref={sentinelRef} className="sx-sentinel" />
-        </section>
+          <div ref={sentinelRef} className="h-8 w-full" />
+        </div>
       </main>
 
-      {/* Fixed bottom footer stats */}
-      <footer className="sx-footer-stats sx-footer--one-row">
-        <div className="sx-footer-stat"><span className="k">Male</span><strong className="v">{male.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Female</span><strong className="v">{female.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Total</span><strong className="v">{total.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Visible</span><strong className="v">{visibleTotal.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Matches</span><strong className="v">{matchedTotal.toLocaleString()}</strong></div>
-        <div className="sx-footer-stat"><span className="k">Synced</span><strong className="v">{syncedTotal.toLocaleString()}</strong></div>
+      <footer className="sticky bottom-0 z-30 border-t border-emerald-100 bg-white/95 px-4 py-3">
+        <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-3 text-center text-sm font-semibold text-slate-700 sm:grid-cols-6">
+          <div>
+            <p className="text-xs uppercase text-slate-500">Male</p>
+            <p>{male.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-slate-500">Female</p>
+            <p>{female.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-slate-500">Total</p>
+            <p>{total.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-slate-500">Visible</p>
+            <p>{visibleTotal.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-slate-500">Matches</p>
+            <p>{matchedTotal.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-slate-500">Synced</p>
+            <p>{syncedTotal.toLocaleString()}</p>
+          </div>
+        </div>
       </footer>
 
       {/* Modals */}
@@ -753,7 +784,7 @@ export default function Search() {
         onClose={() => setDetail(null)}
       />
 
-      <PWAInstallPrompt bottom={90} />
+      <PWAInstallPrompt bottom={120} />
     </div>
   );
 }

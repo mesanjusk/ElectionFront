@@ -10,7 +10,6 @@ import {
   adminUpdateUserDatabases,
   adminResetUserDevice,
 } from '../api';
-import './Admin.css';
 
 const ROLES = ['user', 'operator', 'candidate', 'admin'];
 
@@ -195,47 +194,47 @@ export default function AdminUsers() {
     }
   };
 
+  const inputClass =
+    'mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200';
+  const primaryBtn =
+    'inline-flex items-center rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
+  const ghostBtn =
+    'inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
+  const dangerBtn =
+    'inline-flex items-center rounded-2xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500';
+
   return (
-    <div className="admin">
-      {/* Toast */}
+    <div className="space-y-6">
       {status.text ? (
-        <div className={`toast toast--${status.type}`}>
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            status.type === 'error' ? 'border-rose-100 bg-rose-50 text-rose-900' : 'border-emerald-100 bg-emerald-50 text-emerald-900'
+          }`}
+        >
           {status.text}
         </div>
       ) : null}
 
-      <h1>Admin Users</h1>
-
-      {/* Create User */}
-      <form className="card" onSubmit={onCreate}>
-        <h2>Create New User</h2>
-        <div className="grid grid--3">
-          <label className="field">
-            <span className="field__label">Username</span>
-            <input
-              className="input"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="username"
-            />
+      <form className="rounded-3xl border border-emerald-50 bg-white/90 p-6 shadow-sm" onSubmit={onCreate}>
+        <h2 className="text-xl font-semibold text-slate-900">Create New User</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <label className="block text-sm font-semibold text-slate-600">
+            Username
+            <input className={inputClass} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
           </label>
-          <label className="field">
-            <span className="field__label">Password</span>
+          <label className="block text-sm font-semibold text-slate-600">
+            Password
             <input
-              className="input"
+              className={inputClass}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="minimum 4 characters"
             />
           </label>
-          <label className="field">
-            <span className="field__label">Role</span>
-            <select
-              className="input"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
+          <label className="block text-sm font-semibold text-slate-600">
+            Role
+            <select className={inputClass} value={role} onChange={(e) => setRole(e.target.value)}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
@@ -243,14 +242,19 @@ export default function AdminUsers() {
           </label>
         </div>
 
-        {/* Allowed DBs */}
-        <div className="field">
-          <span className="field__label">Allowed Databases</span>
-          <div className="chips">
+        <div className="mt-4 text-sm font-semibold text-slate-600">
+          Allowed Databases
+          <div className="mt-2 flex flex-wrap gap-2">
             {dbs.map((d) => (
-              <label key={d.id} className={`chip ${allowed.includes(d.id) ? 'chip--active' : ''}`}>
+              <label
+                key={d.id}
+                className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-sm font-semibold ${
+                  allowed.includes(d.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600'
+                }`}
+              >
                 <input
                   type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600"
                   checked={allowed.includes(d.id)}
                   onChange={() => onToggleDb(d.id)}
                 />
@@ -260,28 +264,17 @@ export default function AdminUsers() {
           </div>
         </div>
 
-        <div className="actions">
-          <button className="btn btn--primary" type="submit">Create</button>
+        <div className="mt-4 flex justify-end">
+          <button className={primaryBtn} type="submit">Create</button>
         </div>
       </form>
 
-      {/* Users Table */}
-      <div className="card">
-        <h2>All Users</h2>
+      <div className="rounded-3xl border border-emerald-50 bg-white/90 p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-slate-900">All Users</h2>
         {loading ? (
-          <p>Loading…</p>
+          <p className="mt-4 text-sm text-slate-500">Loading…</p>
         ) : (
-          <div className="table">
-            <div className="table__head">
-              <div>Username</div>
-              <div>Role</div>
-              <div>Allowed DBs</div>
-              <div>Device</div>
-              <div>Created</div>
-              <div>Updated</div>
-              <div>Actions</div>
-            </div>
-
+          <div className="mt-4 space-y-4">
             {users.map((u) => {
               const id = getId(u);
               const isRoleEditing = roleEditing[id] !== undefined;
@@ -290,94 +283,102 @@ export default function AdminUsers() {
               const dbList = Array.from(dbSet);
 
               return (
-                <div key={id} className="table__row">
-                  {/* Username */}
-                  <div>
-                    <div className="mono">{u.username}</div>
-                    <div className="muted small">Password not stored in plain text</div>
-                  </div>
+                <div key={id} className="rounded-2xl border border-slate-100 p-4 shadow-sm">
+                  <div className="grid gap-4 md:grid-cols-7 md:items-start">
+                    <div className="md:col-span-1">
+                      <div className="font-semibold text-slate-900">{u.username}</div>
+                      <div className="text-xs text-slate-500">Password not stored in plain text</div>
+                    </div>
 
-                  {/* Role (inline edit) */}
-                  <div>
-                    {isRoleEditing ? (
-                      <div className="inline-edit">
-                        <select
-                          className="input input--sm"
-                          value={roleEditing[id]}
-                          onChange={(e) =>
-                            setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))
-                          }
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                        <div className="inline-actions">
-                          <button className="btn btn--sm" onClick={() => saveRole(id)}>Save</button>
-                          <button className="btn btn--sm btn--ghost" onClick={() => cancelRoleEdit(id)}>Cancel</button>
+                    <div className="md:col-span-1 space-y-2">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</div>
+                      {isRoleEditing ? (
+                        <div className="space-y-2">
+                          <select
+                            className={inputClass}
+                            value={roleEditing[id]}
+                            onChange={(e) => setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))}
+                          >
+                            {ROLES.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                          <div className="flex gap-2">
+                            <button className={primaryBtn} type="button" onClick={() => saveRole(id)}>Save</button>
+                            <button className={ghostBtn} type="button" onClick={() => cancelRoleEdit(id)}>Cancel</button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="badge">{getRole(u)}</div>
-                        <button className="link" onClick={() => beginRoleEdit(id, getRole(u))}>edit</button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Allowed DBs (inline edit) */}
-                  <div>
-                    {isDbEditing ? (
-                      <>
-                        <div className="chips chips--wrap">
-                          {dbs.map((d) => (
-                            <label key={d.id} className={`chip ${dbSet.has(d.id) ? 'chip--active' : ''}`}>
-                              <input
-                                type="checkbox"
-                                checked={dbSet.has(d.id)}
-                                onChange={() => toggleDbForUser(id, d.id)}
-                              />
-                              <span>{d.name || d.id}</span>
-                            </label>
-                          ))}
-                        </div>
-                        <div className="inline-actions">
-                          <button className="btn btn--sm" onClick={() => saveDbEdit(id)}>Save</button>
-                          <button className="btn btn--sm btn--ghost" onClick={() => cancelDbEdit(id)}>Cancel</button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="muted small">
-                          {dbList.length ? dbList.join(', ') : '—'}
-                        </div>
-                        <button className="link" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>edit</button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Device info */}
-                  <div>
-                    <div className="muted small">
-                      {u.deviceIdBound ? (
-                        <>
-                          <div className="mono small">bound: {u.deviceIdBound}</div>
-                          <div className="small">at: {fmt(u.deviceBoundAt)}</div>
-                        </>
                       ) : (
-                        '—'
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{getRole(u)}</span>
+                          <button className="text-sm font-semibold text-emerald-600" onClick={() => beginRoleEdit(id, getRole(u))}>edit</button>
+                        </div>
                       )}
                     </div>
-                    <button className="link" onClick={() => onResetDevice(id)}>Reset device</button>
-                  </div>
 
-                  <div>{fmt(u.createdAt)}</div>
-                  <div>{fmt(u.updatedAt)}</div>
+                    <div className="md:col-span-2 space-y-2">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Allowed DBs</div>
+                      {isDbEditing ? (
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            {dbs.map((d) => (
+                              <label
+                                key={d.id}
+                                className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-sm font-semibold ${
+                                  dbSet.has(d.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                                  checked={dbSet.has(d.id)}
+                                  onChange={() => toggleDbForUser(id, d.id)}
+                                />
+                                <span>{d.name || d.id}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <button className={primaryBtn} type="button" onClick={() => saveDbEdit(id)}>Save</button>
+                            <button className={ghostBtn} type="button" onClick={() => cancelDbEdit(id)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-slate-500">{dbList.length ? dbList.join(', ') : '—'}</span>
+                          <button className="text-sm font-semibold text-emerald-600" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>edit</button>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Actions */}
-                  <div className="row-actions">
-                    <button className="btn btn--sm" onClick={() => openPwdModal(id)}>Change Password</button>
-                    <button className="btn btn--sm btn--danger" onClick={() => onDelete(id)}>Delete</button>
+                    <div className="md:col-span-1 space-y-2">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Device</div>
+                      <div className="text-xs text-slate-500">
+                        {u.deviceIdBound ? (
+                          <>
+                            <div className="font-mono text-sm">bound: {u.deviceIdBound}</div>
+                            <div>at: {fmt(u.deviceBoundAt)}</div>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </div>
+                      <button className="text-sm font-semibold text-emerald-600" onClick={() => onResetDevice(id)}>Reset device</button>
+                    </div>
+
+                    <div className="md:col-span-1 text-sm text-slate-600">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</div>
+                      {fmt(u.createdAt)}
+                    </div>
+                    <div className="md:col-span-1 text-sm text-slate-600">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</div>
+                      {fmt(u.updatedAt)}
+                    </div>
+
+                    <div className="md:col-span-1 flex flex-wrap gap-2">
+                      <button className={ghostBtn} type="button" onClick={() => openPwdModal(id)}>Change Password</button>
+                      <button className={dangerBtn} type="button" onClick={() => onDelete(id)}>Delete</button>
+                    </div>
                   </div>
                 </div>
               );
@@ -386,16 +387,15 @@ export default function AdminUsers() {
         )}
       </div>
 
-      {/* Change Password Modal */}
       {pwdUserId ? (
-        <div className="modal">
-          <div className="modal__dialog">
-            <h3>Change Password</h3>
-            <form onSubmit={savePassword}>
-              <label className="field">
-                <span className="field__label">New Password</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
+          <div className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">Change Password</h3>
+            <form className="mt-4 space-y-4" onSubmit={savePassword}>
+              <label className="block text-sm font-semibold text-slate-600">
+                New Password
                 <input
-                  className="input"
+                  className={inputClass}
                   type="password"
                   value={newPwd}
                   onChange={(e) => setNewPwd(e.target.value)}
@@ -403,13 +403,12 @@ export default function AdminUsers() {
                   autoFocus
                 />
               </label>
-              <div className="actions">
-                <button className="btn btn--primary" type="submit">Save</button>
-                <button className="btn btn--ghost" type="button" onClick={closePwdModal}>Cancel</button>
+              <div className="flex gap-2">
+                <button className={primaryBtn} type="submit">Save</button>
+                <button className={ghostBtn} type="button" onClick={closePwdModal}>Cancel</button>
               </div>
-              <p className="muted small" style={{ marginTop: 8 }}>
-                Note: Current passwords are not retrievable (stored as secure hashes).  
-                After saving, you’ll see the new password once to share with the user.
+              <p className="text-xs text-slate-500">
+                Note: Current passwords are not retrievable (stored as secure hashes). After saving, you’ll see the new password once to share with the user.
               </p>
             </form>
           </div>

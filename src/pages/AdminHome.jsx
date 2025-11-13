@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import api from '../api';
 import AdminUsers from './AdminUsers.jsx';
 import { getUser, getAvailableDatabases, setAvailableDatabases } from '../auth';
-import './Admin.css';
 
 function resolveId(entity) {
   if (!entity) return undefined;
@@ -30,11 +29,16 @@ function StatCard({ title, value, hint, onClick, href, icon = '📊' }) {
     return { role: 'button', tabIndex: 0, onClick, onKeyDown: handleKeyDown };
   })();
   return (
-    <Component className="admin-stat-card" {...interactiveProps}>
-      <div className="admin-stat-card__icon" aria-hidden>{icon}</div>
-      <div className="admin-stat-card__title">{title}</div>
-      <div className="admin-stat-card__value">{value}</div>
-      {hint && <div className="admin-stat-card__hint">{hint}</div>}
+    <Component
+      className="flex flex-col gap-1 rounded-2xl border border-emerald-50 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+      {...interactiveProps}
+    >
+      <div className="text-2xl" aria-hidden>
+        {icon}
+      </div>
+      <div className="text-sm font-semibold text-slate-600">{title}</div>
+      <div className="text-2xl font-bold text-emerald-700">{value}</div>
+      {hint && <div className="text-sm text-slate-500">{hint}</div>}
     </Component>
   );
 }
@@ -127,16 +131,28 @@ export default function AdminHome() {
   const totalPlainUsers = users.filter((u) => roleOf(u) === 'user').length;
   const totalDatabases = databases.length;
 
+  const panelClass = 'rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-lg shadow-emerald-900/5 backdrop-blur';
+  const primaryBtn =
+    'inline-flex items-center rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
+  const ghostBtn =
+    'inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
+  const tabButton = (active) =>
+    `rounded-full px-4 py-2 text-sm font-semibold transition ${
+      active ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 hover:text-emerald-600'
+    }`;
+
   const Toolbar = (
-    <div className="admin-toolbar">
-      <div className="admin-toolbar__group">
-        <span className="admin-badge">Admin</span>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">Admin</span>
         {currentUser?.username && (
-          <span className="help-text">Signed in as <b>{currentUser.username}</b></span>
+          <span className="text-sm text-slate-500">
+            Signed in as <b className="text-slate-700">{currentUser.username}</b>
+          </span>
         )}
       </div>
-      <div className="admin-toolbar__group">
-        <button className="btn btn--primary" type="button" onClick={() => { loadDatabases(); loadUsers(); }}>
+      <div className="flex items-center gap-2">
+        <button className={primaryBtn} type="button" onClick={() => { loadDatabases(); loadUsers(); }}>
           ⟳ Refresh
         </button>
       </div>
@@ -144,7 +160,7 @@ export default function AdminHome() {
   );
 
   const TabBar = (
-    <div role="tablist" aria-label="Admin tabs" className="admin-tabs">
+    <div role="tablist" aria-label="Admin tabs" className="flex flex-wrap gap-2">
       {[
         ['overview', 'Overview'],
         ['team', 'Team'],
@@ -156,7 +172,7 @@ export default function AdminHome() {
           type="button"
           role="tab"
           aria-selected={tab === key}
-          className="admin-tab"
+          className={tabButton(tab === key)}
           onClick={() => setTab(key)}
         >
           {label}
@@ -166,21 +182,20 @@ export default function AdminHome() {
   );
 
   return (
-    <div className="page admin-page">
-      <div className="admin-page__content">
-        <header className="admin-surface admin-surface--header">
-          <div className="admin-surface__header">
-            <h1 className="panel__title">Admin Dashboard</h1>
-            <p className="panel__subtitle">Manage users, assign voter databases, and jump to common actions.</p>
+    <div className="min-h-screen bg-emerald-50/40 px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <header className={`${panelClass} space-y-4`}>
+          <div>
+            <h1 className="text-3xl font-semibold text-slate-900">Admin Dashboard</h1>
+            <p className="text-sm text-slate-500">Manage users, assign voter databases, and jump to common actions.</p>
           </div>
           {Toolbar}
           {TabBar}
         </header>
 
-        {/* Overview */}
         {tab === 'overview' && (
-          <section aria-labelledby="overview" className="admin-surface">
-            <div className="admin-grid admin-grid--stats">
+          <section aria-labelledby="overview" className={panelClass}>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <StatCard title="Total Accounts" value={totalUsers} hint="All members" icon="👥" onClick={() => setTab('team')} />
               <StatCard title="Admins" value={totalAdmins} hint="Full access" icon="🛡️" onClick={() => setTab('team')} />
               <StatCard title="Operators" value={totalOperators} hint="On-ground users" icon="🤝" onClick={() => setTab('team')} />
@@ -189,7 +204,7 @@ export default function AdminHome() {
               <StatCard title="Voter Databases" value={totalDatabases} hint="Available lists" icon="🗃️" onClick={() => setTab('databases')} />
             </div>
 
-            <div className="admin-grid admin-grid--actions">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <StatCard title="Open Voter Search" value="Search & Filter" hint="Find voters quickly" href="/search" icon="🔎" />
               <StatCard title="Manage Users" value="Add / Edit / Assign" hint="Create users and set roles" onClick={() => setTab('team')} icon="👤" />
               <StatCard title="Assign Databases" value="Grant access" hint="Control which lists each user sees" onClick={() => setTab('databases')} icon="🗂️" />
@@ -198,60 +213,64 @@ export default function AdminHome() {
           </section>
         )}
 
-        {/* Team */}
         {tab === 'team' && (
           <>
-            <section className="admin-surface" aria-labelledby="create-user">
-              <div className="admin-surface__header">
-                <h2 className="panel__title" id="create-user">Team management</h2>
-                <p className="panel__subtitle">Add teammates (username only — email optional), choose a role, and assign databases.</p>
+            <section className={panelClass} aria-labelledby="create-user">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-semibold text-slate-900" id="create-user">Team management</h2>
+                <p className="text-sm text-slate-500">Add teammates (username only — email optional), choose a role, and assign databases.</p>
               </div>
-              <AdminUsers onCreated={onUserCreated} />
+              <div className="mt-4">
+                <AdminUsers onCreated={onUserCreated} />
+              </div>
             </section>
 
-            <section className="admin-surface" aria-labelledby="user-access">
-              <div className="admin-surface__header">
-                <h3 className="panel__title" id="user-access">User access & databases</h3>
-                <p className="panel__subtitle">Toggle which voter databases each user can access.</p>
+            <section className={panelClass} aria-labelledby="user-access">
+              <div className="space-y-1">
+                <h3 className="text-xl font-semibold text-slate-900" id="user-access">User access & databases</h3>
+                <p className="text-sm text-slate-500">Toggle which voter databases each user can access.</p>
               </div>
 
               {status.text && (
-                <div className={`alert ${status.type === 'error' ? 'alert--error' : 'alert--success'}`} role="status">
+                <div
+                  className={`mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${
+                    status.type === 'error'
+                      ? 'border-rose-100 bg-rose-50 text-rose-900'
+                      : 'border-emerald-100 bg-emerald-50 text-emerald-900'
+                  }`}
+                  role="status"
+                >
                   <span aria-hidden>{status.type === 'error' ? '⚠️' : '✅'}</span>
                   <span>{status.text}</span>
                 </div>
               )}
 
               {loading ? (
-                <p className="help-text admin-loading">Loading users…</p>
+                <p className="mt-4 text-sm text-slate-500">Loading users…</p>
               ) : users.length === 0 ? (
-                <p className="help-text admin-empty">No team members found yet.</p>
+                <p className="mt-4 text-sm text-slate-500">No team members found yet.</p>
               ) : (
-                <div className="admin-table-wrapper">
-                  <table className="admin-table">
-                    <thead>
+                <div className="mt-6 overflow-x-auto">
+                  <table className="min-w-full divide-y divide-emerald-50 text-sm">
+                    <thead className="bg-emerald-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                       <tr>
-                        <th>User</th>
-                        <th>Role</th>
-                        <th>Allowed databases</th>
-                        <th>Actions</th>
+                        <th className="px-4 py-3">User</th>
+                        <th className="px-4 py-3">Role</th>
+                        <th className="px-4 py-3">Allowed databases</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-100">
                       {users.map((user) => {
                         const userId = resolveId(user);
                         const assigned = new Set(user?.allowedDatabaseIds || user?.databaseIds || []);
                         const isAdmin = (user?.role || '').toLowerCase() === 'admin';
                         return (
-                          <tr key={userId || Math.random()}>
-                            <td data-label="User">
-                              <div className="admin-user-meta">
-                                <b>{user?.username || '—'}</b>
-                              </div>
-                            </td>
-                            <td data-label="Role">
+                          <tr key={userId || Math.random()} className="align-top">
+                            <td className="px-4 py-3 font-semibold text-slate-800">{user?.username || '—'}</td>
+                            <td className="px-4 py-3">
                               <select
-                                className="select"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
                                 value={user?.role || 'user'}
                                 disabled={isAdmin}
                                 onChange={(e) => onRoleChange(userId, e.target.value)}
@@ -267,15 +286,16 @@ export default function AdminHome() {
                                 )}
                               </select>
                             </td>
-                            <td data-label="Allowed databases">
-                              <div className="admin-checkbox-list">
+                            <td className="px-4 py-3">
+                              <div className="grid gap-2 md:grid-cols-2">
                                 {databases.length > 0 ? (
                                   databases.map((db) => {
                                     const id = resolveId(db);
                                     return (
-                                      <label key={id} className="admin-checkbox">
+                                      <label key={id} className="flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-600">
                                         <input
                                           type="checkbox"
+                                          className="h-4 w-4 rounded border-slate-300 text-emerald-600"
                                           checked={assigned.has(id)}
                                           onChange={(e) => onToggleDatabase(userId, id, e.target.checked)}
                                         />
@@ -284,13 +304,13 @@ export default function AdminHome() {
                                     );
                                   })
                                 ) : (
-                                  <span className="help-text">No voter databases available.</span>
+                                  <span className="text-sm text-slate-500">No voter databases available.</span>
                                 )}
                               </div>
                             </td>
-                            <td data-label="Actions">
+                            <td className="px-4 py-3">
                               <button
-                                className="btn btn--ghost"
+                                className={ghostBtn}
                                 type="button"
                                 onClick={() => saveUser(user)}
                                 disabled={savingId === userId}
@@ -309,26 +329,25 @@ export default function AdminHome() {
           </>
         )}
 
-        {/* Databases */}
         {tab === 'databases' && (
-          <section className="admin-surface" aria-labelledby="database-panel">
-            <div className="admin-surface__header">
-              <h2 className="panel__title" id="database-panel">Voter databases</h2>
-              <p className="panel__subtitle">Your available lists. Assign them to team members from the <b>Team</b> tab.</p>
+          <section className={panelClass} aria-labelledby="database-panel">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold text-slate-900" id="database-panel">Voter databases</h2>
+              <p className="text-sm text-slate-500">Your available lists. Assign them to team members from the <b>Team</b> tab.</p>
             </div>
 
-            <div className="admin-database-grid">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               {databases.length === 0 ? (
-                <p className="help-text admin-empty">No voter databases available.</p>
+                <p className="text-sm text-slate-500">No voter databases available.</p>
               ) : (
                 databases.map((db) => {
                   const label = databaseDisplayName(db);
                   return (
-                    <div key={resolveId(db)} className="admin-database-card">
-                      <div className="admin-section-title">{label}</div>
-                      <div className="help-text">ID: <code>{resolveId(db)}</code></div>
-                      <div className="admin-card-actions">
-                        <Link className="btn btn--ghost" to="/search">Open in Search</Link>
+                    <div key={resolveId(db)} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                      <div className="text-lg font-semibold text-slate-900">{label}</div>
+                      <div className="text-sm text-slate-500">ID: <code className="font-mono">{resolveId(db)}</code></div>
+                      <div className="mt-3">
+                        <Link className={ghostBtn} to="/search">Open in Search</Link>
                       </div>
                     </div>
                   );
@@ -338,25 +357,26 @@ export default function AdminHome() {
           </section>
         )}
 
-        {/* Settings */}
         {tab === 'settings' && (
-          <section className="admin-surface" aria-labelledby="settings">
-            <div className="admin-surface__header">
-              <h2 className="panel__title" id="settings">Settings</h2>
-              <p className="panel__subtitle">General admin preferences.</p>
+          <section className={panelClass} aria-labelledby="settings">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold text-slate-900" id="settings">Settings</h2>
+              <p className="text-sm text-slate-500">General admin preferences.</p>
             </div>
 
-            <div className="admin-database-grid">
-              <div className="admin-settings-card">
-                <div className="admin-section-title">Theme</div>
-                <div className="help-text">Using a light, professional palette (green / grey / black / white).</div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                <div className="text-lg font-semibold text-slate-900">Theme</div>
+                <p className="text-sm text-slate-500">Using a light, professional palette (green / grey / black / white).</p>
               </div>
 
-              <div className="admin-settings-card">
-                <div className="admin-section-title">Shortcuts</div>
-                <div className="admin-card-actions">
-                  <Link to="/search" className="btn btn--ghost">Go to Search</Link>
-                  <button type="button" className="btn btn--ghost" onClick={() => setTab('team')}>Manage Users</button>
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                <div className="text-lg font-semibold text-slate-900">Shortcuts</div>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link to="/search" className={ghostBtn}>Go to Search</Link>
+                  <button type="button" className={ghostBtn} onClick={() => setTab('team')}>
+                    Manage Users
+                  </button>
                 </div>
               </div>
             </div>

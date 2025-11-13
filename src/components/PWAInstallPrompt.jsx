@@ -109,16 +109,19 @@ export default function PWAInstallPrompt({ delayMs = 2500, bottom = 72 }) {
   };
 
   return (
-    <div className="pwa-banner" style={{ "--pwa-offset": `${bottom}px` }}>
+    <div
+      className="fixed inset-x-4 z-40 flex items-center gap-4 rounded-3xl border border-emerald-100 bg-white/90 px-5 py-4 shadow-2xl shadow-emerald-900/10 backdrop-blur"
+      style={{ bottom: `${bottom}px` }}
+    >
       <button
         type="button"
-        className="pwa-banner__close"
+        className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-white text-lg text-emerald-600 transition hover:border-emerald-200 hover:text-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
         onClick={hidePrompt}
         aria-label="Dismiss install prompt"
       >
         ×
       </button>
-      <p className="pwa-banner__tip">
+      <p className="flex-1 text-sm text-slate-600">
         {isIOS ? (
           <>
             Install this app: tap <strong>Share</strong> <span aria-hidden>⬆️</span> then
@@ -128,10 +131,14 @@ export default function PWAInstallPrompt({ delayMs = 2500, bottom = 72 }) {
           <>Install Voter Console for quicker access and reliable offline search.</>
         )}
       </p>
-      <div className="pwa-banner__actions">
-        <button type="button" className="btn btn--primary" onClick={doInstall}>
+      <div className="flex flex-shrink-0 items-center">
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+          onClick={doInstall}
+        >
           <span aria-hidden>➕</span>
-          <span>{isIOS ? "Add to Home Screen" : "Install app"}</span>
+          <span>{isIOS ? 'Add to Home Screen' : 'Install app'}</span>
         </button>
       </div>
     </div>
