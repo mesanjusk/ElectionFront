@@ -11,7 +11,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   Container,
   Dialog,
   DialogActions,
@@ -653,7 +652,7 @@ export default function Search() {
   ];
 
   return (
-    <Box sx={{ minHeight: "100vh", pb: 8 }}>
+    <Box sx={{ minHeight: "100vh", pb: 14 }}>
       {/* Reusable top navbar */}
       <TopNavbar
         collectionName={collectionName}
@@ -664,24 +663,36 @@ export default function Search() {
         onPush={handlePush}
       />
 
-      {/* Sticky filters bar just below TopNavbar */}
+      {/* Sticky search bar just below TopNavbar */}
       <Box
         sx={(theme) => ({
           position: "sticky",
-          top: theme.mixins.toolbar.minHeight || 72,
+          top: theme.mixins.toolbar?.minHeight || 72,
           zIndex: theme.zIndex.appBar - 1,
           bgcolor: "background.paper",
           borderBottom: "1px solid rgba(15,23,42,0.08)",
         })}
       >
-        <Container maxWidth="lg" sx={{ py: 1 }}>
-          <Stack spacing={1.5}>
+        <Container maxWidth="lg" sx={{ py: 0.75 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ width: "100%" }}
+          >
             <TextField
+              size="small"
+              fullWidth
               label="Search voters"
               placeholder="Search by name, EPIC or phone"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
                     <VoiceSearchButton
@@ -692,33 +703,18 @@ export default function Search() {
                   </InputAdornment>
                 ),
               }}
+              sx={{
+                maxWidth: { xs: "100%", sm: 420 },
+              }}
             />
-            <Tabs
-              value={tab}
-              onChange={(_, value) => setTab(value)}
-              variant="scrollable"
-              allowScrollButtonsMobile
-            >
-              {filterTabs.map((filter) => (
-                <Tab
-                  key={filter.key}
-                  label={filter.label}
-                  value={filter.key}
-                />
-              ))}
-            </Tabs>
-            <ToggleButtonGroup
-              value={ageBand}
-              exclusive
-              onChange={(_, value) => value && setAgeBand(value)}
+            <Button
+              variant="outlined"
               size="small"
+              onClick={() => setQ("")}
+              disabled={!q}
             >
-              {ageFilters.map((filter) => (
-                <ToggleButton key={filter.key} value={filter.key}>
-                  {filter.label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
+              Clear
+            </Button>
           </Stack>
         </Container>
       </Box>
@@ -883,31 +879,6 @@ export default function Search() {
               </Stack>
             </CardContent>
           </Card>
-
-          {/* Totals */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6">Totals</Typography>
-              <Stack
-                direction="row"
-                spacing={1}
-                flexWrap="wrap"
-                sx={{ mt: 1 }}
-              >
-                <Chip label={`Male ${male.toLocaleString()}`} />
-                <Chip label={`Female ${female.toLocaleString()}`} />
-                <Chip label={`All records ${total.toLocaleString()}`} />
-              </Stack>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 1 }}
-              >
-                {syncedTotal.toLocaleString()} voters synced locally. Filters
-                show {matchedTotal.toLocaleString()} matches.
-              </Typography>
-            </CardContent>
-          </Card>
         </Stack>
       </Container>
 
@@ -924,6 +895,75 @@ export default function Search() {
         voter={detail}
         onClose={() => setDetail(null)}
       />
+
+      {/* Fixed narrow footer: gender tabs, age filters, totals */}
+      <Box
+        sx={(theme) => ({
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: theme.zIndex.appBar,
+          bgcolor: "background.paper",
+          borderTop: "1px solid rgba(15,23,42,0.12)",
+        })}
+      >
+        <Container maxWidth="lg" sx={{ py: 0.5 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={0.5}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+          >
+            {/* All / Male / Female tabs */}
+            <Tabs
+              value={tab}
+              onChange={(_, value) => setTab(value)}
+              variant="scrollable"
+              allowScrollButtonsMobile
+              sx={{
+                minHeight: 32,
+                "& .MuiTab-root": {
+                  minHeight: 32,
+                  paddingY: 0,
+                },
+              }}
+            >
+              {filterTabs.map((filter) => (
+                <Tab
+                  key={filter.key}
+                  label={filter.label}
+                  value={filter.key}
+                />
+              ))}
+            </Tabs>
+
+            {/* Age filters */}
+            <ToggleButtonGroup
+              value={ageBand}
+              exclusive
+              onChange={(_, value) => value && setAgeBand(value)}
+              size="small"
+            >
+              {ageFilters.map((filter) => (
+                <ToggleButton key={filter.key} value={filter.key}>
+                  {filter.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+
+            {/* Totals (narrow text) */}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
+              {total.toLocaleString()} | Synced {syncedTotal.toLocaleString()}
+            </Typography>
+          </Stack>
+        </Container>
+      </Box>
 
       <PWAInstallPrompt bottom={120} />
     </Box>
