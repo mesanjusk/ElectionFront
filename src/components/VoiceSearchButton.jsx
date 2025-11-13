@@ -1,7 +1,10 @@
 // client/src/components/VoiceSearchButton.jsx
 import React, { useRef, useState } from 'react';
+import { IconButton, Tooltip } from '@mui/material';
+import MicNoneRoundedIcon from '@mui/icons-material/MicNoneRounded';
+import StopCircleRoundedIcon from '@mui/icons-material/StopCircleRounded';
 
-export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN', className = '' }) {
+export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN' }) {
   const recRef = useRef(null);
   const [active, setActive] = useState(false);
 
@@ -40,15 +43,18 @@ export default function VoiceSearchButton({ onResult, disabled, lang = 'hi-IN', 
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled}
-      className={`voice-button${active ? ' active' : ''} ${className}`.trim()}
-      aria-pressed={active}
-      title={active ? 'Tap to stop voice search' : 'Start voice search'}
-    >
-      {active ? '🎙️ ' : '🎤 '}
-    </button>
+    <Tooltip title={active ? 'Tap to stop voice search' : 'Start voice search'}>
+      <span>
+        <IconButton
+          color={active ? 'secondary' : 'primary'}
+          onClick={handleClick}
+          disabled={disabled}
+          aria-pressed={active}
+          size="large"
+        >
+          {active ? <StopCircleRoundedIcon /> : <MicNoneRoundedIcon />}
+        </IconButton>
+      </span>
+    </Tooltip>
   );
 }

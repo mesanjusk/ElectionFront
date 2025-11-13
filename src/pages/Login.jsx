@@ -1,6 +1,20 @@
 // client/src/pages/Login.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  LinearProgress,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { apiLogin, setAuthToken } from '../services/api';
 import { pullAll, pushOutbox, resetSyncState } from '../services/sync';
 import {
@@ -61,6 +75,13 @@ export default function Login() {
     return 'activate';
   })();
   const [mode, setMode] = useState(initialMode);
+  const showPinTab = Boolean(activation?.pinHash && !activation?.revoked);
+
+  useEffect(() => {
+    if (!showPinTab && mode === 'pin') {
+      setMode('activate');
+    }
+  }, [showPinTab, mode]);
 
   // Language is fixed to English — no UI controls
   const [language] = useState(DEFAULT_LANGUAGE);
@@ -331,129 +352,100 @@ export default function Login() {
     setInfoMessage('Reactivate this device with your username and password.');
   };
 
-  const showActivation = mode === 'activate' && !(activation?.pinHash && !activation?.revoked);
+  const currentTab = showPinTab ? mode : 'activate';
+  const isActivationView = currentTab === 'activate';
 
-  const cardStyle = {
-    width: 'min(420px, 100%)',
-    borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--surface-border)',
-    background: 'var(--surface)',
-    padding: '32px',
-    boxShadow: '0 40px 80px rgba(15,23,42,0.15)',
+  const handlePinInputChange = (value) => {
+    setPinInput(value.replace(/[^0-9]/g, '').slice(0, 2));
   };
 
   return (
-    <div className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={cardStyle}>
-        <header style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 16px',
-              borderRadius: 20,
-              background: 'var(--brand-soft)',
-              color: 'var(--brand-dark)',
-            }}
-          >
-            <span style={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.04em' }}>SB</span>
-            <div style={{ textAlign: 'left' }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>SMart Book</p>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>Manage voters data</p>
-            </div>
-          </div>
-          {!showActivation && (
-            <p className="section-subtext" style={{ marginTop: 12 }}>
-              Enter your PIN to continue.
-            </p>
-          )}
-        </header>
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', py: { xs: 4, md: 8 } }}>
+      <Container maxWidth="sm">
+        <Card elevation={8}>
+          <CardContent>
+            <Stack spacing={3}>
+              <Stack spacing={0.5} textAlign="center">
+                <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 3 }}>
+                  Smart Book access
+                </Typography>
+                <Typography variant="h4">Secure login</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Activate this device once and unlock daily with your quick PIN.
+                </Typography>
+              </Stack>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {infoMessage && (
-            <div className="alert alert--info" role="status">
-              <span aria-hidden>⚠️</span>
-              <span>{infoMessage}</span>
-            </div>
-          )}
-          {error && (
-            <div className="alert alert--error" role="alert">
-              <span aria-hidden>⚠️</span>
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
+              {(infoMessage || error) && (
+                <Stack spacing={1}>
+                  {infoMessage && <Alert severity="info">{infoMessage}</Alert>}
+                  {error && <Alert severity="error">{error}</Alert>}
+                </Stack>
+              )}
 
-        {showActivation ? (
-          <form style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={handleActivationSubmit}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Username</span>
-              <input
-                className="input-field"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="smart book"
-                autoComplete="username"
-                required
-              />
-            </label>
+              <Tabs
+                value={currentTab}
+                onChange={(_, value) => setMode(value)}
+                variant="fullWidth"
+                textColor="primary"
+                indicatorColor="primary"
+              >
+                <Tab label="Activate device" value="activate" />
+                {showPinTab && <Tab label="Unlock with PIN" value="pin" />}
+              </Tabs>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Password</span>
-              <input
-                className="input-field"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                required
-              />
-            </label>
+              {isActivationView ? (
+                <Stack component="form" spacing={2} onSubmit={handleActivationSubmit}>
+                  <TextField
+                    label="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
+                    required
+                    fullWidth
+                  />
+                  <TextField
+                    label="Password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                    fullWidth
+                  />
+                  <Button type="submit" variant="contained" size="large" disabled={loading}>
+                    {loading ? 'Syncing data…' : 'Activate & sync'}
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack component="form" spacing={2} onSubmit={handlePinSubmit}>
+                  <TextField
+                    label="2 digit PIN"
+                    value={pinInput}
+                    onChange={(e) => handlePinInputChange(e.target.value)}
+                    inputProps={{ inputMode: 'numeric', maxLength: 2, pattern: '[0-9]{2}' }}
+                    required
+                  />
+                  <Button type="submit" variant="contained" size="large">
+                    Login
+                  </Button>
+                  <Button variant="outlined" onClick={startReactivation}>
+                    Reactivate this device
+                  </Button>
+                </Stack>
+              )}
 
-            <button className="btn btn--primary" disabled={loading} type="submit">
-              {loading ? 'Syncing data…' : 'Activate & sync'}
-            </button>
-          </form>
-        ) : (
-          <form style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={handlePinSubmit}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>2 digit PIN</span>
-              <input
-                className="input-field"
-                inputMode="numeric"
-                pattern="[0-9]{2}"
-                maxLength={2}
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 2))}
-                placeholder="••"
-                autoFocus
-                required
-              />
-            </label>
-
-            <button className="btn btn--primary" type="submit">
-              Login
-            </button>
-
-            <button className="btn btn--ghost" type="button" onClick={startReactivation}>
-              Reactivate this device
-            </button>
-          </form>
-        )}
-
-        {loading && (
-          <div style={{ marginTop: 24 }} role="status" aria-live="polite">
-            <div className="progress-track">
-              <span className="progress-fill" style={{ width: `${Math.min(progress, 100)}%` }} />
-            </div>
-            <p className="section-subtext" style={{ textAlign: 'center', marginTop: 8 }}>
-              {progressLabel || `Downloading ${progress.toLocaleString()} records…`}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+              {loading && (
+                <Stack spacing={1} role="status" aria-live="polite">
+                  <LinearProgress color="secondary" />
+                  <Typography variant="body2" color="text.secondary" textAlign="center">
+                    {progressLabel || 'Preparing your offline workspace…'}
+                  </Typography>
+                </Stack>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }

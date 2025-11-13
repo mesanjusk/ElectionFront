@@ -1,5 +1,41 @@
 // client/src/pages/Search.jsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import {
+  AppBar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
+  InputAdornment,
+  Menu,
+  MenuItem,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Toolbar,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import CloudDownloadRoundedIcon from "@mui/icons-material/CloudDownloadRounded";
+import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import CallRoundedIcon from "@mui/icons-material/CallRounded";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { setAuthToken } from "../services/api";
 import { lockSession, getActiveDatabase } from "../auth"; // ✅ read active DB id
 import { db } from "../db/indexedDb";
@@ -169,48 +205,49 @@ function MobileEditModal({ open, voter, onClose }) {
   const [mobile, setMobile] = useState(getMobile(voter));
   useEffect(() => setMobile(getMobile(voter)), [voter]);
 
-  if (!open) return null;
+  if (!open || !voter) return null;
+
+  const handleSave = async () => {
+    const n = normalizePhone(mobile);
+    if (!n) {
+      alert('Enter a valid 10-digit mobile.');
+      return;
+    }
+    await updateVoterLocal(voter._id, { mobile: n });
+    onClose(true);
+  };
+
   return (
-    <div className="modal-backdrop" onClick={() => onClose(false)}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <header>
-          <h3>{getMobile(voter) ? 'Edit mobile' : 'Add mobile'}</h3>
-          <button className="btn btn--icon" onClick={() => onClose(false)} type="button">✕</button>
-        </header>
-        <div className="record-grid">
-          <strong>{getName(voter)}</strong>
-          <div className="record-row" style={{ justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>EPIC</span>
-            <span style={{ fontFamily: 'monospace' }}>{getEPIC(voter)}</span>
-          </div>
-          <input
-            className="input-field"
-            value={mobile}
+    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
+      <DialogTitle>{getMobile(voter) ? 'Edit mobile' : 'Add mobile'}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {getName(voter)}
+          </Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              EPIC
+            </Typography>
+            <Typography fontFamily="monospace">{getEPIC(voter)}</Typography>
+          </Stack>
+          <TextField
+            label="Mobile number"
+            value={mobile || ''}
             onChange={(e) => setMobile(e.target.value)}
             placeholder="10-digit mobile"
-            inputMode="numeric"
+            inputProps={{ inputMode: 'numeric' }}
+            fullWidth
           />
-        </div>
-        <div style={{ marginTop: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button className="btn btn--ghost" onClick={() => onClose(false)} type="button">
-            Cancel
-          </button>
-          <button
-            className="btn btn--primary"
-            style={{ flex: 1 }}
-            onClick={async () => {
-              const n = normalizePhone(mobile);
-              if (!n) return alert('Enter a valid 10-digit mobile.');
-              await updateVoterLocal(voter._id, { mobile: n });
-              onClose(true);
-            }}
-            type="button"
-          >
-            Save (Local)
-          </button>
-        </div>
-      </div>
-    </div>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onClose(false)}>Cancel</Button>
+        <Button onClick={handleSave} variant="contained">
+          Save (local)
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -237,48 +274,45 @@ function RecordModal({ open, voter, onClose }) {
     : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
   return (
-    <div className="modal-backdrop" onClick={() => onClose(false)}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <header>
-          <h3>Record details</h3>
-          <button className="btn btn--icon" onClick={() => onClose(false)} type="button">✕</button>
-        </header>
-        <div className="record-grid">
+    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="sm">
+      <DialogTitle>Record details</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.5}>
           {fields.map(([k, v]) => (
-            <div key={k} className="record-row">
-              <span style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k}</span>
-              <span>{String(v)}</span>
-            </div>
+            <Stack key={k} direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                {k}
+              </Typography>
+              <Typography fontWeight={600}>{String(v)}</Typography>
+            </Stack>
           ))}
-          <textarea className="textarea-field" readOnly value={shareText} />
-        </div>
-        <div style={{ marginTop: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <a className="btn btn--primary" style={{ flex: 1 }} href={waUrl} target="_blank" rel="noreferrer">
-            Share on WhatsApp
-          </a>
-          <button className="btn btn--ghost" onClick={() => onClose(false)} type="button">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+          <TextField
+            label="Share text"
+            value={shareText}
+            multiline
+            minRows={3}
+            fullWidth
+            InputProps={{ readOnly: true }}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Button
+          component="a"
+          href={waUrl}
+          target="_blank"
+          rel="noreferrer"
+          variant="contained"
+          startIcon={<WhatsAppIcon />}
+        >
+          Share on WhatsApp
+        </Button>
+        <Button onClick={() => onClose(false)} variant="outlined">
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
-}
-
-/* ---------------- Click-outside helper for the top menu ---------------- */
-function useClickOutside(ref, onOutside) {
-  useEffect(() => {
-    function handler(e) {
-      if (!ref.current) return;
-      if (!ref.current.contains(e.target)) onOutside?.();
-    }
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("touchstart", handler, { passive: true });
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("touchstart", handler);
-    };
-  }, [ref, onOutside]);
 }
 
 /* ================================== PAGE ================================== */
@@ -306,9 +340,7 @@ export default function Search() {
   }, [activeDb]);
 
   const [voiceLang, setVoiceLang] = useState("mr-IN");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  useClickOutside(menuRef, () => setMenuOpen(false));
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");     // all | male | female | surname
@@ -320,8 +352,11 @@ export default function Search() {
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
   const sentinelRef = useRef(null);
+  const handleMenuOpen = (event) => setMenuAnchorEl(event.currentTarget);
+  const handleMenuClose = () => setMenuAnchorEl(null);
 
   const logout = () => {
+    handleMenuClose();
     lockSession();
     location.href = "/login";
   };
@@ -449,229 +484,257 @@ export default function Search() {
   ];
 
   return (
-    <div className="search-shell">
-      <header className="search-header">
-        <div className="search-toolbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="btn btn--icon" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu" type="button">
-              ☰
-            </button>
-            <span style={{ fontWeight: 600, color: 'var(--muted-dark)' }}>Hello, {userName}</span>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="btn btn--icon"
-              type="button"
-              aria-label="Pull"
-              disabled={busy}
-              onClick={async () => {
-                if (!activeDb) return alert('No database selected.');
-                setBusy(true);
-                try {
-                  const c = await pullAll({ databaseId: activeDb });
-                  alert(`Pulled ${c} changes from server.`);
-                  await loadAll();
-                } catch (e) {
-                  alert('Pull failed: ' + (e?.message || e));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              ⬇
-            </button>
-            <button
-              className="btn btn--icon"
-              type="button"
-              aria-label="Push"
-              disabled={busy}
-              onClick={async () => {
-                if (!activeDb) return alert('No database selected.');
-                setBusy(true);
-                try {
-                  const res = await pushOutbox({ databaseId: activeDb });
-                  alert(`Pushed: ${res.pushed}${res.failed?.length ? `, Failed: ${res.failed.length}` : ''}`);
-                } catch (e) {
-                  alert('Push failed: ' + (e?.message || e));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              ⬆
-            </button>
-          </div>
-        </div>
-
-        {menuOpen && (
-          <div className="search-toolbar" ref={menuRef} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Voice language</span>
-              <select className="select-field" value={voiceLang} onChange={(e) => setVoiceLang(e.target.value)}>
-                <option value="mr-IN">Marathi (mr-IN)</option>
-                <option value="hi-IN">Hindi (hi-IN)</option>
-                <option value="en-IN">English (en-IN)</option>
-              </select>
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn btn--ghost" type="button" onClick={logout}>
-                Logout ⎋
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="search-bar">
-          <input
-            className="input-field"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={tab === 'surname' ? 'Type surname (last name)' : 'Search by name, EPIC, booth or phone'}
-            autoComplete="off"
-          />
-          <VoiceSearchButton onResult={setQ} lang={voiceLang} disabled={busy} />
-          <button className="btn btn--icon" aria-label="Clear search" onClick={() => setQ('')} disabled={!q} type="button">
-            ✕
-          </button>
-        </div>
-
-        <div className="search-filters">
-          {filterTabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={`chip-button${tab === t.key ? ' active' : ''}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="search-filters">
-          {ageFilters.map((a) => (
-            <button
-              key={a.key}
-              type="button"
-              onClick={() => setAgeBand(a.key)}
-              className={`chip-button${ageBand === a.key ? ' active' : ''}`}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <main className="results-container">
-        {visible.map((r, i) => {
-          const name = getName(r);
-          const serialTxt = getSerialText(r);
-          const serialNum = getSerialNum(r);
-          const age = getAge(r);
-          const gender = getGender(r);
-          const mob = getMobile(r);
-
-          const shareText = buildShareText(r);
-          const waHref = mob
-            ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
-            : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
-
-          return (
-            <div className="voter-card" key={r._id || `${i}-${serialTxt}`}>
-              <div className="voter-meta">
-                <span style={{ fontWeight: 600, color: 'var(--brand-dark)' }}>
-                  {!Number.isNaN(serialNum) ? serialNum : serialTxt || '—'}
-                </span>
-                <span>{age ? `Age ${age}` : 'Age —'}</span>
-                <span>{gender || '—'}</span>
-                <button
-                  className="btn btn--tiny"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelected(r);
+    <Box sx={{ minHeight: '100vh', pb: 8 }}>
+      <AppBar
+        position="sticky"
+        color="transparent"
+        elevation={0}
+        sx={{ backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(15,23,42,0.08)' }}
+      >
+        <Toolbar sx={{ justifyContent: 'space-between', minHeight: 72 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <IconButton onClick={handleMenuOpen} color="inherit">
+              <MenuRoundedIcon />
+            </IconButton>
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Assigned search
+              </Typography>
+              <Typography variant="h6">Hello, {userName}</Typography>
+            </Box>
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <Tooltip title="Pull latest">
+              <span>
+                <IconButton
+                  color="primary"
+                  onClick={async () => {
+                    if (!activeDb) return alert('No database selected.');
+                    setBusy(true);
+                    try {
+                      const c = await pullAll({ databaseId: activeDb });
+                      alert(`Pulled ${c} changes from server.`);
+                      await loadAll();
+                    } catch (e) {
+                      alert('Pull failed: ' + (e?.message || e));
+                    } finally {
+                      setBusy(false);
+                    }
                   }}
-                  title={mob ? 'Edit mobile' : 'Add mobile'}
-                  type="button"
+                  disabled={busy}
                 >
-                  ✎
-                </button>
-              </div>
+                  <CloudDownloadRoundedIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Push offline updates">
+              <span>
+                <IconButton
+                  color="primary"
+                  onClick={async () => {
+                    if (!activeDb) return alert('No database selected.');
+                    setBusy(true);
+                    try {
+                      const res = await pushOutbox({ databaseId: activeDb });
+                      alert(`Pushed: ${res.pushed}${res.failed?.length ? `, Failed: ${res.failed.length}` : ''}`);
+                    } catch (e) {
+                      alert('Push failed: ' + (e?.message || e));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  disabled={busy}
+                >
+                  <CloudUploadRoundedIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Toolbar>
+      </AppBar>
 
-              <div className="voter-main">
-                <button className="voter-name" title={name} onClick={() => setDetail(r)} type="button">
-                  {name}
-                </button>
+      <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose} keepMounted>
+        <Box sx={{ px: 2, py: 1.5, width: 280 }}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Voice language
+          </Typography>
+          <TextField
+            select
+            size="small"
+            fullWidth
+            sx={{ mt: 1.5 }}
+            value={voiceLang}
+            onChange={(e) => setVoiceLang(e.target.value)}
+          >
+            <MenuItem value="mr-IN">Marathi (mr-IN)</MenuItem>
+            <MenuItem value="hi-IN">Hindi (hi-IN)</MenuItem>
+            <MenuItem value="en-IN">English (en-IN)</MenuItem>
+          </TextField>
+          <Button
+            variant="outlined"
+            startIcon={<LogoutRoundedIcon />}
+            sx={{ mt: 2 }}
+            onClick={logout}
+          >
+            Logout
+          </Button>
+        </Box>
+      </Menu>
 
-                {mob ? (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <a className="btn btn--tiny" href={`tel:${mob}`} onClick={(e) => e.stopPropagation()} title={`Call ${mob}`}>
-                      📞
-                    </a>
-                    <a
-                      className="btn btn--tiny"
-                      href={waHref}
-                      onClick={(e) => e.stopPropagation()}
-                      title="WhatsApp"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      🟢
-                    </a>
-                  </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={3}>
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <TextField
+                  label="Search voters"
+                  placeholder="Search by name, EPIC or phone"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <VoiceSearchButton onResult={(text) => setQ(text)} lang={voiceLang} disabled={busy} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <Tabs
+                  value={tab}
+                  onChange={(_, value) => setTab(value)}
+                  variant="scrollable"
+                  allowScrollButtonsMobile
+                >
+                  {filterTabs.map((filter) => (
+                    <Tab key={filter.key} label={filter.label} value={filter.key} />
+                  ))}
+                </Tabs>
+                <ToggleButtonGroup
+                  value={ageBand}
+                  exclusive
+                  onChange={(_, value) => value && setAgeBand(value)}
+                  size="small"
+                >
+                  {ageFilters.map((filter) => (
+                    <ToggleButton key={filter.key} value={filter.key}>
+                      {filter.label}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Chip label={`Visible ${visibleTotal.toLocaleString()}`} />
+                  <Chip label={`Matches ${matchedTotal.toLocaleString()}`} />
+                  <Chip label={`Synced ${syncedTotal.toLocaleString()}`} />
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                {visible.length === 0 ? (
+                  <Typography color="text.secondary">No voters match your filters yet.</Typography>
                 ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <a className="btn btn--tiny" href={waHref} onClick={(e) => e.stopPropagation()} title="Share to WhatsApp">
-                      🟢
-                    </a>
-                    <button
-                      className="btn btn--tiny"
-                      title="Add mobile"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelected(r);
-                      }}
-                      type="button"
-                    >
-                      ＋
-                    </button>
-                  </div>
+                  visible.map((r, i) => {
+                    const name = getName(r);
+                    const serialTxt = getSerialText(r);
+                    const serialNum = getSerialNum(r);
+                    const age = getAge(r);
+                    const gender = getGender(r);
+                    const mob = getMobile(r);
+                    const shareText = buildShareText(r);
+                    const waHref = mob
+                      ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+                      : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+                    return (
+                      <Paper
+                        key={r._id || `${i}-${serialTxt}`}
+                        sx={{
+                          p: 2,
+                          display: 'flex',
+                          flexDirection: { xs: 'column', md: 'row' },
+                          justifyContent: 'space-between',
+                          gap: 2,
+                        }}
+                      >
+                        <Stack spacing={0.5}>
+                          <Typography variant="overline" color="text.secondary">
+                            Serial / Part
+                          </Typography>
+                          <Typography variant="h5">
+                            {!Number.isNaN(serialNum) ? serialNum : serialTxt || '—'} · {getPart(r) || '—'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Age {age || '—'} · {gender || '—'}
+                          </Typography>
+                        </Stack>
+                        <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
+                          <Typography variant="h6">{name}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            EPIC {getEPIC(r)}
+                          </Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<CallRoundedIcon />}
+                              disabled={!mob}
+                              component={mob ? 'a' : 'button'}
+                              href={mob ? `tel:${mob}` : undefined}
+                            >
+                              Call
+                            </Button>
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              startIcon={<WhatsAppIcon />}
+                              component="a"
+                              href={waHref}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Share
+                            </Button>
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<SearchRoundedIcon />}
+                              onClick={() => setDetail(r)}
+                            >
+                              Details
+                            </Button>
+                            <IconButton size="small" color="primary" onClick={() => setSelected(r)}>
+                              <EditRoundedIcon />
+                            </IconButton>
+                          </Stack>
+                        </Stack>
+                      </Paper>
+                    );
+                  })
                 )}
-              </div>
-            </div>
-          );
-        })}
+                <Box ref={sentinelRef} sx={{ height: 32 }} />
+              </Stack>
+            </CardContent>
+          </Card>
 
-        <div ref={sentinelRef} style={{ height: 32 }} />
-      </main>
-
-      <footer className="footer-stats">
-        <div className="stats-grid">
-          <div className="stats-tile">
-            <small>Male</small>
-            <strong>{male.toLocaleString()}</strong>
-          </div>
-          <div className="stats-tile">
-            <small>Female</small>
-            <strong>{female.toLocaleString()}</strong>
-          </div>
-          <div className="stats-tile">
-            <small>Total</small>
-            <strong>{total.toLocaleString()}</strong>
-          </div>
-          <div className="stats-tile">
-            <small>Visible</small>
-            <strong>{visibleTotal.toLocaleString()}</strong>
-          </div>
-          <div className="stats-tile">
-            <small>Matches</small>
-            <strong>{matchedTotal.toLocaleString()}</strong>
-          </div>
-          <div className="stats-tile">
-            <small>Synced</small>
-            <strong>{syncedTotal.toLocaleString()}</strong>
-          </div>
-        </div>
-      </footer>
+          <Card>
+            <CardContent>
+              <Typography variant="h6">Totals</Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+                <Chip label={`Male ${male.toLocaleString()}`} />
+                <Chip label={`Female ${female.toLocaleString()}`} />
+                <Chip label={`All records ${total.toLocaleString()}`} />
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {syncedTotal.toLocaleString()} voters synced locally. Filters show {matchedTotal.toLocaleString()} matches.
+              </Typography>
+            </CardContent>
+          </Card>
+        </Stack>
+      </Container>
 
       <MobileEditModal
         open={!!selected}
@@ -684,6 +747,6 @@ export default function Search() {
       <RecordModal open={!!detail} voter={detail} onClose={() => setDetail(null)} />
 
       <PWAInstallPrompt bottom={120} />
-    </div>
+    </Box>
   );
 }

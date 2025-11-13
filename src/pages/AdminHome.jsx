@@ -1,6 +1,34 @@
 // client/src/pages/AdminHome.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Divider,
+  Grid,
+  IconButton,
+  MenuItem,
+  Stack,
+  Tab,
+  Tabs,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from '@mui/material';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import FolderSharedRoundedIcon from '@mui/icons-material/FolderSharedRounded';
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import api from '../api';
 import AdminUsers from './AdminUsers.jsx';
 import { getUser, getAvailableDatabases, setAvailableDatabases } from '../auth';
@@ -15,32 +43,26 @@ function databaseDisplayName(db) {
   return db.name || db.title || db.label || `Database ${resolveId(db)}`;
 }
 
-function StatCard({ title, value, hint, onClick, href, icon = '📊' }) {
-  const Component = href ? Link : 'div';
-  const interactiveProps = (() => {
-    if (href) return { to: href };
-    if (!onClick) return {};
-    const handleKeyDown = (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        onClick();
-      }
-    };
-    return { role: 'button', tabIndex: 0, onClick, onKeyDown: handleKeyDown };
-  })();
+function StatCard({ title, value, hint, icon }) {
   return (
-    <Component
-      className="glass-pill"
-      style={{ display: 'flex', flexDirection: 'column', gap: 4, cursor: (onClick || href) ? 'pointer' : 'default' }}
-      {...interactiveProps}
-    >
-      <div style={{ fontSize: '1.4rem' }} aria-hidden>
-        {icon}
-      </div>
-      <div style={{ fontSize: '0.85rem', color: 'var(--muted)', fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-dark)' }}>{value}</div>
-      {hint && <div className="section-subtext">{hint}</div>}
-    </Component>
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Stack spacing={1}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            {icon}
+            <Typography variant="subtitle2" color="text.secondary">
+              {title}
+            </Typography>
+          </Stack>
+          <Typography variant="h4">{value}</Typography>
+          {hint && (
+            <Typography variant="body2" color="text.secondary">
+              {hint}
+            </Typography>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -80,9 +102,14 @@ export default function AdminHome() {
     }
   };
 
-  useEffect(() => { loadDatabases(); loadUsers(); }, []);
+  useEffect(() => {
+    loadDatabases();
+    loadUsers();
+  }, []);
 
-  const onUserCreated = () => { loadUsers(); };
+  const onUserCreated = () => {
+    loadUsers();
+  };
 
   const updateUserField = (id, updater) => {
     if (!id) return;
@@ -139,227 +166,280 @@ export default function AdminHome() {
     ['settings', 'Settings'],
   ];
 
+  const renderStatus = () => {
+    if (!status.text) return null;
+    return (
+      <Alert severity={status.type === 'error' ? 'error' : 'success'}>{status.text}</Alert>
+    );
+  };
+
   return (
-    <div className="page-shell">
-      <div className="page-container">
-        <header className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div>
-            <h1 className="section-heading">Admin Dashboard</h1>
-            <p className="section-subtext">Manage users, assign voter databases, and jump to common actions.</p>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span style={{ padding: '4px 12px', borderRadius: 999, background: 'var(--brand-soft)', fontWeight: 600 }}>Admin</span>
-              {currentUser?.username && (
-                <span className="section-subtext">
-                  Signed in as <strong>{currentUser.username}</strong>
-                </span>
-              )}
-            </div>
-            <button className="btn btn--primary" type="button" onClick={() => { loadDatabases(); loadUsers(); }}>
-              ⟳ Refresh
-            </button>
-          </div>
-          <div role="tablist" aria-label="Admin tabs" className="chip-set">
-            {tabOptions.map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={tab === key}
-                className={`chip-button${tab === key ? ' active' : ''}`}
-                onClick={() => setTab(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </header>
+    <Box sx={{ minHeight: '100vh', py: { xs: 4, md: 6 } }}>
+      <Container maxWidth="xl">
+        <Stack spacing={4}>
+          <Card>
+            <CardContent>
+              <Stack spacing={3}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
+                  <Stack spacing={0.5}>
+                    <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
+                      Admin workspace
+                    </Typography>
+                    <Typography variant="h4">Dashboard</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Manage users, assign databases, and monitor sync health.
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Chip icon={<AdminPanelSettingsRoundedIcon />} label={currentUser?.username || 'Admin'} color="primary" variant="outlined" />
+                    <IconButton onClick={() => { loadDatabases(); loadUsers(); }} aria-label="Refresh">
+                      <RefreshRoundedIcon />
+                    </IconButton>
+                  </Stack>
+                </Stack>
 
-        {tab === 'overview' && (
-          <section aria-labelledby="overview" className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <div className="card-grid">
-              <StatCard title="Total Accounts" value={totalUsers} hint="All members" icon="👥" onClick={() => setTab('team')} />
-              <StatCard title="Admins" value={totalAdmins} hint="Full access" icon="🛡️" onClick={() => setTab('team')} />
-              <StatCard title="Operators" value={totalOperators} hint="On-ground users" icon="🤝" onClick={() => setTab('team')} />
-              <StatCard title="Candidates" value={totalCandidates} hint="Candidate logins" icon="🎯" onClick={() => setTab('team')} />
-              <StatCard title="Users" value={totalPlainUsers} hint="General role" icon="🧑‍💼" onClick={() => setTab('team')} />
-              <StatCard title="Voter Databases" value={totalDatabases} hint="Available lists" icon="🗃️" onClick={() => setTab('databases')} />
-            </div>
+                <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile>
+                  {tabOptions.map(([key, label]) => (
+                    <Tab key={key} label={label} value={key} />
+                  ))}
+                </Tabs>
+              </Stack>
+            </CardContent>
+          </Card>
 
-            <div className="card-grid">
-              <StatCard title="Open Voter Search" value="Search & Filter" hint="Find voters quickly" href="/search" icon="🔎" />
-              <StatCard title="Manage Users" value="Add / Edit / Assign" hint="Create users and set roles" onClick={() => setTab('team')} icon="👤" />
-              <StatCard title="Assign Databases" value="Grant access" hint="Control which lists each user sees" onClick={() => setTab('databases')} icon="🗂️" />
-              <StatCard title="Server Health" value="OK" hint="Everything looks good" icon="✅" />
-            </div>
-          </section>
-        )}
+          {tab === 'overview' && (
+            <Stack spacing={3}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <StatCard title="Total Accounts" value={totalUsers} hint="All members" icon={<DashboardRoundedIcon color="primary" />} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <StatCard title="Admins" value={totalAdmins} hint="Full access" icon={<AdminPanelSettingsRoundedIcon color="primary" />} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <StatCard title="Operators" value={totalOperators} hint="On-ground users" icon={<FolderSharedRoundedIcon color="primary" />} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <StatCard title="Candidates" value={totalCandidates} hint="Candidate logins" icon={<FolderSharedRoundedIcon color="secondary" />} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <StatCard title="Users" value={totalPlainUsers} hint="General role" icon={<FolderSharedRoundedIcon color="action" />} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <StatCard title="Databases" value={totalDatabases} hint="Available lists" icon={<SearchRoundedIcon color="primary" />} />
+                </Grid>
+              </Grid>
 
-        {tab === 'team' && (
-          <>
-            <section className="glass-panel" aria-labelledby="create-user">
-              <div>
-                <h2 className="section-heading" id="create-user">Team management</h2>
-                <p className="section-subtext">Add teammates, choose a role, and assign databases.</p>
-              </div>
-              <div style={{ marginTop: 20 }}>
-                <AdminUsers onCreated={onUserCreated} />
-              </div>
-            </section>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6">Quick actions</Typography>
+                      <Divider sx={{ my: 2 }} />
+                      <Stack spacing={1.5}>
+                        <Button component={Link} to="/search" variant="outlined" startIcon={<SearchRoundedIcon />}>
+                          Open voter search
+                        </Button>
+                        <Button variant="outlined" onClick={() => setTab('team')} startIcon={<FolderSharedRoundedIcon />}>
+                          Manage users & roles
+                        </Button>
+                        <Button variant="outlined" onClick={() => setTab('databases')} startIcon={<DashboardRoundedIcon />}>
+                          Assign databases
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6">Sync status</Typography>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        Everything looks good. Keep refreshing to fetch the latest counts.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Stack>
+          )}
 
-            <section className="glass-panel" aria-labelledby="user-access">
-              <div>
-                <h3 className="section-heading" style={{ fontSize: '1.4rem' }} id="user-access">User access & databases</h3>
-                <p className="section-subtext">Toggle which voter databases each user can access.</p>
-              </div>
+          {tab === 'team' && (
+            <Stack spacing={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h5">Team management</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Create users, assign a role, and decide which databases each person can access.
+                  </Typography>
+                  <AdminUsers onCreated={onUserCreated} />
+                </CardContent>
+              </Card>
 
-              {status.text && (
-                <div className={`alert ${status.type === 'error' ? 'alert--error' : 'alert--info'}`} style={{ marginTop: 20 }} role="status">
-                  <span aria-hidden>{status.type === 'error' ? '⚠️' : '✅'}</span>
-                  <span>{status.text}</span>
-                </div>
-              )}
+              <Card>
+                <CardContent>
+                  <Stack spacing={2}>
+                    <Typography variant="h6">User access & databases</Typography>
+                    {renderStatus()}
+                    {loading ? (
+                      <Typography variant="body2" color="text.secondary">Loading users…</Typography>
+                    ) : users.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">No team members found yet.</Typography>
+                    ) : (
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>User</TableCell>
+                            <TableCell>Role</TableCell>
+                            <TableCell>Allowed databases</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {users.map((user) => {
+                            const userId = resolveId(user);
+                            const assigned = new Set(user?.allowedDatabaseIds || user?.databaseIds || []);
+                            const isAdmin = (user?.role || '').toLowerCase() === 'admin';
+                            return (
+                              <TableRow key={userId || Math.random()}>
+                                <TableCell>
+                                  <Typography fontWeight={600}>{user?.username || '—'}</Typography>
+                                </TableCell>
+                                <TableCell sx={{ minWidth: 150 }}>
+                                  <TextField
+                                    select
+                                    size="small"
+                                    value={user?.role || 'user'}
+                                    disabled={isAdmin}
+                                    onChange={(e) => onRoleChange(userId, e.target.value)}
+                                    fullWidth
+                                  >
+                                    {isAdmin ? (
+                                      <MenuItem value="admin">Admin</MenuItem>
+                                    ) : (
+                                      [
+                                        <MenuItem key="user" value="user">User</MenuItem>,
+                                        <MenuItem key="candidate" value="candidate">Candidate</MenuItem>,
+                                        <MenuItem key="operator" value="operator">Operator</MenuItem>,
+                                      ]
+                                    )}
+                                  </TextField>
+                                </TableCell>
+                                <TableCell>
+                                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                                    {databases.length === 0 ? (
+                                      <Typography variant="body2" color="text.secondary">No databases available.</Typography>
+                                    ) : (
+                                      databases.map((db) => {
+                                        const id = resolveId(db);
+                                        const checked = assigned.has(id);
+                                        return (
+                                          <Chip
+                                            key={id}
+                                            label={databaseDisplayName(db)}
+                                            color={checked ? 'primary' : 'default'}
+                                            variant={checked ? 'filled' : 'outlined'}
+                                            onClick={() => onToggleDatabase(userId, id, !checked)}
+                                          />
+                                        );
+                                      })
+                                    )}
+                                  </Stack>
+                                </TableCell>
+                                <TableCell align="right">
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => saveUser(user)}
+                                    disabled={savingId === userId}
+                                  >
+                                    {savingId === userId ? 'Saving…' : 'Save'}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Stack>
+          )}
 
-              {loading ? (
-                <p className="section-subtext" style={{ marginTop: 16 }}>Loading users…</p>
-              ) : users.length === 0 ? (
-                <p className="section-subtext" style={{ marginTop: 16 }}>No team members found yet.</p>
-              ) : (
-                <div style={{ marginTop: 24, overflowX: 'auto' }}>
-                  <table className="table-shell">
-                    <thead>
-                      <tr>
-                        <th>User</th>
-                        <th>Role</th>
-                        <th>Allowed databases</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((user) => {
-                        const userId = resolveId(user);
-                        const assigned = new Set(user?.allowedDatabaseIds || user?.databaseIds || []);
-                        const isAdmin = (user?.role || '').toLowerCase() === 'admin';
-                        return (
-                          <tr key={userId || Math.random()}>
-                            <td style={{ fontWeight: 600 }}>{user?.username || '—'}</td>
-                            <td>
-                              <select
-                                className="select-field"
-                                value={user?.role || 'user'}
-                                disabled={isAdmin}
-                                onChange={(e) => onRoleChange(userId, e.target.value)}
-                              >
-                                {isAdmin ? (
-                                  <option value="admin">Admin</option>
-                                ) : (
-                                  <>
-                                    <option value="user">User</option>
-                                    <option value="candidate">Candidate</option>
-                                    <option value="operator">Operator</option>
-                                  </>
-                                )}
-                              </select>
-                            </td>
-                            <td>
-                              <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
-                                {databases.length > 0 ? (
-                                  databases.map((db) => {
-                                    const id = resolveId(db);
-                                    return (
-                                      <label key={id} className="glass-pill" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                        <input
-                                          type="checkbox"
-                                          checked={assigned.has(id)}
-                                          onChange={(e) => onToggleDatabase(userId, id, e.target.checked)}
-                                        />
-                                        <span style={{ fontSize: '0.9rem' }}>{databaseDisplayName(db)}</span>
-                                      </label>
-                                    );
-                                  })
-                                ) : (
-                                  <span className="section-subtext">No voter databases available.</span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <button
-                                className="btn btn--ghost"
-                                type="button"
-                                onClick={() => saveUser(user)}
-                                disabled={savingId === userId}
-                              >
-                                {savingId === userId ? 'Saving…' : 'Save'}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          </>
-        )}
+          {tab === 'databases' && (
+            <Card>
+              <CardContent>
+                <Typography variant="h5">Voter databases</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Assign these lists to team members from the Team tab.
+                </Typography>
+                {databases.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">No voter databases available.</Typography>
+                ) : (
+                  <Grid container spacing={3}>
+                    {databases.map((db) => (
+                      <Grid item xs={12} md={6} lg={4} key={resolveId(db)}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Typography fontWeight={600}>{databaseDisplayName(db)}</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ my: 1 }}>
+                              ID: <code>{resolveId(db)}</code>
+                            </Typography>
+                            <Button component={Link} to="/search" variant="outlined" size="small">
+                              Open in search
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-        {tab === 'databases' && (
-          <section className="glass-panel" aria-labelledby="database-panel">
-            <div>
-              <h2 className="section-heading" id="database-panel">Voter databases</h2>
-              <p className="section-subtext">Assign these lists to team members from the Team tab.</p>
-            </div>
-
-            <div className="card-grid" style={{ marginTop: 20 }}>
-              {databases.length === 0 ? (
-                <p className="section-subtext">No voter databases available.</p>
-              ) : (
-                databases.map((db) => {
-                  const label = databaseDisplayName(db);
-                  return (
-                    <div key={resolveId(db)} className="glass-pill" style={{ gap: 8 }}>
-                      <div style={{ fontWeight: 600 }}>{label}</div>
-                      <div className="section-subtext">
-                        ID: <code>{resolveId(db)}</code>
-                      </div>
-                      <div>
-                        <Link className="btn btn--ghost" to="/search">Open in Search</Link>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </section>
-        )}
-
-        {tab === 'settings' && (
-          <section className="glass-panel" aria-labelledby="settings">
-            <div>
-              <h2 className="section-heading" id="settings">Settings</h2>
-              <p className="section-subtext">General admin preferences.</p>
-            </div>
-
-            <div className="card-grid" style={{ marginTop: 20 }}>
-              <div className="glass-pill" style={{ gap: 8 }}>
-                <div style={{ fontWeight: 600 }}>Theme</div>
-                <p className="section-subtext">Using a light, professional palette (green / grey / black / white).</p>
-              </div>
-
-              <div className="glass-pill" style={{ gap: 12 }}>
-                <div style={{ fontWeight: 600 }}>Shortcuts</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                  <Link to="/search" className="btn btn--ghost">Go to Search</Link>
-                  <button type="button" className="btn btn--ghost" onClick={() => setTab('team')}>
-                    Manage Users
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-      </div>
-    </div>
+          {tab === 'settings' && (
+            <Card>
+              <CardContent>
+                <Typography variant="h5">Settings</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  General admin preferences.
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography fontWeight={600}>Theme</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Using a light, professional palette (blue / green accents).
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography fontWeight={600}>Shortcuts</Typography>
+                        <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                          <Button component={Link} to="/search" variant="outlined">
+                            Go to search
+                          </Button>
+                          <Button variant="outlined" onClick={() => setTab('team')}>
+                            Manage users
+                          </Button>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          )}
+        </Stack>
+      </Container>
+    </Box>
   );
 }

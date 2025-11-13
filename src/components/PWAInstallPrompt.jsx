@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+import { Button, IconButton, Paper, Slide, Stack, Typography } from "@mui/material";
+import AddToHomeScreenRoundedIcon from "@mui/icons-material/AddToHomeScreenRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 const HIDDEN_KEY = "pwaPromptHidden";
 
@@ -109,24 +112,44 @@ export default function PWAInstallPrompt({ delayMs = 2500, bottom = 72 }) {
   };
 
   return (
-    <div className="pwa-banner" style={{ bottom: `${bottom}px` }}>
-      <button className="btn btn--icon" onClick={hidePrompt} aria-label="Dismiss install prompt" type="button">
-        ×
-      </button>
-      <p className="pwa-banner__message">
-        {isIOS ? (
-          <>
-            Install this app: tap <strong>Share</strong> <span aria-hidden>⬆️</span> then
-            <strong> "Add to Home Screen".</strong>
-          </>
-        ) : (
-          <>Install Voter Console for quicker access and reliable offline search.</>
-        )}
-      </p>
-      <button className="btn btn--primary" onClick={doInstall} type="button">
-        <span aria-hidden>➕</span>
-        <span>{isIOS ? 'Add to Home Screen' : 'Install app'}</span>
-      </button>
-    </div>
+    <Slide direction="up" in={visible} mountOnEnter unmountOnExit>
+      <Paper
+        elevation={12}
+        sx={{
+          position: "fixed",
+          left: "50%",
+          transform: "translateX(-50%)",
+          bottom,
+          px: 3,
+          py: 2,
+          zIndex: 1400,
+          width: { xs: "90%", sm: "auto" },
+        }}
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
+          <Stack direction="row" spacing={1.5} alignItems="center" flex={1}>
+            <AddToHomeScreenRoundedIcon color="primary" />
+            <Typography variant="body2">
+              {isIOS ? (
+                <>
+                  Install this app: tap <strong>Share</strong> <span aria-hidden>⬆️</span> then
+                  <strong> "Add to Home Screen".</strong>
+                </>
+              ) : (
+                <>Install the voter console for faster access and reliable offline search.</>
+              )}
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button onClick={doInstall} variant="contained" color="primary" startIcon={<AddToHomeScreenRoundedIcon fontSize="small" />}>
+              {isIOS ? "Add to Home Screen" : "Install"}
+            </Button>
+            <IconButton onClick={hidePrompt} aria-label="Dismiss install prompt">
+              <CloseRoundedIcon />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Slide>
   );
 }

@@ -1,5 +1,22 @@
 // client/src/pages/AdminUsers.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import {
   adminListUsers,
   adminListDatabases,
@@ -13,39 +30,26 @@ import {
 
 const ROLES = ['user', 'operator', 'candidate', 'admin'];
 
-// helpers to be resilient to id/_id
 const getId = (u) => u?.id || u?._id;
 const getRole = (u) => (u?.role || '').toLowerCase();
 const fmt = (d) => (d ? new Date(d).toLocaleString() : '—');
 
-export default function AdminUsers() {
+export default function AdminUsers({ onCreated }) {
   const [users, setUsers] = useState([]);
   const [dbs, setDbs] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // page-level toast
   const [status, setStatus] = useState({ type: '', text: '' });
-  useEffect(() => {
-    if (!status.text) return;
-    const t = setTimeout(() => setStatus({ type: '', text: '' }), 3000);
-    return () => clearTimeout(t);
-  }, [status]);
 
-  // create form
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
   const [allowed, setAllowed] = useState([]);
 
-  // password modal
   const [pwdUserId, setPwdUserId] = useState(null);
   const [newPwd, setNewPwd] = useState('');
 
-  // role inline edit
-  const [roleEditing, setRoleEditing] = useState({}); // { userId: 'admin' }
-
-  // db selection per user (edit overlay)
-  const [dbEditing, setDbEditing] = useState({}); // { userId: Set([...]) }
+  const [roleEditing, setRoleEditing] = useState({});
+  const [dbEditing, setDbEditing] = useState({});
 
   async function loadAll() {
     setLoading(true);
@@ -65,9 +69,7 @@ export default function AdminUsers() {
   }, []);
 
   const onToggleDb = (id) => {
-    setAllowed((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setAllowed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const onCreate = async (e) => {
@@ -88,6 +90,7 @@ export default function AdminUsers() {
       setRole('user');
       setAllowed([]);
       setStatus({ type: 'ok', text: 'User created' });
+      onCreated?.();
       await loadAll();
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
@@ -185,9 +188,7 @@ export default function AdminUsers() {
       await adminUpdateUserPassword(pwdUserId, newPwd);
       closePwdModal();
       setStatus({ type: 'ok', text: 'Password updated' });
-      // optional: reload list to update updatedAt
       await loadAll();
-      // Show the temporary password once (since we can't retrieve it later)
       window.alert(`New password set successfully.\nShare this one-time value with the user:\n\n${newPwd}`);
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
@@ -195,186 +196,239 @@ export default function AdminUsers() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {status.text ? (
-        <div className={`alert ${status.type === 'error' ? 'alert--error' : 'alert--info'}`}>{status.text}</div>
-      ) : null}
+    <Stack spacing={3}>
+      {status.text && (
+        <Alert severity={status.type === 'error' ? 'error' : 'success'}>{status.text}</Alert>
+      )}
 
-      <form className="glass-panel" onSubmit={onCreate}>
-        <h2 className="section-heading">Create New User</h2>
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', marginTop: 16 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}>
-            Username
-            <input className="input-field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}>
-            Password
-            <input
-              className="input-field"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="minimum 4 characters"
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}>
-            Role
-            <select className="select-field" value={role} onChange={(e) => setRole(e.target.value)}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div style={{ marginTop: 20 }}>
-          <p className="section-subtext" style={{ fontWeight: 600, color: 'var(--muted-dark)' }}>Allowed Databases</p>
-          <div className="chip-set" style={{ marginTop: 12 }}>
-            {dbs.map((d) => (
-              <label key={d.id} className={`chip-button${allowed.includes(d.id) ? ' active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" checked={allowed.includes(d.id)} onChange={() => onToggleDb(d.id)} />
-                <span>{d.name || d.id}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 20, textAlign: 'right' }}>
-          <button className="btn btn--primary" type="submit">Create</button>
-        </div>
-      </form>
-
-      <div className="glass-panel">
-        <h2 className="section-heading">All Users</h2>
-        {loading ? (
-          <p className="section-subtext" style={{ marginTop: 16 }}>Loading…</p>
-        ) : (
-          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {users.map((u) => {
-              const id = getId(u);
-              const isRoleEditing = roleEditing[id] !== undefined;
-              const isDbEditing = dbEditing[id] !== undefined;
-              const dbSet = isDbEditing ? dbEditing[id] : new Set(u?.allowedDatabaseIds || []);
-              const dbList = Array.from(dbSet);
-
-              return (
-                <div key={id} className="glass-pill" style={{ flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-                    <strong>{u.username}</strong>
-                    <span className="section-subtext">Password not stored in plain text</span>
-                  </div>
-
-                  <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
-                    <div>
-                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Role</p>
-                      {isRoleEditing ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          <select className="select-field" value={roleEditing[id]} onChange={(e) => setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))}>
-                            {ROLES.map((r) => (
-                              <option key={r} value={r}>{r}</option>
-                            ))}
-                          </select>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button className="btn btn--primary" type="button" onClick={() => saveRole(id)}>Save</button>
-                            <button className="btn btn--ghost" type="button" onClick={() => cancelRoleEdit(id)}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span className="chip-button active" style={{ cursor: 'default' }}>{getRole(u)}</span>
-                          <button className="btn btn--tiny" type="button" onClick={() => beginRoleEdit(id, getRole(u))}>edit</button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Allowed DBs</p>
-                      {isDbEditing ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          <div className="chip-set">
-                            {dbs.map((d) => (
-                              <label key={d.id} className={`chip-button${dbSet.has(d.id) ? ' active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                <input type="checkbox" checked={dbSet.has(d.id)} onChange={() => toggleDbForUser(id, d.id)} />
-                                <span>{d.name || d.id}</span>
-                              </label>
-                            ))}
-                          </div>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button className="btn btn--primary" type="button" onClick={() => saveDbEdit(id)}>Save</button>
-                            <button className="btn btn--ghost" type="button" onClick={() => cancelDbEdit(id)}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span className="section-subtext">{dbList.length ? dbList.join(', ') : '—'}</span>
-                          <button className="btn btn--tiny" type="button" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>edit</button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Device</p>
-                      <div className="section-subtext">
-                        {u.deviceIdBound ? (
-                          <>
-                            <div style={{ fontFamily: 'monospace' }}>bound: {u.deviceIdBound}</div>
-                            <div>at: {fmt(u.deviceBoundAt)}</div>
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </div>
-                      <button className="btn btn--tiny" type="button" onClick={() => onResetDevice(id)}>Reset device</button>
-                    </div>
-
-                    <div>
-                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Created</p>
-                      <span>{fmt(u.createdAt)}</span>
-                    </div>
-                    <div>
-                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Updated</p>
-                      <span>{fmt(u.updatedAt)}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      <button className="btn btn--ghost" type="button" onClick={() => openPwdModal(id)}>Change Password</button>
-                      <button className="btn btn--danger" type="button" onClick={() => onDelete(id)}>Delete</button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {pwdUserId ? (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <h3>Change Password</h3>
-            <form style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={savePassword}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                New Password
-                <input
-                  className="input-field"
-                  type="password"
-                  value={newPwd}
-                  onChange={(e) => setNewPwd(e.target.value)}
-                  placeholder="minimum 4 characters"
-                  autoFocus
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="h6">Create new user</Typography>
+          <Box component="form" onSubmit={onCreate} sx={{ mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth required />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth required />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value)} fullWidth>
+                  {ROLES.map((r) => (
+                    <MenuItem key={r} value={r}>
+                      {r}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </Grid>
+            <Typography variant="subtitle2" sx={{ mt: 3 }}>
+              Allowed databases
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+              {dbs.map((d) => (
+                <Chip
+                  key={d.id}
+                  label={d.name || d.id}
+                  color={allowed.includes(d.id) ? 'primary' : 'default'}
+                  variant={allowed.includes(d.id) ? 'filled' : 'outlined'}
+                  onClick={() => onToggleDb(d.id)}
                 />
-              </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn--primary" type="submit">Save</button>
-                <button className="btn btn--ghost" type="button" onClick={closePwdModal}>Cancel</button>
-              </div>
-              <p className="section-subtext" style={{ fontSize: '0.75rem' }}>
-                Note: Current passwords are not retrievable (stored as secure hashes). After saving, you’ll see the new password once to share with the user.
-              </p>
-            </form>
-          </div>
-        </div>
-      ) : null}
-    </div>
+              ))}
+            </Stack>
+            <Stack direction="row" justifyContent="flex-end" sx={{ mt: 3 }}>
+              <Button type="submit" variant="contained">
+                Create user
+              </Button>
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="h6">All users</Typography>
+          {loading ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Loading…
+            </Typography>
+          ) : (
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              {users.map((u) => {
+                const id = getId(u);
+                const isRoleEditing = roleEditing[id] !== undefined;
+                const isDbEditing = dbEditing[id] !== undefined;
+                const dbSet = isDbEditing ? dbEditing[id] : new Set(u?.allowedDatabaseIds || []);
+                const dbList = Array.from(dbSet);
+
+                return (
+                  <Card key={id} variant="outlined">
+                    <CardContent>
+                      <Stack spacing={2}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
+                          <Stack spacing={0.5}>
+                            <Typography variant="h6">{u.username}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Passwords stored securely (hashed)
+                            </Typography>
+                          </Stack>
+                          <Stack direction="row" spacing={1}>
+                            <Chip label={getRole(u)} color="primary" variant="outlined" />
+                            <Button size="small" variant="outlined" onClick={() => openPwdModal(id)}>
+                              Change password
+                            </Button>
+                            <Button size="small" variant="outlined" color="error" onClick={() => onDelete(id)}>
+                              Delete
+                            </Button>
+                          </Stack>
+                        </Stack>
+
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="caption" color="text.secondary">
+                              Role
+                            </Typography>
+                            {isRoleEditing ? (
+                              <Stack spacing={1} sx={{ mt: 1 }}>
+                                <TextField
+                                  select
+                                  value={roleEditing[id]}
+                                  onChange={(e) => setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))}
+                                  fullWidth
+                                >
+                                  {ROLES.map((r) => (
+                                    <MenuItem key={r} value={r}>
+                                      {r}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                                <Stack direction="row" spacing={1}>
+                                  <Button variant="contained" size="small" onClick={() => saveRole(id)}>
+                                    Save
+                                  </Button>
+                                  <Button variant="outlined" size="small" onClick={() => cancelRoleEdit(id)}>
+                                    Cancel
+                                  </Button>
+                                </Stack>
+                              </Stack>
+                            ) : (
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                                <Chip label={getRole(u)} color="primary" variant="filled" />
+                                <Button variant="outlined" size="small" onClick={() => beginRoleEdit(id, getRole(u))}>
+                                  Edit
+                                </Button>
+                              </Stack>
+                            )}
+                          </Grid>
+
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="caption" color="text.secondary">
+                              Allowed DBs
+                            </Typography>
+                            {isDbEditing ? (
+                              <Stack spacing={1} sx={{ mt: 1 }}>
+                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                  {dbs.map((d) => (
+                                    <Chip
+                                      key={d.id}
+                                      label={d.name || d.id}
+                                      color={dbSet.has(d.id) ? 'primary' : 'default'}
+                                      variant={dbSet.has(d.id) ? 'filled' : 'outlined'}
+                                      onClick={() => toggleDbForUser(id, d.id)}
+                                    />
+                                  ))}
+                                </Stack>
+                                <Stack direction="row" spacing={1}>
+                                  <Button variant="contained" size="small" onClick={() => saveDbEdit(id)}>
+                                    Save
+                                  </Button>
+                                  <Button variant="outlined" size="small" onClick={() => cancelDbEdit(id)}>
+                                    Cancel
+                                  </Button>
+                                </Stack>
+                              </Stack>
+                            ) : (
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  {dbList.length ? dbList.join(', ') : '—'}
+                                </Typography>
+                                <Button variant="outlined" size="small" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>
+                                  Edit
+                                </Button>
+                              </Stack>
+                            )}
+                          </Grid>
+
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="caption" color="text.secondary">
+                              Device
+                            </Typography>
+                            <Stack spacing={0.5} sx={{ mt: 1 }}>
+                              {u.deviceIdBound ? (
+                                <>
+                                  <Typography fontFamily="monospace">bound: {u.deviceIdBound}</Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    at: {fmt(u.deviceBoundAt)}
+                                  </Typography>
+                                </>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">—</Typography>
+                              )}
+                              <Button variant="outlined" size="small" onClick={() => onResetDevice(id)}>
+                                Reset device
+                              </Button>
+                            </Stack>
+                          </Grid>
+
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="caption" color="text.secondary">
+                              Created
+                            </Typography>
+                            <Typography>{fmt(u.createdAt)}</Typography>
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="caption" color="text.secondary">
+                              Updated
+                            </Typography>
+                            <Typography>{fmt(u.updatedAt)}</Typography>
+                          </Grid>
+                        </Grid>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!pwdUserId} onClose={closePwdModal} fullWidth maxWidth="xs">
+        <DialogTitle>Change password</DialogTitle>
+        <Box component="form" onSubmit={savePassword}>
+          <DialogContent>
+            <Stack spacing={2}>
+              <TextField
+                label="New password"
+                type="password"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+                autoFocus
+                required
+              />
+              <Typography variant="body2" color="text.secondary">
+                Passwords are stored securely. After saving, you will see the new password once to share with the user.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closePwdModal}>Cancel</Button>
+            <Button type="submit" variant="contained">
+              Save
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </Stack>
   );
 }

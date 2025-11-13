@@ -2,6 +2,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Grid,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import QuizRoundedIcon from '@mui/icons-material/QuizRounded';
+import MapRoundedIcon from '@mui/icons-material/MapRounded';
+import SyncRoundedIcon from '@mui/icons-material/SyncRounded';
+import {
   getUser,
   getAvailableDatabases,
   getActiveDatabase,
@@ -103,178 +119,179 @@ export default function Home() {
   const maxVal = Math.max(...chartData.map(d => d.value), 10);
   const barColor = '#2f67ff';
 
+  const quickActions = [
+    {
+      label: 'Voter Search',
+      description: 'Find voters by name, EPIC or phone.',
+      icon: <SearchRoundedIcon color="primary" />,
+      action: () => navigate('/search'),
+    },
+    {
+      label: 'Volunteer Quiz',
+      description: 'Micro-learnings for your team.',
+      icon: <QuizRoundedIcon color="secondary" />,
+      action: () => alert('Volunteer quiz coming soon.'),
+    },
+    {
+      label: 'Constituency Facts',
+      description: 'Reference sheets for your booths.',
+      icon: <MapRoundedIcon color="primary" />,
+      action: () => alert('Constituency fact sheet coming soon.'),
+    },
+  ];
+
   return (
-    <div className="page-shell">
-      <div className="page-container">
-        <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '16px',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <div>
-              <h1 className="section-heading">Candidate Dashboard</h1>
-              <p className="section-subtext">Track your assigned voters and jump back into search.</p>
-            </div>
-            <div style={{ textAlign: 'right', fontSize: '0.9rem', color: 'var(--muted-dark)' }}>
-              <div>
-                Hello, <strong>{user?.username || 'User'}</strong>
-              </div>
-              <div>
-                DB: <strong>{assignedName || '—'}</strong>
-              </div>
-            </div>
-          </div>
+    <Box sx={{ minHeight: '100vh', py: { xs: 4, md: 8 } }}>
+      <Container maxWidth="lg">
+        <Stack spacing={4}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+            <Stack spacing={0.5}>
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
+                Smart Book
+              </Typography>
+              <Typography variant="h4" fontWeight={700}>
+                Candidate dashboard
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Monitor sync health and jump into key flows.
+              </Typography>
+            </Stack>
+            <Card sx={{ minWidth: 260 }}>
+              <CardContent>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Signed in as
+                </Typography>
+                <Typography variant="h6">{user?.username || 'User'}</Typography>
+                <Chip sx={{ mt: 1 }} label={`DB · ${assignedName || 'Unassigned'}`} color="primary" variant="outlined" />
+              </CardContent>
+            </Card>
+          </Stack>
 
-          <section className="glass-panel" style={{ padding: '24px', boxShadow: 'none' }}>
-            <h2 className="section-heading" style={{ fontSize: '1.4rem' }}>
-              Voter records — {assignedName || 'N/A'}
-            </h2>
-            <p className="section-subtext">Last synced total count shown below.</p>
-            <div
-              style={{
-                position: 'relative',
-                height: 260,
-                marginTop: 24,
-                borderRadius: 24,
-                background: 'linear-gradient(180deg, rgba(16,185,129,0.12), #fff)',
-                padding: 24,
-                overflow: 'hidden',
-              }}
-            >
-              {[0.25, 0.5, 0.75].map((g) => (
-                <div
-                  key={g}
-                  style={{
-                    position: 'absolute',
-                    left: 24,
-                    right: 24,
-                    bottom: `${g * 100}%`,
-                    borderTop: '1px dashed rgba(16,185,129,0.3)',
-                  }}
-                />
-              ))}
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  justifyContent: 'center',
-                  gap: 40,
-                  paddingBottom: 24,
-                }}
-              >
-                {chartData.map((d) => {
-                  const h = Math.round((d.value / maxVal) * 200);
-                  return (
-                    <div key={d.label} style={{ textAlign: 'center' }}>
-                      <div
-                        style={{
-                          width: 56,
-                          height: h,
-                          borderRadius: 20,
-                          background: 'linear-gradient(180deg, #34d399, #0fb981)',
-                          margin: '0 auto 8px',
-                          transition: 'height 0.3s ease',
-                        }}
-                      />
-                      <div style={{ fontWeight: 600 }}>{d.label}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>{d.value.toLocaleString()}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <p className="section-subtext" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-              <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--brand)' }} /> value
-            </p>
-          </section>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={7}>
+              <Card>
+                <CardContent>
+                  <Stack spacing={2}>
+                    <Typography variant="h6">Voter records — {assignedName || 'N/A'}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Latest synced total shown below.
+                    </Typography>
+                    <Box sx={{
+                      position: 'relative',
+                      minHeight: 220,
+                      borderRadius: 3,
+                      background: 'linear-gradient(180deg, rgba(15,111,255,0.08), #fff)',
+                      p: 3,
+                    }}>
+                      {[0.25, 0.5, 0.75].map((g) => (
+                        <Box key={g} sx={{
+                          position: 'absolute',
+                          left: 24,
+                          right: 24,
+                          bottom: `${g * 100}%`,
+                          borderTop: '1px dashed rgba(15,111,255,0.2)',
+                        }} />
+                      ))}
+                      <Stack direction="row" justifyContent="center" alignItems="flex-end" spacing={6} sx={{ position: 'absolute', inset: 0, pb: 3 }}>
+                        {chartData.map((d) => {
+                          const h = Math.round((d.value / maxVal) * 170);
+                          return (
+                            <Stack key={d.label} spacing={1} alignItems="center">
+                              <Box sx={{ width: 64, height: h, borderRadius: 5, background: 'linear-gradient(180deg,#0fb981,#0f6fff)' }} />
+                              <Typography variant="subtitle1">{d.label}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {d.value.toLocaleString()}
+                              </Typography>
+                            </Stack>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={5}>
+              <Card>
+                <CardContent>
+                  <Stack spacing={2}>
+                    <Typography variant="h6">Assigned voter access</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {assignedDb
+                        ? 'This device is restricted to the voter database assigned to you.'
+                        : 'No voter database is linked yet. Ask an administrator to assign one.'}
+                    </Typography>
+                    <Stack spacing={1}>
+                      <Typography variant="caption" color="text.secondary">
+                        Active database
+                      </Typography>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography fontWeight={600}>{assignedName || '—'}</Typography>
+                        </CardContent>
+                      </Card>
+                    </Stack>
+                    <Button
+                      variant="contained"
+                      startIcon={<SyncRoundedIcon />}
+                      onClick={syncAssigned}
+                      disabled={syncing || !assignedDb}
+                    >
+                      {syncing ? 'Syncing…' : 'Sync assigned voters'}
+                    </Button>
+                    {syncMessage && (
+                      <Typography variant="body2" color="text.secondary">
+                        {syncMessage}
+                      </Typography>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
 
-          <section className="glass-panel" style={{ padding: '24px', boxShadow: 'none' }}>
-            <h2 className="section-heading" style={{ fontSize: '1.4rem' }}>
-              Assigned voter access
-            </h2>
-            <p className="section-subtext" style={{ marginBottom: 16 }}>
-              {assignedDb
-                ? 'Your device is restricted to your assigned voter database.'
-                : 'No voter database is assigned to your account. Please contact the administrator.'}
-            </p>
-            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Voter database
-            </div>
-            <div
-              style={{
-                margin: '8px 0 20px',
-                borderRadius: 20,
-                border: '1px dashed rgba(15,23,42,0.2)',
-                padding: '12px 16px',
-                background: 'rgba(15,23,42,0.02)',
-                fontWeight: 600,
-              }}
-            >
-              {assignedName || '—'}
-            </div>
-            <button className="btn btn--primary" type="button" onClick={syncAssigned} disabled={syncing || !assignedDb}>
-              {syncing ? 'Syncing…' : 'Sync assigned voters'}
-            </button>
-            {syncMessage && (
-              <p className="section-subtext" style={{ marginTop: 12 }}>
-                {syncMessage}
-              </p>
-            )}
-          </section>
+          <Grid container spacing={3}>
+            {quickActions.map((action) => (
+              <Grid item xs={12} md={4} key={action.label}>
+                <Card onClick={action.action} sx={{ cursor: 'pointer' }}>
+                  <CardContent>
+                    <Stack spacing={1.5}>
+                      <Box>{action.icon}</Box>
+                      <Typography variant="h6">{action.label}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {action.description}
+                      </Typography>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
 
-          <section className="card-grid">
-            <button type="button" onClick={() => navigate('/search')} className="glass-pill">
-              <span style={{ fontSize: '1.2rem' }}>🔎</span>
-              <strong>Voter Search</strong>
-              <p className="section-subtext">Find voters by name or EPIC (within assigned DB).</p>
-            </button>
-            <button type="button" onClick={() => alert('Volunteer Quiz – coming soon')} className="glass-pill">
-              <span style={{ fontSize: '1.2rem' }}>💛</span>
-              <strong>Volunteer Quiz</strong>
-              <p className="section-subtext">Train volunteers with quick MCQs.</p>
-            </button>
-            <button type="button" onClick={() => alert('Constituency GK – coming soon')} className="glass-pill">
-              <span style={{ fontSize: '1.2rem' }}>📍</span>
-              <strong>Constituency GK</strong>
-              <p className="section-subtext">Quick facts about your area.</p>
-            </button>
-          </section>
-
-          <section className="glass-panel" style={{ padding: '24px', boxShadow: 'none' }}>
-            <h2 className="section-heading" style={{ fontSize: '1.4rem' }}>Quick Search</h2>
-            <p className="section-subtext">Search by name or EPIC within your assigned database.</p>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0,1fr) auto',
-                gap: 16,
-                alignItems: 'end',
-                marginTop: 16,
-              }}
-            >
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Search term</span>
-                <input
-                  className="input-field"
-                  placeholder="Start typing a name or EPIC"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
-              </label>
-              <button className="btn btn--primary" type="button" onClick={goSearch}>
-                Go to results
-              </button>
-            </div>
-          </section>
-        </section>
-      </div>
-    </div>
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="h6">Quick search</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Search by name or EPIC within your assigned database.
+                </Typography>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                  <TextField
+                    label="Search term"
+                    fullWidth
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Start typing a name or EPIC"
+                  />
+                  <Button variant="contained" size="large" onClick={goSearch}>
+                    Go to results
+                  </Button>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
+      </Container>
+    </Box>
   );
 }

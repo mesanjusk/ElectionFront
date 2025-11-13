@@ -1,5 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  LinearProgress,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import { apiLogin, setAuthToken } from '../services/api';
 import { pullAll, resetSyncState } from '../services/sync';
 import {
@@ -72,90 +85,61 @@ export default function AdminLogin() {
     }
   };
 
-  const cardStyle = {
-    width: 'min(420px, 100%)',
-    borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--surface-border)',
-    background: 'var(--surface)',
-    padding: '32px',
-    boxShadow: '0 40px 80px rgba(15,23,42,0.15)',
-  };
-
   return (
-    <div className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={cardStyle}>
-        <header style={{ textAlign: 'center' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 18px',
-              borderRadius: 22,
-              background: 'var(--brand-soft)',
-              color: 'var(--brand-dark)',
-            }}
-          >
-            <span style={{ fontWeight: 800, fontSize: '1.4rem' }}>SB</span>
-            <div style={{ textAlign: 'left' }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.18em', textTransform: 'uppercase' }}>SMart Book Admin</p>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>Control centre access</p>
-            </div>
-          </div>
-        </header>
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', py: { xs: 4, md: 8 } }}>
+      <Container maxWidth="sm">
+        <Card elevation={8}>
+          <CardContent>
+            <Stack spacing={3}>
+              <Stack spacing={1} textAlign="center" alignItems="center">
+                <AdminPanelSettingsRoundedIcon color="primary" sx={{ fontSize: 48 }} />
+                <Typography variant="h4">Admin control</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Sign in to assign databases, manage roles, and monitor sync health.
+                </Typography>
+              </Stack>
 
-        {error && (
-          <div className="alert alert--error" style={{ marginTop: 24 }} role="alert">
-            <span aria-hidden>⚠️</span>
-            <span>{error}</span>
-          </div>
-        )}
+              {error && <Alert severity="error">{error}</Alert>}
 
-        <form style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={onSubmit}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Username</span>
-            <input
-              className="input-field"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              type="text"
-              autoComplete="username"
-              required
-            />
-          </label>
+              <Stack component="form" spacing={2} onSubmit={onSubmit}>
+                <TextField
+                  label="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  fullWidth
+                />
+                <Button type="submit" variant="contained" size="large" disabled={loading}>
+                  {loading ? 'Syncing data…' : 'Sign in'}
+                </Button>
+              </Stack>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Password</span>
-            <input
-              className="input-field"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
-
-          <button className="btn btn--primary" disabled={loading} type="submit">
-            {loading ? 'Syncing data…' : 'Sign in'}
-          </button>
-        </form>
-
-        {loading ? (
-          <div style={{ marginTop: 24 }} role="status" aria-live="polite">
-            <div className="progress-track">
-              <span className="progress-fill" style={{ width: `${Math.min(progress, 100)}%` }} />
-            </div>
-            <p className="section-subtext" style={{ textAlign: 'center', marginTop: 8 }}>Preparing admin workspace…</p>
-          </div>
-        ) : (
-          <p className="section-subtext" style={{ textAlign: 'center', marginTop: 24 }}>
-            Need field access instead? Go back to the regular login page.
-          </p>
-        )}
-      </div>
-    </div>
+              {loading ? (
+                <Stack spacing={1} role="status" aria-live="polite">
+                  <LinearProgress />
+                  <Typography variant="body2" color="text.secondary">
+                    Preparing admin workspace…
+                  </Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  Need field access instead? Use the standard login page.
+                </Typography>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
