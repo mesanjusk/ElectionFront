@@ -1,4 +1,4 @@
-// client/src/pages/Search.jsx
+// client/src/pages/Search.jsx 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   AppBar,
@@ -12,7 +12,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   InputAdornment,
   Menu,
@@ -37,7 +36,7 @@ import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { setAuthToken } from "../services/api";
-import { lockSession, getActiveDatabase } from "../auth"; // ✅ read active DB id
+import { lockSession, getActiveDatabase, getUser } from "../auth"; // ✅ added getUser
 import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -210,7 +209,7 @@ function MobileEditModal({ open, voter, onClose }) {
   const handleSave = async () => {
     const n = normalizePhone(mobile);
     if (!n) {
-      alert('Enter a valid 10-digit mobile.');
+      alert("Enter a valid 10-digit mobile.");
       return;
     }
     await updateVoterLocal(voter._id, { mobile: n });
@@ -219,13 +218,19 @@ function MobileEditModal({ open, voter, onClose }) {
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>{getMobile(voter) ? 'Edit mobile' : 'Add mobile'}</DialogTitle>
+      <DialogTitle>
+        {getMobile(voter) ? "Edit mobile" : "Add mobile"}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           <Typography variant="subtitle1" fontWeight={600}>
             {getName(voter)}
           </Typography>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
             <Typography variant="caption" color="text.secondary">
               EPIC
             </Typography>
@@ -233,10 +238,10 @@ function MobileEditModal({ open, voter, onClose }) {
           </Stack>
           <TextField
             label="Mobile number"
-            value={mobile || ''}
+            value={mobile || ""}
             onChange={(e) => setMobile(e.target.value)}
             placeholder="10-digit mobile"
-            inputProps={{ inputMode: 'numeric' }}
+            inputProps={{ inputMode: "numeric" }}
             fullWidth
           />
         </Stack>
@@ -255,16 +260,21 @@ function MobileEditModal({ open, voter, onClose }) {
 function RecordModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
   const fields = [
-    ['Name', getName(voter)],
-    ['EPIC', getEPIC(voter)],
-    ['R/P/S', getRPS(voter) || '—'],
-    ['Part', getPart(voter) || '—'],
-    ['Serial', !Number.isNaN(getSerialNum(voter)) ? getSerialNum(voter) : getSerialText(voter) || '—'],
-    ['Age', getAge(voter) || '—'],
-    ['Sex', getGender(voter) || '—'],
-    ['House', getHouseNo(voter) || '—'],
-    ['C/O', getCareOf(voter) || '—'],
-    ['Mobile', getMobile(voter) || '—'],
+    ["Name", getName(voter)],
+    ["EPIC", getEPIC(voter)],
+    ["R/P/S", getRPS(voter) || "—"],
+    ["Part", getPart(voter) || "—"],
+    [
+      "Serial",
+      !Number.isNaN(getSerialNum(voter))
+        ? getSerialNum(voter)
+        : getSerialText(voter) || "—",
+    ],
+    ["Age", getAge(voter) || "—"],
+    ["Sex", getGender(voter) || "—"],
+    ["House", getHouseNo(voter) || "—"],
+    ["C/O", getCareOf(voter) || "—"],
+    ["Mobile", getMobile(voter) || "—"],
   ];
   const shareText = buildShareText(voter);
 
@@ -279,7 +289,12 @@ function RecordModal({ open, voter, onClose }) {
       <DialogContent dividers>
         <Stack spacing={1.5}>
           {fields.map(([k, v]) => (
-            <Stack key={k} direction="row" justifyContent="space-between" alignItems="center">
+            <Stack
+              key={k}
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+            >
               <Typography variant="caption" color="text.secondary">
                 {k}
               </Typography>
@@ -296,7 +311,7 @@ function RecordModal({ open, voter, onClose }) {
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+      <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
         <Button
           component="a"
           href={waUrl}
@@ -323,12 +338,20 @@ export default function Search() {
     if (t) setAuthToken(t);
   }, []);
 
+  // ✅ Proper username (from auth + localStorage)
   const [userName, setUserName] = useState("User");
   useEffect(() => {
-    const u = localStorage.getItem("userName") ||
-              localStorage.getItem("name") ||
-              JSON.parse(localStorage.getItem("user") || "{}").name;
-    if (u) setUserName(u);
+    try {
+      const authUser = getUser && getUser();
+      const fromStorage =
+        window.localStorage.getItem("userName") ||
+        window.localStorage.getItem("name") ||
+        (authUser && (authUser.username || authUser.name)) ||
+        JSON.parse(window.localStorage.getItem("user") || "{}").name;
+      if (fromStorage) setUserName(fromStorage);
+    } catch {
+      // ignore
+    }
   }, []);
 
   // ✅ read active DB id for pull/push
@@ -343,7 +366,7 @@ export default function Search() {
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState("all");     // all | male | female | surname
+  const [tab, setTab] = useState("all"); // all | male | female | surname
   const [ageBand, setAgeBand] = useState("all"); // all | 18-30 | 30-45 | 45-60 | 60+
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
@@ -376,7 +399,9 @@ export default function Search() {
     setAllRows(arr);
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // surname helper (last token)
   const getSurname = (r) => {
@@ -397,7 +422,7 @@ export default function Search() {
       if (ageBand === "18-30") return a >= 18 && a <= 30;
       if (ageBand === "30-45") return a >= 30 && a <= 45;
       if (ageBand === "45-60") return a >= 45 && a <= 60;
-      if (ageBand === "60+")   return a >= 61;
+      if (ageBand === "60+") return a >= 61;
       return true;
     };
 
@@ -420,8 +445,8 @@ export default function Search() {
       // normal wide search
       const name = getName(r).toLowerCase();
       const epic = getEPIC(r).toLowerCase();
-      const mob  = (getMobile(r) || "").toLowerCase();
-      const rps  = (getRPS(r) || "").toLowerCase();
+      const mob = (getMobile(r) || "").toLowerCase();
+      const rps = (getRPS(r) || "").toLowerCase();
       const part = (getPart(r) || "").toLowerCase();
       const serialTxt = String(getSerialText(r) ?? "").toLowerCase();
       return (
@@ -445,7 +470,9 @@ export default function Search() {
     const el = sentinelRef.current;
     const io = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
-        setVisibleCount((c) => Math.min(c + 300, filtered.length || c + 300));
+        setVisibleCount((c) =>
+          Math.min(c + 300, filtered.length || c + 300)
+        );
       }
     });
     io.observe(el);
@@ -470,28 +497,31 @@ export default function Search() {
   const syncedTotal = allRows.length;
 
   const filterTabs = [
-    { key: 'all', label: 'All' },
-    { key: 'male', label: 'Male' },
-    { key: 'female', label: 'Female' },
-    { key: 'surname', label: 'Surname' },
+    { key: "all", label: "All" },
+    { key: "male", label: "Male" },
+    { key: "female", label: "Female" },
+    { key: "surname", label: "Surname" },
   ];
   const ageFilters = [
-    { key: 'all', label: 'All' },
-    { key: '18-30', label: '18–30' },
-    { key: '30-45', label: '30–45' },
-    { key: '45-60', label: '45–60' },
-    { key: '60+', label: '60+' },
+    { key: "all", label: "All" },
+    { key: "18-30", label: "18–30" },
+    { key: "30-45", label: "30–45" },
+    { key: "45-60", label: "45–60" },
+    { key: "60+", label: "60+" },
   ];
 
   return (
-    <Box sx={{ minHeight: '100vh', pb: 8 }}>
+    <Box sx={{ minHeight: "100vh", pb: 8 }}>
       <AppBar
         position="sticky"
         color="transparent"
         elevation={0}
-        sx={{ backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(15,23,42,0.08)' }}
+        sx={{
+          backdropFilter: "blur(16px)",
+          borderBottom: "1px solid rgba(15,23,42,0.08)",
+        }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between', minHeight: 72 }}>
+        <Toolbar sx={{ justifyContent: "space-between", minHeight: 72 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <IconButton onClick={handleMenuOpen} color="inherit">
               <MenuRoundedIcon />
@@ -509,14 +539,14 @@ export default function Search() {
                 <IconButton
                   color="primary"
                   onClick={async () => {
-                    if (!activeDb) return alert('No database selected.');
+                    if (!activeDb) return alert("No database selected.");
                     setBusy(true);
                     try {
                       const c = await pullAll({ databaseId: activeDb });
                       alert(`Pulled ${c} changes from server.`);
                       await loadAll();
                     } catch (e) {
-                      alert('Pull failed: ' + (e?.message || e));
+                      alert("Pull failed: " + (e?.message || e));
                     } finally {
                       setBusy(false);
                     }
@@ -532,13 +562,19 @@ export default function Search() {
                 <IconButton
                   color="primary"
                   onClick={async () => {
-                    if (!activeDb) return alert('No database selected.');
+                    if (!activeDb) return alert("No database selected.");
                     setBusy(true);
                     try {
                       const res = await pushOutbox({ databaseId: activeDb });
-                      alert(`Pushed: ${res.pushed}${res.failed?.length ? `, Failed: ${res.failed.length}` : ''}`);
+                      alert(
+                        `Pushed: ${res.pushed}${
+                          res.failed?.length
+                            ? `, Failed: ${res.failed.length}`
+                            : ""
+                        }`
+                      );
                     } catch (e) {
-                      alert('Push failed: ' + (e?.message || e));
+                      alert("Push failed: " + (e?.message || e));
                     } finally {
                       setBusy(false);
                     }
@@ -553,7 +589,12 @@ export default function Search() {
         </Toolbar>
       </AppBar>
 
-      <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose} keepMounted>
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+        keepMounted
+      >
         <Box sx={{ px: 2, py: 1.5, width: 280 }}>
           <Typography variant="subtitle2" color="text.secondary">
             Voice language
@@ -594,7 +635,11 @@ export default function Search() {
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <VoiceSearchButton onResult={(text) => setQ(text)} lang={voiceLang} disabled={busy} />
+                        <VoiceSearchButton
+                          onResult={(text) => setQ(text)}
+                          lang={voiceLang}
+                          disabled={busy}
+                        />
                       </InputAdornment>
                     ),
                   }}
@@ -606,7 +651,11 @@ export default function Search() {
                   allowScrollButtonsMobile
                 >
                   {filterTabs.map((filter) => (
-                    <Tab key={filter.key} label={filter.label} value={filter.key} />
+                    <Tab
+                      key={filter.key}
+                      label={filter.label}
+                      value={filter.key}
+                    />
                   ))}
                 </Tabs>
                 <ToggleButtonGroup
@@ -632,9 +681,11 @@ export default function Search() {
 
           <Card>
             <CardContent>
-              <Stack spacing={2}>
+              <Stack spacing={1.5}>
                 {visible.length === 0 ? (
-                  <Typography color="text.secondary">No voters match your filters yet.</Typography>
+                  <Typography color="text.secondary">
+                    No voters match your filters yet.
+                  </Typography>
                 ) : (
                   visible.map((r, i) => {
                     const name = getName(r);
@@ -645,43 +696,61 @@ export default function Search() {
                     const mob = getMobile(r);
                     const shareText = buildShareText(r);
                     const waHref = mob
-                      ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
-                      : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+                      ? `https://wa.me/91${mob}?text=${encodeURIComponent(
+                          shareText
+                        )}`
+                      : `whatsapp://send?text=${encodeURIComponent(
+                          shareText
+                        )}`;
 
                     return (
                       <Paper
                         key={r._id || `${i}-${serialTxt}`}
                         sx={{
-                          p: 2,
-                          display: 'flex',
-                          flexDirection: { xs: 'column', md: 'row' },
-                          justifyContent: 'space-between',
-                          gap: 2,
+                          p: 1.5, // ✅ slightly smaller padding for narrower card
+                          display: "flex",
+                          flexDirection: {
+                            xs: "column",
+                            md: "row",
+                          },
+                          justifyContent: "space-between",
+                          gap: 1.5, // slightly tighter gap
                         }}
                       >
-                        <Stack spacing={0.5}>
+                        <Stack spacing={0.25}>
                           <Typography variant="overline" color="text.secondary">
                             Serial / Part
                           </Typography>
-                          <Typography variant="h5">
-                            {!Number.isNaN(serialNum) ? serialNum : serialTxt || '—'} · {getPart(r) || '—'}
+                          <Typography variant="subtitle1">
+                            {!Number.isNaN(serialNum)
+                              ? serialNum
+                              : serialTxt || "—"}{" "}
+                            · {getPart(r) || "—"}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Age {age || '—'} · {gender || '—'}
+                            Age {age || "—"} · {gender || "—"}
                           </Typography>
                         </Stack>
-                        <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
-                          <Typography variant="h6">{name}</Typography>
+                        <Stack
+                          spacing={0.5}
+                          alignItems={{ xs: "flex-start", md: "flex-end" }}
+                        >
+                          <Typography variant="subtitle1">{name}</Typography>
                           <Typography variant="body2" color="text.secondary">
                             EPIC {getEPIC(r)}
                           </Typography>
-                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            flexWrap="wrap"
+                            sx={{ mt: 0.5 }}
+                          >
                             <Button
                               variant="outlined"
                               size="small"
                               startIcon={<CallRoundedIcon />}
                               disabled={!mob}
-                              component={mob ? 'a' : 'button'}
+                              component={mob ? "a" : "button"}
                               href={mob ? `tel:${mob}` : undefined}
                             >
                               Call
@@ -706,7 +775,11 @@ export default function Search() {
                             >
                               Details
                             </Button>
-                            <IconButton size="small" color="primary" onClick={() => setSelected(r)}>
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => setSelected(r)}
+                            >
                               <EditRoundedIcon />
                             </IconButton>
                           </Stack>
@@ -723,13 +796,23 @@ export default function Search() {
           <Card>
             <CardContent>
               <Typography variant="h6">Totals</Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                flexWrap="wrap"
+                sx={{ mt: 1 }}
+              >
                 <Chip label={`Male ${male.toLocaleString()}`} />
                 <Chip label={`Female ${female.toLocaleString()}`} />
                 <Chip label={`All records ${total.toLocaleString()}`} />
               </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {syncedTotal.toLocaleString()} voters synced locally. Filters show {matchedTotal.toLocaleString()} matches.
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 1 }}
+              >
+                {syncedTotal.toLocaleString()} voters synced locally. Filters
+                show {matchedTotal.toLocaleString()} matches.
               </Typography>
             </CardContent>
           </Card>
@@ -744,7 +827,11 @@ export default function Search() {
           if (ok) await loadAll();
         }}
       />
-      <RecordModal open={!!detail} voter={detail} onClose={() => setDetail(null)} />
+      <RecordModal
+        open={!!detail}
+        voter={detail}
+        onClose={() => setDetail(null)}
+      />
 
       <PWAInstallPrompt bottom={120} />
     </Box>

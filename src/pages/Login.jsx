@@ -1,5 +1,5 @@
 // client/src/pages/Login.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -128,7 +128,6 @@ export default function Login() {
 
   // Helper: where to go after login
   const goAfterLogin = (user, fallbackUserType) => {
-    // Respect backend-defined userType/role if you route differently.
     const userType = user?.userType || fallbackUserType;
     if (user?.role === 'admin') return navigate('/admin', { replace: true });
     if (userType === 'candidate') return navigate('/search', { replace: true });
@@ -140,6 +139,18 @@ export default function Login() {
     setSession({ token, user, databases: available });
     setAuthToken(token);
 
+    // ✅ Store userName for Search page greeting
+    try {
+      if (user) {
+        const name = user.username || user.name || '';
+        if (name) {
+          window.localStorage.setItem('userName', name);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     // Decide an effective DB, persist it, and use it for sync.
     let effectiveDatabase = chooseEffectiveDatabase({ activeDatabaseId, user });
     if (effectiveDatabase) setActiveDatabase(effectiveDatabase);
@@ -150,12 +161,17 @@ export default function Login() {
     let total = 0;
 
     // Always push + (attempt to) pull on login
-    setProgress(0);
-    setProgressLabel('Uploading offline updates…');
-    try {
-      pushResult = await pushOutbox();
-    } catch (err) {
-      pushError = err;
+    if (effectiveDatabase) {
+      setProgress(0);
+      setProgressLabel('Uploading offline updates…');
+      try {
+        pushResult = await pushOutbox({ databaseId: effectiveDatabase }); // ✅ pass databaseId
+      } catch (err) {
+        pushError = err;
+      }
+    } else {
+      // No DB yet — nothing to push
+      pushResult = { pushed: 0 };
     }
 
     // For first-time activation, reset cursors for a clean pull
@@ -176,7 +192,6 @@ export default function Login() {
           },
         });
       } else {
-        // No DB assigned — we still consider login successful, but inform the user.
         total = 0;
       }
     } catch (err) {
@@ -228,7 +243,7 @@ export default function Login() {
       const stored = await storeActivation({
         username,
         language: DEFAULT_LANGUAGE,
-        userType: user?.userType, // respect server-defined user type
+        userType: user?.userType,
         pin: DEFAULT_PIN,
       });
       const cleaned = clearRevocationFlag();
@@ -256,7 +271,6 @@ export default function Login() {
       return;
     }
     if (!getToken()) {
-      // Token expired — force reactivation, but we keep UI minimal.
       setMode('activate');
       setError('Your secure token has expired. Reactivate with your username and password.');
       return;
@@ -282,62 +296,63 @@ export default function Login() {
     let pulled = 0;
     let pullError = null;
 
-    try {
-      // Always push
+    // ✅ Always push with databaseId when available
+    if (effectiveDatabase) {
       try {
-        pushResult = await pushOutbox();
+        pushResult = await pushOutbox({ databaseId: effectiveDatabase });
       } catch (err) {
         pushError = err;
       }
-
-      // Always attempt pull
-      setProgress(0);
-      setProgressLabel('Downloading latest records…');
-      try {
-        if (effectiveDatabase) {
-          await pullAll({
-            databaseId: effectiveDatabase,
-            onProgress: ({ total: t }) => {
-              pulled = t;
-              setProgress(t);
-              setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
-            },
-          });
-        } else {
-          pulled = 0;
-        }
-      } catch (err) {
-        pullError = err;
-      }
-
-      const updated = setActivationState({ language: DEFAULT_LANGUAGE, revoked: false });
-      setActivation(updated);
-      unlockSession();
-      setPinInput('');
-
-      if (pushError || pullError) {
-        const parts = [];
-        if (pushError) parts.push(`push failed: ${pushError?.message || pushError}`);
-        if (pullError) parts.push(`pull failed: ${pullError?.message || pullError}`);
-        alert(`Unlocked with limited sync — ${parts.join(' and ')}.`);
-      } else {
-        const pushed = pushResult?.pushed || 0;
-        alert(
-          effectiveDatabase
-            ? `Sync complete. Uploaded ${pushed} changes and downloaded ${pulled} updates.`
-            : `Unlocked. No database assigned yet — ask admin to assign one.`
-        );
-      }
-
-      // Use whatever was stored earlier for routing; backend-defined is preferred.
-      const fallbackType = activation?.userType;
-      goAfterLogin(updated?.user, fallbackType);
-      navigate('/', { replace: true }); // safe default
-    } finally {
-      setLoading(false);
-      setProgress(0);
-      setProgressLabel('');
+    } else {
+      pushResult = { pushed: 0 };
     }
+
+    // Always attempt pull
+    setProgress(0);
+    setProgressLabel('Downloading latest records…');
+    try {
+      if (effectiveDatabase) {
+        await pullAll({
+          databaseId: effectiveDatabase,
+          onProgress: ({ total: t }) => {
+            pulled = t;
+            setProgress(t);
+            setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
+          },
+        });
+      } else {
+        pulled = 0;
+      }
+    } catch (err) {
+      pullError = err;
+    }
+
+    const updated = setActivationState({ language: DEFAULT_LANGUAGE, revoked: false });
+    setActivation(updated);
+    unlockSession();
+    setPinInput('');
+
+    if (pushError || pullError) {
+      const parts = [];
+      if (pushError) parts.push(`push failed: ${pushError?.message || pushError}`);
+      if (pullError) parts.push(`pull failed: ${pullError?.message || pullError}`);
+      alert(`Unlocked with limited sync — ${parts.join(' and ')}.`);
+    } else {
+      const pushed = pushResult?.pushed || 0;
+      alert(
+        effectiveDatabase
+          ? `Sync complete. Uploaded ${pushed} changes and downloaded ${pulled} updates.`
+          : `Unlocked. No database assigned yet — ask admin to assign one.`
+      );
+    }
+
+    const fallbackType = activation?.userType;
+    goAfterLogin(updated?.user, fallbackType);
+    navigate('/', { replace: true });
+
+    setLoading(false);
+    setProgress(0);
+    setProgressLabel('');
   };
 
   const startReactivation = () => {

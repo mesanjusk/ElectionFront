@@ -10,7 +10,6 @@ import {
   Container,
   Grid,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
@@ -26,7 +25,6 @@ import {
 import { pullAll, resetSyncState } from '../services/sync';
 
 export default function Home() {
-  const [q, setQ] = useState('');
   const [databases, setDatabases] = useState(() => getAvailableDatabases());
   const [activeDb, setActiveDb] = useState(() => getActiveDatabase());
   const [syncing, setSyncing] = useState(false);
@@ -60,7 +58,6 @@ export default function Home() {
       const id = dbs[0].id || dbs[0]._id;
       setActiveDatabase(id);
       setActiveDb(id);
-      // try read last count
       const cached = Number(localStorage.getItem(`lastSyncCount:${id}`) || 0);
       setTotalCount(Number.isFinite(cached) ? cached : 0);
     } else {
@@ -93,7 +90,6 @@ export default function Home() {
       }
       await resetSyncState(id);
       const total = await pullAll({ databaseId: id });
-      // cache the latest count for dashboard
       localStorage.setItem(`lastSyncCount:${id}`, String(total || 0));
       setTotalCount(total || 0);
       setSyncMessage(`Synced ${total} voter records from your assigned database.`);
@@ -104,20 +100,11 @@ export default function Home() {
     }
   };
 
-  const goSearch = () => {
-    const params = new URLSearchParams();
-    if (q) params.set('q', q.trim());
-    params.set('page', '1');
-    params.set('limit', '20');
-    navigate(`/search?${params.toString()}`);
-  };
-
   // --- Tiny bar chart (no external libs) ---
   const chartData = [
     { label: 'Total', value: totalCount },
   ];
   const maxVal = Math.max(...chartData.map(d => d.value), 10);
-  const barColor = '#2f67ff';
 
   const quickActions = [
     {
@@ -144,7 +131,13 @@ export default function Home() {
     <Box sx={{ minHeight: '100vh', py: { xs: 4, md: 8 } }}>
       <Container maxWidth="lg">
         <Stack spacing={4}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+          {/* Header + user card */}
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={3}
+            alignItems={{ xs: 'flex-start', md: 'center' }}
+            justifyContent="space-between"
+          >
             <Stack spacing={0.5}>
               <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
                 Smart Book
@@ -162,42 +155,69 @@ export default function Home() {
                   Signed in as
                 </Typography>
                 <Typography variant="h6">{user?.username || 'User'}</Typography>
-                <Chip sx={{ mt: 1 }} label={`DB · ${assignedName || 'Unassigned'}`} color="primary" variant="outlined" />
+                <Chip
+                  sx={{ mt: 1 }}
+                  label={`DB · ${assignedName || 'Unassigned'}`}
+                  color="primary"
+                  variant="outlined"
+                />
               </CardContent>
             </Card>
           </Stack>
 
+          {/* Main metrics + sync button on left */}
           <Grid container spacing={3}>
             <Grid item xs={12} md={7}>
               <Card>
                 <CardContent>
                   <Stack spacing={2}>
-                    <Typography variant="h6">Voter records — {assignedName || 'N/A'}</Typography>
+                    <Typography variant="h6">
+                      Voter records — {assignedName || 'N/A'}
+                    </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Latest synced total shown below.
                     </Typography>
-                    <Box sx={{
-                      position: 'relative',
-                      minHeight: 220,
-                      borderRadius: 3,
-                      background: 'linear-gradient(180deg, rgba(15,111,255,0.08), #fff)',
-                      p: 3,
-                    }}>
+
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        minHeight: 220,
+                        borderRadius: 3,
+                        background: 'linear-gradient(180deg, rgba(15,111,255,0.08), #fff)',
+                        p: 3,
+                      }}
+                    >
                       {[0.25, 0.5, 0.75].map((g) => (
-                        <Box key={g} sx={{
-                          position: 'absolute',
-                          left: 24,
-                          right: 24,
-                          bottom: `${g * 100}%`,
-                          borderTop: '1px dashed rgba(15,111,255,0.2)',
-                        }} />
+                        <Box
+                          key={g}
+                          sx={{
+                            position: 'absolute',
+                            left: 24,
+                            right: 24,
+                            bottom: `${g * 100}%`,
+                            borderTop: '1px dashed rgba(15,111,255,0.2)',
+                          }}
+                        />
                       ))}
-                      <Stack direction="row" justifyContent="center" alignItems="flex-end" spacing={6} sx={{ position: 'absolute', inset: 0, pb: 3 }}>
+                      <Stack
+                        direction="row"
+                        justifyContent="center"
+                        alignItems="flex-end"
+                        spacing={6}
+                        sx={{ position: 'absolute', inset: 0, pb: 3 }}
+                      >
                         {chartData.map((d) => {
                           const h = Math.round((d.value / maxVal) * 170);
                           return (
                             <Stack key={d.label} spacing={1} alignItems="center">
-                              <Box sx={{ width: 64, height: h, borderRadius: 5, background: 'linear-gradient(180deg,#0fb981,#0f6fff)' }} />
+                              <Box
+                                sx={{
+                                  width: 64,
+                                  height: h,
+                                  borderRadius: 5,
+                                  background: 'linear-gradient(180deg,#0fb981,#0f6fff)',
+                                }}
+                              />
                               <Typography variant="subtitle1">{d.label}</Typography>
                               <Typography variant="body2" color="text.secondary">
                                 {d.value.toLocaleString()}
@@ -207,53 +227,33 @@ export default function Home() {
                         })}
                       </Stack>
                     </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={5}>
-              <Card>
-                <CardContent>
-                  <Stack spacing={2}>
-                    <Typography variant="h6">Assigned voter access</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {assignedDb
-                        ? 'This device is restricted to the voter database assigned to you.'
-                        : 'No voter database is linked yet. Ask an administrator to assign one.'}
-                    </Typography>
-                    <Stack spacing={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        Active database
-                      </Typography>
-                      <Card variant="outlined">
-                        <CardContent>
-                          <Typography fontWeight={600}>{assignedName || '—'}</Typography>
-                        </CardContent>
-                      </Card>
+
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Button
+                        variant="contained"
+                        startIcon={<SyncRoundedIcon />}
+                        onClick={syncAssigned}
+                        disabled={syncing || !assignedDb}
+                      >
+                        {syncing ? 'Syncing…' : 'Sync assigned voters'}
+                      </Button>
+                      {syncMessage && (
+                        <Typography variant="body2" color="text.secondary">
+                          {syncMessage}
+                        </Typography>
+                      )}
                     </Stack>
-                    <Button
-                      variant="contained"
-                      startIcon={<SyncRoundedIcon />}
-                      onClick={syncAssigned}
-                      disabled={syncing || !assignedDb}
-                    >
-                      {syncing ? 'Syncing…' : 'Sync assigned voters'}
-                    </Button>
-                    {syncMessage && (
-                      <Typography variant="body2" color="text.secondary">
-                        {syncMessage}
-                      </Typography>
-                    )}
                   </Stack>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
 
+          {/* Quick actions — 3 in one row */}
           <Grid container spacing={3}>
             {quickActions.map((action) => (
-              <Grid item xs={12} md={4} key={action.label}>
-                <Card onClick={action.action} sx={{ cursor: 'pointer' }}>
+              <Grid item xs={4} md={4} key={action.label}>
+                <Card onClick={action.action} sx={{ cursor: 'pointer', height: '100%' }}>
                   <CardContent>
                     <Stack spacing={1.5}>
                       <Box>{action.icon}</Box>
@@ -267,29 +267,6 @@ export default function Home() {
               </Grid>
             ))}
           </Grid>
-
-          <Card>
-            <CardContent>
-              <Stack spacing={2}>
-                <Typography variant="h6">Quick search</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Search by name or EPIC within your assigned database.
-                </Typography>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                  <TextField
-                    label="Search term"
-                    fullWidth
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Start typing a name or EPIC"
-                  />
-                  <Button variant="contained" size="large" onClick={goSearch}>
-                    Go to results
-                  </Button>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
         </Stack>
       </Container>
     </Box>
