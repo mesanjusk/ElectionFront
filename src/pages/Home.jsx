@@ -103,127 +103,177 @@ export default function Home() {
   const maxVal = Math.max(...chartData.map(d => d.value), 10);
   const barColor = '#2f67ff';
 
-  const cardClass =
-    'rounded-3xl border border-emerald-100 bg-white/90 p-6 shadow-lg shadow-emerald-900/5 backdrop-blur';
-  const pillButton =
-    'flex flex-col gap-2 rounded-3xl border border-slate-200/80 bg-white/80 p-5 text-left transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-white';
-  const primaryBtn =
-    'inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-60';
-
   return (
-    <div className="min-h-screen px-4 py-10 sm:px-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <div className={`${cardClass} flex flex-col gap-6`}>
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <div className="page-shell">
+      <div className="page-container">
+        <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '16px',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Candidate Dashboard</h1>
-              <p className="text-sm text-slate-500">Track your assigned voters and jump back into search.</p>
+              <h1 className="section-heading">Candidate Dashboard</h1>
+              <p className="section-subtext">Track your assigned voters and jump back into search.</p>
             </div>
-            <div className="text-right text-sm text-slate-500">
+            <div style={{ textAlign: 'right', fontSize: '0.9rem', color: 'var(--muted-dark)' }}>
               <div>
-                Hello, <span className="font-semibold text-slate-700">{user?.username || 'User'}</span>
+                Hello, <strong>{user?.username || 'User'}</strong>
               </div>
               <div>
-                DB: <span className="font-semibold text-slate-700">{assignedName || '—'}</span>
+                DB: <strong>{assignedName || '—'}</strong>
               </div>
             </div>
           </div>
 
-          <section className={cardClass}>
-            <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold text-slate-900">Voter records — {assignedName || 'N/A'}</h2>
-              <p className="text-sm text-slate-500">Last synced total count shown below.</p>
-            </div>
-            <div className="relative mt-4 h-72 w-full overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-50 to-white p-4">
+          <section className="glass-panel" style={{ padding: '24px', boxShadow: 'none' }}>
+            <h2 className="section-heading" style={{ fontSize: '1.4rem' }}>
+              Voter records — {assignedName || 'N/A'}
+            </h2>
+            <p className="section-subtext">Last synced total count shown below.</p>
+            <div
+              style={{
+                position: 'relative',
+                height: 260,
+                marginTop: 24,
+                borderRadius: 24,
+                background: 'linear-gradient(180deg, rgba(16,185,129,0.12), #fff)',
+                padding: 24,
+                overflow: 'hidden',
+              }}
+            >
               {[0.25, 0.5, 0.75].map((g) => (
                 <div
                   key={g}
-                  className="absolute left-4 right-4 border-t border-dashed border-emerald-100"
-                  style={{ bottom: `${g * 100}%` }}
+                  style={{
+                    position: 'absolute',
+                    left: 24,
+                    right: 24,
+                    bottom: `${g * 100}%`,
+                    borderTop: '1px dashed rgba(16,185,129,0.3)',
+                  }}
                 />
               ))}
-              <div className="absolute inset-0 flex items-end justify-center gap-10">
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                  gap: 40,
+                  paddingBottom: 24,
+                }}
+              >
                 {chartData.map((d) => {
-                  const h = Math.round((d.value / maxVal) * 230);
+                  const h = Math.round((d.value / maxVal) * 200);
                   return (
-                    <div key={d.label} className="flex flex-col items-center gap-2">
+                    <div key={d.label} style={{ textAlign: 'center' }}>
                       <div
-                        className="w-14 rounded-2xl bg-emerald-500/90"
-                        style={{ height: `${h}px`, transition: 'height .3s ease' }}
-                        title={`${d.value}`}
+                        style={{
+                          width: 56,
+                          height: h,
+                          borderRadius: 20,
+                          background: 'linear-gradient(180deg, #34d399, #0fb981)',
+                          margin: '0 auto 8px',
+                          transition: 'height 0.3s ease',
+                        }}
                       />
-                      <div className="text-sm font-semibold text-slate-700">{d.label}</div>
-                      <div className="text-xs text-slate-500">{d.value.toLocaleString()}</div>
+                      <div style={{ fontWeight: 600 }}>{d.label}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>{d.value.toLocaleString()}</div>
                     </div>
                   );
                 })}
               </div>
             </div>
-            <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-              <span className="inline-flex h-3 w-3 rounded bg-emerald-500" /> value
-            </div>
+            <p className="section-subtext" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
+              <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--brand)' }} /> value
+            </p>
           </section>
 
-          <section className={cardClass}>
-            <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold text-slate-900">Assigned voter access</h2>
-              <p className="text-sm text-slate-500">
-                {assignedDb
-                  ? 'Your device is restricted to your assigned voter database.'
-                  : 'No voter database is assigned to your account. Please contact the administrator.'}
-              </p>
+          <section className="glass-panel" style={{ padding: '24px', boxShadow: 'none' }}>
+            <h2 className="section-heading" style={{ fontSize: '1.4rem' }}>
+              Assigned voter access
+            </h2>
+            <p className="section-subtext" style={{ marginBottom: 16 }}>
+              {assignedDb
+                ? 'Your device is restricted to your assigned voter database.'
+                : 'No voter database is assigned to your account. Please contact the administrator.'}
+            </p>
+            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Voter database
             </div>
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Voter database</span>
-              <div className="mt-2 w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-slate-700">
-                {assignedName || '—'}
-              </div>
+            <div
+              style={{
+                margin: '8px 0 20px',
+                borderRadius: 20,
+                border: '1px dashed rgba(15,23,42,0.2)',
+                padding: '12px 16px',
+                background: 'rgba(15,23,42,0.02)',
+                fontWeight: 600,
+              }}
+            >
+              {assignedName || '—'}
             </div>
-            <button className={primaryBtn} type="button" onClick={syncAssigned} disabled={syncing || !assignedDb}>
+            <button className="btn btn--primary" type="button" onClick={syncAssigned} disabled={syncing || !assignedDb}>
               {syncing ? 'Syncing…' : 'Sync assigned voters'}
             </button>
-            {syncMessage && <p className="text-sm text-slate-500">{syncMessage}</p>}
+            {syncMessage && (
+              <p className="section-subtext" style={{ marginTop: 12 }}>
+                {syncMessage}
+              </p>
+            )}
           </section>
 
-          <section className="grid gap-4 md:grid-cols-3">
-            <button type="button" onClick={() => navigate('/search')} className={`${pillButton} from-indigo-50/80`}>
-              <span className="text-sm text-slate-500">🔎</span>
-              <span className="text-base font-semibold text-slate-900">Voter Search</span>
-              <span className="text-sm text-slate-500">Find voters by name or EPIC (within assigned DB).</span>
+          <section className="card-grid">
+            <button type="button" onClick={() => navigate('/search')} className="glass-pill">
+              <span style={{ fontSize: '1.2rem' }}>🔎</span>
+              <strong>Voter Search</strong>
+              <p className="section-subtext">Find voters by name or EPIC (within assigned DB).</p>
             </button>
-            <button type="button" onClick={() => alert('Volunteer Quiz – coming soon')} className={pillButton}>
-              <span className="text-sm text-slate-500">💛</span>
-              <span className="text-base font-semibold text-slate-900">Volunteer Quiz</span>
-              <span className="text-sm text-slate-500">Train volunteers with quick MCQs.</span>
+            <button type="button" onClick={() => alert('Volunteer Quiz – coming soon')} className="glass-pill">
+              <span style={{ fontSize: '1.2rem' }}>💛</span>
+              <strong>Volunteer Quiz</strong>
+              <p className="section-subtext">Train volunteers with quick MCQs.</p>
             </button>
-            <button type="button" onClick={() => alert('Constituency GK – coming soon')} className={pillButton}>
-              <span className="text-sm text-slate-500">📍</span>
-              <span className="text-base font-semibold text-slate-900">Constituency GK</span>
-              <span className="text-sm text-slate-500">Quick facts about your area.</span>
+            <button type="button" onClick={() => alert('Constituency GK – coming soon')} className="glass-pill">
+              <span style={{ fontSize: '1.2rem' }}>📍</span>
+              <strong>Constituency GK</strong>
+              <p className="section-subtext">Quick facts about your area.</p>
             </button>
           </section>
 
-          <section className={cardClass}>
-            <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold text-slate-900">Quick Search</h2>
-              <p className="text-sm text-slate-500">Search by name or EPIC within your assigned database.</p>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-              <label className="block">
-                <span className="text-sm font-semibold text-slate-600">Search term</span>
+          <section className="glass-panel" style={{ padding: '24px', boxShadow: 'none' }}>
+            <h2 className="section-heading" style={{ fontSize: '1.4rem' }}>Quick Search</h2>
+            <p className="section-subtext">Search by name or EPIC within your assigned database.</p>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0,1fr) auto',
+                gap: 16,
+                alignItems: 'end',
+                marginTop: 16,
+              }}
+            >
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Search term</span>
                 <input
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-base text-slate-900 shadow-inner focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  className="input-field"
                   placeholder="Start typing a name or EPIC"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                 />
               </label>
-              <button className={`${primaryBtn} md:self-end`} type="button" onClick={goSearch}>
+              <button className="btn btn--primary" type="button" onClick={goSearch}>
                 Go to results
               </button>
             </div>
           </section>
-        </div>
+        </section>
       </div>
     </div>
   );

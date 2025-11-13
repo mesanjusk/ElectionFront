@@ -194,47 +194,32 @@ export default function AdminUsers() {
     }
   };
 
-  const inputClass =
-    'mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200';
-  const primaryBtn =
-    'inline-flex items-center rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
-  const ghostBtn =
-    'inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
-  const dangerBtn =
-    'inline-flex items-center rounded-2xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500';
-
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {status.text ? (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            status.type === 'error' ? 'border-rose-100 bg-rose-50 text-rose-900' : 'border-emerald-100 bg-emerald-50 text-emerald-900'
-          }`}
-        >
-          {status.text}
-        </div>
+        <div className={`alert ${status.type === 'error' ? 'alert--error' : 'alert--info'}`}>{status.text}</div>
       ) : null}
 
-      <form className="rounded-3xl border border-emerald-50 bg-white/90 p-6 shadow-sm" onSubmit={onCreate}>
-        <h2 className="text-xl font-semibold text-slate-900">Create New User</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <label className="block text-sm font-semibold text-slate-600">
+      <form className="glass-panel" onSubmit={onCreate}>
+        <h2 className="section-heading">Create New User</h2>
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', marginTop: 16 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}>
             Username
-            <input className={inputClass} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+            <input className="input-field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
           </label>
-          <label className="block text-sm font-semibold text-slate-600">
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}>
             Password
             <input
-              className={inputClass}
+              className="input-field"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="minimum 4 characters"
             />
           </label>
-          <label className="block text-sm font-semibold text-slate-600">
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}>
             Role
-            <select className={inputClass} value={role} onChange={(e) => setRole(e.target.value)}>
+            <select className="select-field" value={role} onChange={(e) => setRole(e.target.value)}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
@@ -242,39 +227,29 @@ export default function AdminUsers() {
           </label>
         </div>
 
-        <div className="mt-4 text-sm font-semibold text-slate-600">
-          Allowed Databases
-          <div className="mt-2 flex flex-wrap gap-2">
+        <div style={{ marginTop: 20 }}>
+          <p className="section-subtext" style={{ fontWeight: 600, color: 'var(--muted-dark)' }}>Allowed Databases</p>
+          <div className="chip-set" style={{ marginTop: 12 }}>
             {dbs.map((d) => (
-              <label
-                key={d.id}
-                className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-sm font-semibold ${
-                  allowed.includes(d.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                  checked={allowed.includes(d.id)}
-                  onChange={() => onToggleDb(d.id)}
-                />
+              <label key={d.id} className={`chip-button${allowed.includes(d.id) ? ' active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={allowed.includes(d.id)} onChange={() => onToggleDb(d.id)} />
                 <span>{d.name || d.id}</span>
               </label>
             ))}
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
-          <button className={primaryBtn} type="submit">Create</button>
+        <div style={{ marginTop: 20, textAlign: 'right' }}>
+          <button className="btn btn--primary" type="submit">Create</button>
         </div>
       </form>
 
-      <div className="rounded-3xl border border-emerald-50 bg-white/90 p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-900">All Users</h2>
+      <div className="glass-panel">
+        <h2 className="section-heading">All Users</h2>
         {loading ? (
-          <p className="mt-4 text-sm text-slate-500">Loading…</p>
+          <p className="section-subtext" style={{ marginTop: 16 }}>Loading…</p>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {users.map((u) => {
               const id = getId(u);
               const isRoleEditing = roleEditing[id] !== undefined;
@@ -283,101 +258,87 @@ export default function AdminUsers() {
               const dbList = Array.from(dbSet);
 
               return (
-                <div key={id} className="rounded-2xl border border-slate-100 p-4 shadow-sm">
-                  <div className="grid gap-4 md:grid-cols-7 md:items-start">
-                    <div className="md:col-span-1">
-                      <div className="font-semibold text-slate-900">{u.username}</div>
-                      <div className="text-xs text-slate-500">Password not stored in plain text</div>
-                    </div>
+                <div key={id} className="glass-pill" style={{ flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                    <strong>{u.username}</strong>
+                    <span className="section-subtext">Password not stored in plain text</span>
+                  </div>
 
-                    <div className="md:col-span-1 space-y-2">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</div>
+                  <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
+                    <div>
+                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Role</p>
                       {isRoleEditing ? (
-                        <div className="space-y-2">
-                          <select
-                            className={inputClass}
-                            value={roleEditing[id]}
-                            onChange={(e) => setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))}
-                          >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <select className="select-field" value={roleEditing[id]} onChange={(e) => setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))}>
                             {ROLES.map((r) => (
                               <option key={r} value={r}>{r}</option>
                             ))}
                           </select>
-                          <div className="flex gap-2">
-                            <button className={primaryBtn} type="button" onClick={() => saveRole(id)}>Save</button>
-                            <button className={ghostBtn} type="button" onClick={() => cancelRoleEdit(id)}>Cancel</button>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="btn btn--primary" type="button" onClick={() => saveRole(id)}>Save</button>
+                            <button className="btn btn--ghost" type="button" onClick={() => cancelRoleEdit(id)}>Cancel</button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{getRole(u)}</span>
-                          <button className="text-sm font-semibold text-emerald-600" onClick={() => beginRoleEdit(id, getRole(u))}>edit</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="chip-button active" style={{ cursor: 'default' }}>{getRole(u)}</span>
+                          <button className="btn btn--tiny" type="button" onClick={() => beginRoleEdit(id, getRole(u))}>edit</button>
                         </div>
                       )}
                     </div>
 
-                    <div className="md:col-span-2 space-y-2">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Allowed DBs</div>
+                    <div>
+                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Allowed DBs</p>
                       {isDbEditing ? (
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap gap-2">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div className="chip-set">
                             {dbs.map((d) => (
-                              <label
-                                key={d.id}
-                                className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-sm font-semibold ${
-                                  dbSet.has(d.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                                  checked={dbSet.has(d.id)}
-                                  onChange={() => toggleDbForUser(id, d.id)}
-                                />
+                              <label key={d.id} className={`chip-button${dbSet.has(d.id) ? ' active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input type="checkbox" checked={dbSet.has(d.id)} onChange={() => toggleDbForUser(id, d.id)} />
                                 <span>{d.name || d.id}</span>
                               </label>
                             ))}
                           </div>
-                          <div className="flex gap-2">
-                            <button className={primaryBtn} type="button" onClick={() => saveDbEdit(id)}>Save</button>
-                            <button className={ghostBtn} type="button" onClick={() => cancelDbEdit(id)}>Cancel</button>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="btn btn--primary" type="button" onClick={() => saveDbEdit(id)}>Save</button>
+                            <button className="btn btn--ghost" type="button" onClick={() => cancelDbEdit(id)}>Cancel</button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm text-slate-500">{dbList.length ? dbList.join(', ') : '—'}</span>
-                          <button className="text-sm font-semibold text-emerald-600" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>edit</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span className="section-subtext">{dbList.length ? dbList.join(', ') : '—'}</span>
+                          <button className="btn btn--tiny" type="button" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>edit</button>
                         </div>
                       )}
                     </div>
 
-                    <div className="md:col-span-1 space-y-2">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Device</div>
-                      <div className="text-xs text-slate-500">
+                    <div>
+                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Device</p>
+                      <div className="section-subtext">
                         {u.deviceIdBound ? (
                           <>
-                            <div className="font-mono text-sm">bound: {u.deviceIdBound}</div>
+                            <div style={{ fontFamily: 'monospace' }}>bound: {u.deviceIdBound}</div>
                             <div>at: {fmt(u.deviceBoundAt)}</div>
                           </>
                         ) : (
                           '—'
                         )}
                       </div>
-                      <button className="text-sm font-semibold text-emerald-600" onClick={() => onResetDevice(id)}>Reset device</button>
+                      <button className="btn btn--tiny" type="button" onClick={() => onResetDevice(id)}>Reset device</button>
                     </div>
 
-                    <div className="md:col-span-1 text-sm text-slate-600">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</div>
-                      {fmt(u.createdAt)}
+                    <div>
+                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Created</p>
+                      <span>{fmt(u.createdAt)}</span>
                     </div>
-                    <div className="md:col-span-1 text-sm text-slate-600">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</div>
-                      {fmt(u.updatedAt)}
+                    <div>
+                      <p className="section-subtext" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Updated</p>
+                      <span>{fmt(u.updatedAt)}</span>
                     </div>
 
-                    <div className="md:col-span-1 flex flex-wrap gap-2">
-                      <button className={ghostBtn} type="button" onClick={() => openPwdModal(id)}>Change Password</button>
-                      <button className={dangerBtn} type="button" onClick={() => onDelete(id)}>Delete</button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <button className="btn btn--ghost" type="button" onClick={() => openPwdModal(id)}>Change Password</button>
+                      <button className="btn btn--danger" type="button" onClick={() => onDelete(id)}>Delete</button>
                     </div>
                   </div>
                 </div>
@@ -388,14 +349,14 @@ export default function AdminUsers() {
       </div>
 
       {pwdUserId ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
-          <div className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-900">Change Password</h3>
-            <form className="mt-4 space-y-4" onSubmit={savePassword}>
-              <label className="block text-sm font-semibold text-slate-600">
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <h3>Change Password</h3>
+            <form style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={savePassword}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 New Password
                 <input
-                  className={inputClass}
+                  className="input-field"
                   type="password"
                   value={newPwd}
                   onChange={(e) => setNewPwd(e.target.value)}
@@ -403,11 +364,11 @@ export default function AdminUsers() {
                   autoFocus
                 />
               </label>
-              <div className="flex gap-2">
-                <button className={primaryBtn} type="submit">Save</button>
-                <button className={ghostBtn} type="button" onClick={closePwdModal}>Cancel</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn--primary" type="submit">Save</button>
+                <button className="btn btn--ghost" type="button" onClick={closePwdModal}>Cancel</button>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="section-subtext" style={{ fontSize: '0.75rem' }}>
                 Note: Current passwords are not retrievable (stored as secure hashes). After saving, you’ll see the new password once to share with the user.
               </p>
             </form>

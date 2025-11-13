@@ -30,15 +30,16 @@ function StatCard({ title, value, hint, onClick, href, icon = '📊' }) {
   })();
   return (
     <Component
-      className="flex flex-col gap-1 rounded-2xl border border-emerald-50 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+      className="glass-pill"
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, cursor: (onClick || href) ? 'pointer' : 'default' }}
       {...interactiveProps}
     >
-      <div className="text-2xl" aria-hidden>
+      <div style={{ fontSize: '1.4rem' }} aria-hidden>
         {icon}
       </div>
-      <div className="text-sm font-semibold text-slate-600">{title}</div>
-      <div className="text-2xl font-bold text-emerald-700">{value}</div>
-      {hint && <div className="text-sm text-slate-500">{hint}</div>}
+      <div style={{ fontSize: '0.85rem', color: 'var(--muted)', fontWeight: 600 }}>{title}</div>
+      <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-dark)' }}>{value}</div>
+      {hint && <div className="section-subtext">{hint}</div>}
     </Component>
   );
 }
@@ -131,71 +132,53 @@ export default function AdminHome() {
   const totalPlainUsers = users.filter((u) => roleOf(u) === 'user').length;
   const totalDatabases = databases.length;
 
-  const panelClass = 'rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-lg shadow-emerald-900/5 backdrop-blur';
-  const primaryBtn =
-    'inline-flex items-center rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
-  const ghostBtn =
-    'inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
-  const tabButton = (active) =>
-    `rounded-full px-4 py-2 text-sm font-semibold transition ${
-      active ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 hover:text-emerald-600'
-    }`;
-
-  const Toolbar = (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">Admin</span>
-        {currentUser?.username && (
-          <span className="text-sm text-slate-500">
-            Signed in as <b className="text-slate-700">{currentUser.username}</b>
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <button className={primaryBtn} type="button" onClick={() => { loadDatabases(); loadUsers(); }}>
-          ⟳ Refresh
-        </button>
-      </div>
-    </div>
-  );
-
-  const TabBar = (
-    <div role="tablist" aria-label="Admin tabs" className="flex flex-wrap gap-2">
-      {[
-        ['overview', 'Overview'],
-        ['team', 'Team'],
-        ['databases', 'Databases'],
-        ['settings', 'Settings'],
-      ].map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          role="tab"
-          aria-selected={tab === key}
-          className={tabButton(tab === key)}
-          onClick={() => setTab(key)}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  const tabOptions = [
+    ['overview', 'Overview'],
+    ['team', 'Team'],
+    ['databases', 'Databases'],
+    ['settings', 'Settings'],
+  ];
 
   return (
-    <div className="min-h-screen bg-emerald-50/40 px-4 py-10 sm:px-6">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
-        <header className={`${panelClass} space-y-4`}>
+    <div className="page-shell">
+      <div className="page-container">
+        <header className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Admin Dashboard</h1>
-            <p className="text-sm text-slate-500">Manage users, assign voter databases, and jump to common actions.</p>
+            <h1 className="section-heading">Admin Dashboard</h1>
+            <p className="section-subtext">Manage users, assign voter databases, and jump to common actions.</p>
           </div>
-          {Toolbar}
-          {TabBar}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ padding: '4px 12px', borderRadius: 999, background: 'var(--brand-soft)', fontWeight: 600 }}>Admin</span>
+              {currentUser?.username && (
+                <span className="section-subtext">
+                  Signed in as <strong>{currentUser.username}</strong>
+                </span>
+              )}
+            </div>
+            <button className="btn btn--primary" type="button" onClick={() => { loadDatabases(); loadUsers(); }}>
+              ⟳ Refresh
+            </button>
+          </div>
+          <div role="tablist" aria-label="Admin tabs" className="chip-set">
+            {tabOptions.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                className={`chip-button${tab === key ? ' active' : ''}`}
+                onClick={() => setTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </header>
 
         {tab === 'overview' && (
-          <section aria-labelledby="overview" className={panelClass}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <section aria-labelledby="overview" className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div className="card-grid">
               <StatCard title="Total Accounts" value={totalUsers} hint="All members" icon="👥" onClick={() => setTab('team')} />
               <StatCard title="Admins" value={totalAdmins} hint="Full access" icon="🛡️" onClick={() => setTab('team')} />
               <StatCard title="Operators" value={totalOperators} hint="On-ground users" icon="🤝" onClick={() => setTab('team')} />
@@ -204,7 +187,7 @@ export default function AdminHome() {
               <StatCard title="Voter Databases" value={totalDatabases} hint="Available lists" icon="🗃️" onClick={() => setTab('databases')} />
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="card-grid">
               <StatCard title="Open Voter Search" value="Search & Filter" hint="Find voters quickly" href="/search" icon="🔎" />
               <StatCard title="Manage Users" value="Add / Edit / Assign" hint="Create users and set roles" onClick={() => setTab('team')} icon="👤" />
               <StatCard title="Assign Databases" value="Grant access" hint="Control which lists each user sees" onClick={() => setTab('databases')} icon="🗂️" />
@@ -215,62 +198,55 @@ export default function AdminHome() {
 
         {tab === 'team' && (
           <>
-            <section className={panelClass} aria-labelledby="create-user">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-semibold text-slate-900" id="create-user">Team management</h2>
-                <p className="text-sm text-slate-500">Add teammates (username only — email optional), choose a role, and assign databases.</p>
+            <section className="glass-panel" aria-labelledby="create-user">
+              <div>
+                <h2 className="section-heading" id="create-user">Team management</h2>
+                <p className="section-subtext">Add teammates, choose a role, and assign databases.</p>
               </div>
-              <div className="mt-4">
+              <div style={{ marginTop: 20 }}>
                 <AdminUsers onCreated={onUserCreated} />
               </div>
             </section>
 
-            <section className={panelClass} aria-labelledby="user-access">
-              <div className="space-y-1">
-                <h3 className="text-xl font-semibold text-slate-900" id="user-access">User access & databases</h3>
-                <p className="text-sm text-slate-500">Toggle which voter databases each user can access.</p>
+            <section className="glass-panel" aria-labelledby="user-access">
+              <div>
+                <h3 className="section-heading" style={{ fontSize: '1.4rem' }} id="user-access">User access & databases</h3>
+                <p className="section-subtext">Toggle which voter databases each user can access.</p>
               </div>
 
               {status.text && (
-                <div
-                  className={`mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${
-                    status.type === 'error'
-                      ? 'border-rose-100 bg-rose-50 text-rose-900'
-                      : 'border-emerald-100 bg-emerald-50 text-emerald-900'
-                  }`}
-                  role="status"
-                >
+                <div className={`alert ${status.type === 'error' ? 'alert--error' : 'alert--info'}`} style={{ marginTop: 20 }} role="status">
                   <span aria-hidden>{status.type === 'error' ? '⚠️' : '✅'}</span>
                   <span>{status.text}</span>
                 </div>
               )}
 
               {loading ? (
-                <p className="mt-4 text-sm text-slate-500">Loading users…</p>
+                <p className="section-subtext" style={{ marginTop: 16 }}>Loading users…</p>
               ) : users.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">No team members found yet.</p>
+                <p className="section-subtext" style={{ marginTop: 16 }}>No team members found yet.</p>
               ) : (
-                <div className="mt-6 overflow-x-auto">
-                  <table className="min-w-full divide-y divide-emerald-50 text-sm">
-                    <thead className="bg-emerald-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <div style={{ marginTop: 24, overflowX: 'auto' }}>
+                  <table className="table-shell">
+                    <thead>
                       <tr>
-                        <th className="px-4 py-3">User</th>
-                        <th className="px-4 py-3">Role</th>
-                        <th className="px-4 py-3">Allowed databases</th>
-                        <th className="px-4 py-3">Actions</th>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Allowed databases</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody>
                       {users.map((user) => {
                         const userId = resolveId(user);
                         const assigned = new Set(user?.allowedDatabaseIds || user?.databaseIds || []);
                         const isAdmin = (user?.role || '').toLowerCase() === 'admin';
                         return (
-                          <tr key={userId || Math.random()} className="align-top">
-                            <td className="px-4 py-3 font-semibold text-slate-800">{user?.username || '—'}</td>
-                            <td className="px-4 py-3">
+                          <tr key={userId || Math.random()}>
+                            <td style={{ fontWeight: 600 }}>{user?.username || '—'}</td>
+                            <td>
                               <select
-                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2"
+                                className="select-field"
                                 value={user?.role || 'user'}
                                 disabled={isAdmin}
                                 onChange={(e) => onRoleChange(userId, e.target.value)}
@@ -286,31 +262,30 @@ export default function AdminHome() {
                                 )}
                               </select>
                             </td>
-                            <td className="px-4 py-3">
-                              <div className="grid gap-2 md:grid-cols-2">
+                            <td>
+                              <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
                                 {databases.length > 0 ? (
                                   databases.map((db) => {
                                     const id = resolveId(db);
                                     return (
-                                      <label key={id} className="flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                                      <label key={id} className="glass-pill" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                         <input
                                           type="checkbox"
-                                          className="h-4 w-4 rounded border-slate-300 text-emerald-600"
                                           checked={assigned.has(id)}
                                           onChange={(e) => onToggleDatabase(userId, id, e.target.checked)}
                                         />
-                                        <span>{databaseDisplayName(db)}</span>
+                                        <span style={{ fontSize: '0.9rem' }}>{databaseDisplayName(db)}</span>
                                       </label>
                                     );
                                   })
                                 ) : (
-                                  <span className="text-sm text-slate-500">No voter databases available.</span>
+                                  <span className="section-subtext">No voter databases available.</span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-3">
+                            <td>
                               <button
-                                className={ghostBtn}
+                                className="btn btn--ghost"
                                 type="button"
                                 onClick={() => saveUser(user)}
                                 disabled={savingId === userId}
@@ -330,24 +305,26 @@ export default function AdminHome() {
         )}
 
         {tab === 'databases' && (
-          <section className={panelClass} aria-labelledby="database-panel">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold text-slate-900" id="database-panel">Voter databases</h2>
-              <p className="text-sm text-slate-500">Your available lists. Assign them to team members from the <b>Team</b> tab.</p>
+          <section className="glass-panel" aria-labelledby="database-panel">
+            <div>
+              <h2 className="section-heading" id="database-panel">Voter databases</h2>
+              <p className="section-subtext">Assign these lists to team members from the Team tab.</p>
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="card-grid" style={{ marginTop: 20 }}>
               {databases.length === 0 ? (
-                <p className="text-sm text-slate-500">No voter databases available.</p>
+                <p className="section-subtext">No voter databases available.</p>
               ) : (
                 databases.map((db) => {
                   const label = databaseDisplayName(db);
                   return (
-                    <div key={resolveId(db)} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                      <div className="text-lg font-semibold text-slate-900">{label}</div>
-                      <div className="text-sm text-slate-500">ID: <code className="font-mono">{resolveId(db)}</code></div>
-                      <div className="mt-3">
-                        <Link className={ghostBtn} to="/search">Open in Search</Link>
+                    <div key={resolveId(db)} className="glass-pill" style={{ gap: 8 }}>
+                      <div style={{ fontWeight: 600 }}>{label}</div>
+                      <div className="section-subtext">
+                        ID: <code>{resolveId(db)}</code>
+                      </div>
+                      <div>
+                        <Link className="btn btn--ghost" to="/search">Open in Search</Link>
                       </div>
                     </div>
                   );
@@ -358,23 +335,23 @@ export default function AdminHome() {
         )}
 
         {tab === 'settings' && (
-          <section className={panelClass} aria-labelledby="settings">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold text-slate-900" id="settings">Settings</h2>
-              <p className="text-sm text-slate-500">General admin preferences.</p>
+          <section className="glass-panel" aria-labelledby="settings">
+            <div>
+              <h2 className="section-heading" id="settings">Settings</h2>
+              <p className="section-subtext">General admin preferences.</p>
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                <div className="text-lg font-semibold text-slate-900">Theme</div>
-                <p className="text-sm text-slate-500">Using a light, professional palette (green / grey / black / white).</p>
+            <div className="card-grid" style={{ marginTop: 20 }}>
+              <div className="glass-pill" style={{ gap: 8 }}>
+                <div style={{ fontWeight: 600 }}>Theme</div>
+                <p className="section-subtext">Using a light, professional palette (green / grey / black / white).</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                <div className="text-lg font-semibold text-slate-900">Shortcuts</div>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Link to="/search" className={ghostBtn}>Go to Search</Link>
-                  <button type="button" className={ghostBtn} onClick={() => setTab('team')}>
+              <div className="glass-pill" style={{ gap: 12 }}>
+                <div style={{ fontWeight: 600 }}>Shortcuts</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                  <Link to="/search" className="btn btn--ghost">Go to Search</Link>
+                  <button type="button" className="btn btn--ghost" onClick={() => setTab('team')}>
                     Manage Users
                   </button>
                 </div>

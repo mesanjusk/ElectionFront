@@ -72,39 +72,50 @@ export default function AdminLogin() {
     }
   };
 
-  const cardClass =
-    'w-full max-w-md rounded-[30px] border border-emerald-100/70 bg-white/90 p-8 shadow-2xl shadow-emerald-900/10 backdrop-blur';
-  const labelClass = 'text-sm font-semibold text-slate-600';
-  const inputClass =
-    'mt-2 w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-slate-900 shadow-inner shadow-emerald-900/5 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200';
-  const primaryBtn =
-    'inline-flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-60';
+  const cardStyle = {
+    width: 'min(420px, 100%)',
+    borderRadius: 'var(--radius-lg)',
+    border: '1px solid var(--surface-border)',
+    background: 'var(--surface)',
+    padding: '32px',
+    boxShadow: '0 40px 80px rgba(15,23,42,0.15)',
+  };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
-      <div className={cardClass}>
-        <header className="flex flex-col items-center gap-2 text-center">
-          <div className="inline-flex items-center gap-3 rounded-2xl bg-emerald-50/70 px-4 py-2 text-emerald-700">
-            <span className="text-2xl font-black tracking-tight">SB</span>
-            <div className="text-left">
-              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700">SMart Book Admin</p>
-              <p className="text-xs text-slate-500">Control centre access</p>
+    <div className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={cardStyle}>
+        <header style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 18px',
+              borderRadius: 22,
+              background: 'var(--brand-soft)',
+              color: 'var(--brand-dark)',
+            }}
+          >
+            <span style={{ fontWeight: 800, fontSize: '1.4rem' }}>SB</span>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.18em', textTransform: 'uppercase' }}>SMart Book Admin</p>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>Control centre access</p>
             </div>
           </div>
         </header>
 
         {error && (
-          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">
+          <div className="alert alert--error" style={{ marginTop: 24 }} role="alert">
             <span aria-hidden>⚠️</span>
             <span>{error}</span>
           </div>
         )}
 
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          <label className="block">
-            <span className={labelClass}>Username</span>
+        <form style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={onSubmit}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Username</span>
             <input
-              className={inputClass}
+              className="input-field"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter your username"
@@ -114,10 +125,10 @@ export default function AdminLogin() {
             />
           </label>
 
-          <label className="block">
-            <span className={labelClass}>Password</span>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-dark)' }}>Password</span>
             <input
-              className={inputClass}
+              className="input-field"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -127,23 +138,20 @@ export default function AdminLogin() {
             />
           </label>
 
-          <button className={primaryBtn} disabled={loading} type="submit">
+          <button className="btn btn--primary" disabled={loading} type="submit">
             {loading ? 'Syncing data…' : 'Sign in'}
           </button>
         </form>
 
         {loading ? (
-          <div className="mt-6 space-y-2" role="status" aria-live="polite">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-emerald-100">
-              <span
-                className="block h-full rounded-full bg-emerald-500 transition-all"
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
+          <div style={{ marginTop: 24 }} role="status" aria-live="polite">
+            <div className="progress-track">
+              <span className="progress-fill" style={{ width: `${Math.min(progress, 100)}%` }} />
             </div>
-            <span className="block text-center text-sm text-slate-500">Preparing admin workspace…</span>
+            <p className="section-subtext" style={{ textAlign: 'center', marginTop: 8 }}>Preparing admin workspace…</p>
           </div>
         ) : (
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="section-subtext" style={{ textAlign: 'center', marginTop: 24 }}>
             Need field access instead? Go back to the regular login page.
           </p>
         )}
