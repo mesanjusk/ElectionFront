@@ -1,7 +1,7 @@
 // client/src/pages/Search.jsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { setAuthToken } from "../services/api";
-import { lockSession } from "../auth";
+import { lockSession, getActiveDatabase } from "../auth"; // ✅ read active DB id
 import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -85,7 +85,6 @@ const getHouseNo = (r) =>
 const getAge = (r) =>
   pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
 
-// 💡 numeric age (null if not parseable)
 const getAgeNum = (r) => {
   const raw = getAge(r);
   const m = String(raw || "").match(/\d+/);
@@ -97,7 +96,7 @@ const getAgeNum = (r) => {
 const getGender = (r) => {
   const g =
     pick(r, ["gender", "Gender"]) ||
-    pick(r?.__raw, ["Gender", "gender", "लिंग", "লিংগ"]) ||
+    pick(r?.__raw, ["Gender", "gender", "লিংগ", "लिंग"]) ||
     "";
   const s = String(g).toLowerCase();
   if (!s) return "";
@@ -299,13 +298,22 @@ export default function Search() {
     if (u) setUserName(u);
   }, []);
 
+  // ✅ read active DB id for pull/push
+  const [activeDb, setActiveDb] = useState(() => getActiveDatabase() || "");
+  useEffect(() => {
+    // in case it was changed elsewhere (e.g., Home auto-select)
+    const id = getActiveDatabase() || "";
+    if (id && id !== activeDb) setActiveDb(id);
+  }, [activeDb]);
+
   const [voiceLang, setVoiceLang] = useState("mr-IN");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   useClickOutside(menuRef, () => setMenuOpen(false));
 
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState("all"); // ⭐ new filter tab: all | male | female | 18-35 | 35+
+  const [tab, setTab] = useState("all");     // all | male | female | surname
+  const [ageBand, setAgeBand] = useState("all"); // all | 18-30 | 30-45 | 45-60 | 60+
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -336,31 +344,50 @@ export default function Search() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Apply text filter + tab filter together
+  // surname helper (last token)
+  const getSurname = (r) => {
+    const n = (getName(r) || "").trim();
+    if (!n) return "";
+    const parts = n.split(/\s+/);
+    return parts[parts.length - 1].toLowerCase();
+  };
+
+  // Combined filter: text + tab + age band
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
 
+    const inAgeBand = (r) => {
+      if (ageBand === "all") return true;
+      const a = getAgeNum(r);
+      if (a == null) return false;
+      if (ageBand === "18-30") return a >= 18 && a <= 30;
+      if (ageBand === "30-45") return a >= 30 && a <= 45;
+      if (ageBand === "45-60") return a >= 45 && a <= 60;
+      if (ageBand === "60+")   return a >= 61;
+      return true;
+    };
+
     const passesTab = (r) => {
-      if (tab === "all") return true;
       if (tab === "male") return getGender(r) === "M";
       if (tab === "female") return getGender(r) === "F";
-      if (tab === "18-35") {
-        const a = getAgeNum(r);
-        return a !== null && a >= 18 && a <= 35;
+      if (tab === "surname") {
+        if (!term) return true; // if no term, show all (age filter still applies)
+        return getSurname(r).startsWith(term);
       }
-      if (tab === "35+") {
-        const a = getAgeNum(r);
-        return a !== null && a >= 36;
-      }
-      return true;
+      return true; // 'all'
     };
 
     const textMatch = (r) => {
       if (!term) return true;
+      if (tab === "surname") {
+        // surname tab uses surname-only matching
+        return getSurname(r).startsWith(term);
+      }
+      // normal wide search
       const name = getName(r).toLowerCase();
       const epic = getEPIC(r).toLowerCase();
-      const mob = (getMobile(r) || "").toLowerCase();
-      const rps = (getRPS(r) || "").toLowerCase();
+      const mob  = (getMobile(r) || "").toLowerCase();
+      const rps  = (getRPS(r) || "").toLowerCase();
       const part = (getPart(r) || "").toLowerCase();
       const serialTxt = String(getSerialText(r) ?? "").toLowerCase();
       return (
@@ -373,11 +400,11 @@ export default function Search() {
       );
     };
 
-    return allRows.filter((r) => textMatch(r) && passesTab(r));
-  }, [q, tab, allRows]);
+    return allRows.filter((r) => textMatch(r) && passesTab(r) && inAgeBand(r));
+  }, [q, tab, ageBand, allRows]);
 
-  // Reset window on search or tab change
-  useEffect(() => setVisibleCount(200), [q, tab]);
+  // Reset window on any filter change
+  useEffect(() => setVisibleCount(200), [q, tab, ageBand]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -421,7 +448,7 @@ export default function Search() {
           >
             ☰
           </button>
-          <span className="sx-username" title={userName}>{userName}</span>
+          <span className="sx-username" title={userName}>Hello, {userName}</span>
         </div>
 
         <div className="sx-right">
@@ -431,9 +458,10 @@ export default function Search() {
             aria-label="Pull"
             disabled={busy}
             onClick={async () => {
+              if (!activeDb) return alert("No database selected.");
               setBusy(true);
               try {
-                const c = await pullAll();
+                const c = await pullAll({ databaseId: activeDb }); // ✅ pass DB id
                 alert(`Pulled ${c} changes from server.`);
                 await loadAll();
               } catch (e) {
@@ -451,9 +479,10 @@ export default function Search() {
             aria-label="Push"
             disabled={busy}
             onClick={async () => {
+              if (!activeDb) return alert("No database selected.");
               setBusy(true);
               try {
-                const res = await pushOutbox();
+                const res = await pushOutbox({ databaseId: activeDb }); // ✅ pass DB id
                 alert(
                   `Pushed: ${res.pushed}${
                     res.failed?.length ? `, Failed: ${res.failed.length}` : ""
@@ -499,7 +528,7 @@ export default function Search() {
           className="sx-search-input"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by name, EPIC, booth or phone"
+          placeholder={tab === "surname" ? "Type surname (last name)" : "Search by name, EPIC, booth or phone"}
           autoComplete="off"
         />
         <VoiceSearchButton
@@ -520,7 +549,7 @@ export default function Search() {
         </button>
       </div>
 
-      {/* ⭐ Tab row (WhatsApp-style) */}
+      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -529,7 +558,7 @@ export default function Search() {
           borderBottom: "1px solid #eee",
           background: "#fff",
           position: "sticky",
-          top: 56, // just below the appbar height
+          top: 56,
           zIndex: 5,
         }}
       >
@@ -537,8 +566,7 @@ export default function Search() {
           { key: "all", label: "All" },
           { key: "male", label: "Male" },
           { key: "female", label: "Female" },
-          { key: "18-35", label: "18–35" },
-          { key: "35+", label: "35+" },
+          { key: "surname", label: "Surname" },
         ].map((t) => {
           const active = tab === t.key;
           return (
@@ -557,6 +585,48 @@ export default function Search() {
               }}
             >
               {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Age sub-menu */}
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          padding: "8px 12px",
+          borderBottom: "1px solid #f1f1f1",
+          background: "#fff",
+          position: "sticky",
+          top: 56 + 41, // below tabs (approx height)
+          zIndex: 4,
+        }}
+      >
+        {[
+          { key: "all",   label: "All" },
+          { key: "18-30", label: "18–30" },
+          { key: "30-45", label: "30–45" },
+          { key: "45-60", label: "45–60" },
+          { key: "60+",   label: "60+" },
+        ].map((a) => {
+          const active = ageBand === a.key;
+          return (
+            <button
+              key={a.key}
+              type="button"
+              onClick={() => setAgeBand(a.key)}
+              style={{
+                border: "1px solid #e5e7eb",
+                background: active ? "#eef2ff" : "#fff",
+                color: active ? "#1f4cff" : "#374151",
+                fontWeight: active ? 700 : 500,
+                padding: "6px 10px",
+                borderRadius: 999,
+                cursor: "pointer",
+              }}
+            >
+              {a.label}
             </button>
           );
         })}
@@ -581,7 +651,6 @@ export default function Search() {
 
               return (
                 <div className="sx-card sx-card--readable" key={r._id || `${i}-${serialTxt}`}>
-                  {/* Row 1: Serial · Age · Sex · Edit */}
                   <div className="sx-row-compact">
                     <div className="sx-serial-pill">
                       {!Number.isNaN(serialNum) ? serialNum : serialTxt || "—"}
@@ -598,7 +667,6 @@ export default function Search() {
                     </button>
                   </div>
 
-                  {/* Row 2: Name + actions */}
                   <div className="sx-row-compact">
                     <button
                       className="sx-name-compact sx-name-button"
