@@ -40,6 +40,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { setAuthToken } from "../services/api";
 import {
   lockSession,
@@ -52,6 +53,10 @@ import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
+import TopNavbar from "../components/TopNavbar.jsx";
+
+
+
 
 /* ---------------- helpers (EN + MR + __raw fallbacks) ---------------- */
 const pick = (obj, keys) => {
@@ -185,75 +190,6 @@ const normalizePhone = (raw) => {
   if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
   if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
   return d.length === 10 ? d : "";
-};
-
-/* Simple transliteration: Devanagari to Latin (approx) */
-const DEV_TO_LATIN = {
-  अ: "a",
-  आ: "aa",
-  इ: "i",
-  ई: "ii",
-  उ: "u",
-  ऊ: "uu",
-  ए: "e",
-  ऐ: "ai",
-  ओ: "o",
-  औ: "au",
-  क: "k",
-  ख: "kh",
-  ग: "g",
-  घ: "gh",
-  च: "ch",
-  छ: "chh",
-  ज: "j",
-  झ: "jh",
-  ट: "t",
-  ठ: "th",
-  ड: "d",
-  ढ: "dh",
-  त: "t",
-  थ: "th",
-  द: "d",
-  ध: "dh",
-  न: "n",
-  प: "p",
-  फ: "ph",
-  ब: "b",
-  भ: "bh",
-  म: "m",
-  य: "y",
-  र: "r",
-  ल: "l",
-  व: "v",
-  स: "s",
-  श: "sh",
-  ष: "sh",
-  ह: "h",
-  ङ: "n",
-  ञ: "n",
-  ऱ: "r",
-  "्": "",
-  "ा": "a",
-  "ि": "i",
-  "ी": "i",
-  "ु": "u",
-  "ू": "u",
-  "े": "e",
-  "ै": "ai",
-  "ो": "o",
-  "ौ": "au",
-  "ं": "n",
-  "ँ": "n",
-};
-
-const transliterate = (text) => {
-  const s = String(text || "");
-  let out = "";
-  for (let i = 0; i < s.length; i += 1) {
-    const ch = s[i];
-    out += DEV_TO_LATIN[ch] || ch.toLowerCase();
-  }
-  return out;
 };
 
 /* Share text for WhatsApp */
@@ -414,6 +350,17 @@ function RecordModal({ open, voter, onClose }) {
   );
 }
 
+/* ---------------- Reusable Top Navbar component ---------------- */
+<TopNavbar
+  collectionName={collectionName}
+  userName={userName}
+  busy={busy}
+  onMenuOpen={handleMenuOpen}
+  onPull={handlePull}
+  onPush={handlePush}
+/>
+
+
 /* ================================== PAGE ================================== */
 export default function Search() {
   // auth for server Pull/Push
@@ -504,10 +451,50 @@ export default function Search() {
     loadAll();
   }, [loadAll]);
 
-  // Combined filter: text + tab + age band with transliteration
+  const handlePull = async () => {
+    const id = getActiveDatabase();
+    if (!id) return alert("No database selected.");
+    if (id !== activeDb) {
+      setActiveDatabase(id);
+      setActiveDbState(id);
+    }
+    setBusy(true);
+    try {
+      const c = await pullAll({ databaseId: id });
+      alert(`Pulled ${c} changes from server.`);
+      await loadAll();
+    } catch (e) {
+      alert("Pull failed: " + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePush = async () => {
+    const id = getActiveDatabase();
+    if (!id) return alert("No database selected.");
+    if (id !== activeDb) {
+      setActiveDatabase(id);
+      setActiveDbState(id);
+    }
+    setBusy(true);
+    try {
+      const res = await pushOutbox({ databaseId: id });
+      alert(
+        `Pushed: ${res.pushed}${
+          res.failed?.length ? `, Failed: ${res.failed.length}` : ""
+        }`
+      );
+    } catch (e) {
+      alert("Push failed: " + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Combined filter: text + tab + age band (no transliteration, exact match)
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const termTrans = transliterate(term);
 
     const inAgeBand = (r) => {
       if (ageBand === "all") return true;
@@ -543,18 +530,13 @@ export default function Search() {
       const partL = part.toLowerCase();
       const serialL = serialTxt.toLowerCase();
 
-      const nameT = transliterate(nameL);
-      const partT = transliterate(partL);
-
       return (
         nameL.includes(term) ||
         epicL.includes(term) ||
         mobL.includes(term) ||
         rpsL.includes(term) ||
         partL.includes(term) ||
-        serialL.includes(term) ||
-        nameT.includes(termTrans) ||
-        partT.includes(termTrans)
+        serialL.includes(term)
       );
     };
 
@@ -609,92 +591,14 @@ export default function Search() {
 
   return (
     <Box sx={{ minHeight: "100vh", pb: 8 }}>
-      <AppBar
-        position="sticky"
-        color="transparent"
-        elevation={0}
-        sx={{
-          backdropFilter: "blur(16px)",
-          borderBottom: "1px solid rgba(15,23,42,0.08)",
-        }}
-      >
-        <Toolbar sx={{ justifyContent: "space-between", minHeight: 72 }}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <IconButton onClick={handleMenuOpen} color="inherit">
-              <MenuRoundedIcon />
-            </IconButton>
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                {collectionName || "Collection"}
-              </Typography>
-              <Typography variant="h6">{userName}</Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" spacing={1}>
-            <Tooltip title="Pull latest">
-              <span>
-                <IconButton
-                  color="primary"
-                  onClick={async () => {
-                    const id = getActiveDatabase();
-                    if (!id) return alert("No database selected.");
-                    if (id !== activeDb) {
-                      setActiveDatabase(id);
-                      setActiveDbState(id);
-                    }
-                    setBusy(true);
-                    try {
-                      const c = await pullAll({ databaseId: id });
-                      alert(`Pulled ${c} changes from server.`);
-                      await loadAll();
-                    } catch (e) {
-                      alert("Pull failed: " + (e?.message || e));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                  disabled={busy}
-                >
-                  <CloudDownloadRoundedIcon />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="Push offline updates">
-              <span>
-                <IconButton
-                  color="primary"
-                  onClick={async () => {
-                    const id = getActiveDatabase();
-                    if (!id) return alert("No database selected.");
-                    if (id !== activeDb) {
-                      setActiveDatabase(id);
-                      setActiveDbState(id);
-                    }
-                    setBusy(true);
-                    try {
-                      const res = await pushOutbox({ databaseId: id });
-                      alert(
-                        `Pushed: ${res.pushed}${
-                          res.failed?.length
-                            ? `, Failed: ${res.failed.length}`
-                            : ""
-                        }`
-                      );
-                    } catch (e) {
-                      alert("Push failed: " + (e?.message || e));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                  disabled={busy}
-                >
-                  <CloudUploadRoundedIcon />
-                </IconButton>
-              </span>
-            </Tooltip>
-          </Stack>
-        </Toolbar>
-      </AppBar>
+      <TopNavbar
+        collectionName={collectionName}
+        userName={userName}
+        busy={busy}
+        onMenuOpen={handleMenuOpen}
+        onPull={handlePull}
+        onPush={handlePush}
+      />
 
       <Menu
         anchorEl={menuAnchorEl}
@@ -722,7 +626,7 @@ export default function Search() {
               <Stack spacing={2}>
                 <TextField
                   label="Search voters"
-                  placeholder="Search by name, EPIC or phone"
+                  placeholder="Type name in Marathi/Hindi, or EPIC / phone"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   InputProps={{
@@ -807,7 +711,7 @@ export default function Search() {
                           gap: 0.5,
                         }}
                       >
-                        {/* Row 1: Serial · Part · Age · Sex */}
+                        {/* Row 1: Serial · Part · Age · Sex + + button on right */}
                         <Stack
                           direction="row"
                           spacing={1}
@@ -826,24 +730,41 @@ export default function Search() {
                           >
                             · Age {age || "—"} · {gender || "—"}
                           </Typography>
+                          <Box sx={{ flexGrow: 1 }} />
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => setSelected(r)}
+                          >
+                            <AddRoundedIcon fontSize="small" />
+                          </IconButton>
                         </Stack>
 
-                        {/* Row 2: Name */}
-                        <Typography variant="subtitle1" fontWeight={600}>
+                        {/* Row 2: Name (clickable -> details) */}
+                        <Typography
+                          variant="subtitle1"
+                          fontWeight={600}
+                          sx={{
+                            cursor: "pointer",
+                            textDecoration: "none",
+                            "&:hover": {
+                              textDecoration: "underline",
+                            },
+                          }}
+                          onClick={() => setDetail(r)}
+                        >
                           {name}
                         </Typography>
 
-                        {/* Row 3: EPIC */}
-                        <Typography variant="body2" color="text.secondary">
-                          EPIC {getEPIC(r)}
-                        </Typography>
+                        {/* Row 3: EPIC removed from list card */}                        
 
-                        {/* Row 4: Actions */}
+                        {/* Row 4: Actions - Call, Share, Edit icon in one row */}
                         <Stack
                           direction="row"
                           spacing={1}
                           flexWrap="wrap"
                           sx={{ mt: 0.25 }}
+                          alignItems="center"
                         >
                           <Button
                             variant="outlined"
@@ -866,14 +787,6 @@ export default function Search() {
                             rel="noreferrer"
                           >
                             Share
-                          </Button>
-                          <Button
-                            variant="text"
-                            size="small"
-                            startIcon={<SearchRoundedIcon />}
-                            onClick={() => setDetail(r)}
-                          >
-                            Details
                           </Button>
                           <IconButton
                             size="small"

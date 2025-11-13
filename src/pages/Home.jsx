@@ -23,6 +23,8 @@ import {
   setActiveDatabase,
 } from '../auth';
 import { pullAll, resetSyncState } from '../services/sync';
+import TopNavbar from "../components/TopNavbar.jsx";
+
 
 export default function Home() {
   const [databases, setDatabases] = useState(() => getAvailableDatabases());
@@ -109,26 +111,36 @@ export default function Home() {
   const quickActions = [
     {
       label: 'Voter Search',
-      description: 'Find voters by name, EPIC or phone.',
+      description: '',
       icon: <SearchRoundedIcon color="primary" />,
       action: () => navigate('/search'),
     },
     {
-      label: 'Volunteer Quiz',
-      description: 'Micro-learnings for your team.',
+      label: '1',
+      description: '',
       icon: <QuizRoundedIcon color="secondary" />,
       action: () => alert('Volunteer quiz coming soon.'),
     },
     {
-      label: 'Constituency Facts',
-      description: 'Reference sheets for your booths.',
+      label: '2',
+      description: '',
       icon: <MapRoundedIcon color="primary" />,
       action: () => alert('Constituency fact sheet coming soon.'),
     },
   ];
 
   return (
+    
     <Box sx={{ minHeight: '100vh', py: { xs: 4, md: 8 } }}>
+      <TopNavbar
+  collectionName={collectionName}
+  userName={userName}
+  busy={busy}
+  onMenuOpen={handleMenuOpen}
+  onPull={handlePull}
+  onPush={handlePush}
+/>
+
       <Container maxWidth="lg">
         <Stack spacing={4}>
           {/* Header + user card */}
