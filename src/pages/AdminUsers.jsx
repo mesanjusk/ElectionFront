@@ -34,6 +34,35 @@ const getId = (u) => u?.id || u?._id;
 const getRole = (u) => (u?.role || '').toLowerCase();
 const fmt = (d) => (d ? new Date(d).toLocaleString() : '—');
 
+// 🔧 Cloudinary config – replace with your values
+const CLOUDINARY_CLOUD_NAME = 'your_cloud_name';
+const CLOUDINARY_UPLOAD_PRESET = 'your_unsigned_preset';
+
+// helper: upload image file to Cloudinary
+async function uploadAvatarToCloudinary(file) {
+  if (!file) return null;
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error('Cloudinary config missing. Set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.');
+  }
+
+  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    throw new Error('Image upload failed');
+  }
+
+  const data = await res.json();
+  return data.secure_url;
+}
+
 export default function AdminUsers({ onCreated }) {
   const [users, setUsers] = useState([]);
   const [dbs, setDbs] = useState([]);
@@ -44,6 +73,11 @@ export default function AdminUsers({ onCreated }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
   const [allowed, setAllowed] = useState([]);
+
+  // 🖼 avatar states for create-user
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [pwdUserId, setPwdUserId] = useState(null);
   const [newPwd, setNewPwd] = useState('');
@@ -72,28 +106,54 @@ export default function AdminUsers({ onCreated }) {
     setAllowed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const resetCreateForm = () => {
+    setUsername('');
+    setPassword('');
+    setRole('user');
+    setAllowed([]);
+    setAvatarFile(null);
+    setAvatarPreview('');
+    setUploadingAvatar(false);
+  };
+
   const onCreate = async (e) => {
     e.preventDefault();
     setStatus({ type: '', text: '' });
+
     try {
       if (!username.trim()) throw new Error('Username required');
       if (password.length < 4) throw new Error('Password must be at least 4 chars');
+
+      let avatarUrl = null;
+
+      if (avatarFile) {
+        setUploadingAvatar(true);
+        avatarUrl = await uploadAvatarToCloudinary(avatarFile);
+      }
 
       await adminCreateUser({
         username: username.trim(),
         password,
         role,
         allowedDatabaseIds: allowed,
+        avatarUrl, // 👈 send Cloudinary URL to backend
       });
-      setUsername('');
-      setPassword('');
-      setRole('user');
-      setAllowed([]);
+
+      resetCreateForm();
       setStatus({ type: 'ok', text: 'User created' });
       onCreated?.();
       await loadAll();
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -207,13 +267,32 @@ export default function AdminUsers({ onCreated }) {
           <Box component="form" onSubmit={onCreate} sx={{ mt: 2 }}>
             <Grid container spacing={2}>
               <Grid item xs={12} md={4}>
-                <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth required />
+                <TextField
+                  label="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  fullWidth
+                  required
+                />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth required />
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  fullWidth
+                  required
+                />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField select label="Role" value={role} onChange={(e) => setRole(e.target.value)} fullWidth>
+                <TextField
+                  select
+                  label="Role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  fullWidth
+                >
                   {ROLES.map((r) => (
                     <MenuItem key={r} value={r}>
                       {r}
@@ -221,7 +300,38 @@ export default function AdminUsers({ onCreated }) {
                   ))}
                 </TextField>
               </Grid>
+
+              {/* Avatar upload */}
+              <Grid item xs={12} md={4}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  fullWidth
+                  disabled={uploadingAvatar}
+                >
+                  {uploadingAvatar ? 'Uploading image…' : 'Upload user image'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleAvatarChange}
+                  />
+                </Button>
+                {avatarPreview && (
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                    <img
+                      src={avatarPreview}
+                      alt="Preview"
+                      style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      Image selected
+                    </Typography>
+                  </Stack>
+                )}
+              </Grid>
             </Grid>
+
             <Typography variant="subtitle2" sx={{ mt: 3 }}>
               Allowed databases
             </Typography>
@@ -237,8 +347,12 @@ export default function AdminUsers({ onCreated }) {
               ))}
             </Stack>
             <Stack direction="row" justifyContent="flex-end" sx={{ mt: 3 }}>
-              <Button type="submit" variant="contained">
-                Create user
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={uploadingAvatar}
+              >
+                {uploadingAvatar ? 'Uploading…' : 'Create user'}
               </Button>
             </Stack>
           </Box>
@@ -265,7 +379,12 @@ export default function AdminUsers({ onCreated }) {
                   <Card key={id} variant="outlined">
                     <CardContent>
                       <Stack spacing={2}>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={1}
+                          alignItems="center"
+                          justifyContent="space-between"
+                        >
                           <Stack spacing={0.5}>
                             <Typography variant="h6">{u.username}</Typography>
                             <Typography variant="body2" color="text.secondary">
@@ -277,7 +396,12 @@ export default function AdminUsers({ onCreated }) {
                             <Button size="small" variant="outlined" onClick={() => openPwdModal(id)}>
                               Change password
                             </Button>
-                            <Button size="small" variant="outlined" color="error" onClick={() => onDelete(id)}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              onClick={() => onDelete(id)}
+                            >
                               Delete
                             </Button>
                           </Stack>
@@ -293,7 +417,12 @@ export default function AdminUsers({ onCreated }) {
                                 <TextField
                                   select
                                   value={roleEditing[id]}
-                                  onChange={(e) => setRoleEditing((prev) => ({ ...prev, [id]: e.target.value }))}
+                                  onChange={(e) =>
+                                    setRoleEditing((prev) => ({
+                                      ...prev,
+                                      [id]: e.target.value,
+                                    }))
+                                  }
                                   fullWidth
                                 >
                                   {ROLES.map((r) => (
@@ -303,18 +432,35 @@ export default function AdminUsers({ onCreated }) {
                                   ))}
                                 </TextField>
                                 <Stack direction="row" spacing={1}>
-                                  <Button variant="contained" size="small" onClick={() => saveRole(id)}>
+                                  <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={() => saveRole(id)}
+                                  >
                                     Save
                                   </Button>
-                                  <Button variant="outlined" size="small" onClick={() => cancelRoleEdit(id)}>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => cancelRoleEdit(id)}
+                                  >
                                     Cancel
                                   </Button>
                                 </Stack>
                               </Stack>
                             ) : (
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                                sx={{ mt: 1 }}
+                              >
                                 <Chip label={getRole(u)} color="primary" variant="filled" />
-                                <Button variant="outlined" size="small" onClick={() => beginRoleEdit(id, getRole(u))}>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={() => beginRoleEdit(id, getRole(u))}
+                                >
                                   Edit
                                 </Button>
                               </Stack>
@@ -339,20 +485,37 @@ export default function AdminUsers({ onCreated }) {
                                   ))}
                                 </Stack>
                                 <Stack direction="row" spacing={1}>
-                                  <Button variant="contained" size="small" onClick={() => saveDbEdit(id)}>
+                                  <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={() => saveDbEdit(id)}
+                                  >
                                     Save
                                   </Button>
-                                  <Button variant="outlined" size="small" onClick={() => cancelDbEdit(id)}>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => cancelDbEdit(id)}
+                                  >
                                     Cancel
                                   </Button>
                                 </Stack>
                               </Stack>
                             ) : (
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                                sx={{ mt: 1 }}
+                              >
                                 <Typography variant="body2" color="text.secondary">
                                   {dbList.length ? dbList.join(', ') : '—'}
                                 </Typography>
-                                <Button variant="outlined" size="small" onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}
+                                >
                                   Edit
                                 </Button>
                               </Stack>
@@ -366,15 +529,23 @@ export default function AdminUsers({ onCreated }) {
                             <Stack spacing={0.5} sx={{ mt: 1 }}>
                               {u.deviceIdBound ? (
                                 <>
-                                  <Typography fontFamily="monospace">bound: {u.deviceIdBound}</Typography>
+                                  <Typography fontFamily="monospace">
+                                    bound: {u.deviceIdBound}
+                                  </Typography>
                                   <Typography variant="body2" color="text.secondary">
                                     at: {fmt(u.deviceBoundAt)}
                                   </Typography>
                                 </>
                               ) : (
-                                <Typography variant="body2" color="text.secondary">—</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  —
+                                </Typography>
                               )}
-                              <Button variant="outlined" size="small" onClick={() => onResetDevice(id)}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => onResetDevice(id)}
+                              >
                                 Reset device
                               </Button>
                             </Stack>
@@ -417,7 +588,8 @@ export default function AdminUsers({ onCreated }) {
                 required
               />
               <Typography variant="body2" color="text.secondary">
-                Passwords are stored securely. After saving, you will see the new password once to share with the user.
+                Passwords are stored securely. After saving, you will see the new password once to
+                share with the user.
               </Typography>
             </Stack>
           </DialogContent>

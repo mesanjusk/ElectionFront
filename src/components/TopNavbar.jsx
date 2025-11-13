@@ -43,7 +43,7 @@ export default function TopNavbar({
           </IconButton>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              {userName} {collectionName || "Collection"}
+              {userName} {collectionName || ""}
             </Typography>
             
           </Box>

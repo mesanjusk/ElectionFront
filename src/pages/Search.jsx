@@ -667,7 +667,7 @@ export default function Search() {
       <Box
         sx={(theme) => ({
           position: "sticky",
-          top: theme.mixins.toolbar?.minHeight || 72,
+          top: theme.mixins.toolbar?.minHeight || 52,
           zIndex: theme.zIndex.appBar - 1,
           bgcolor: "background.paper",
           borderBottom: "1px solid rgba(15,23,42,0.08)",
