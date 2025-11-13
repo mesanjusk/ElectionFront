@@ -34,15 +34,19 @@ const getId = (u) => u?.id || u?._id;
 const getRole = (u) => (u?.role || '').toLowerCase();
 const fmt = (d) => (d ? new Date(d).toLocaleString() : '—');
 
-// 🔧 Cloudinary config – replace with your values
-const CLOUDINARY_CLOUD_NAME = 'your_cloud_name';
-const CLOUDINARY_UPLOAD_PRESET = 'your_unsigned_preset';
+// 🔧 Cloudinary config – read from Vite env, with safe defaults
+const CLOUDINARY_CLOUD_NAME =
+  import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dadcprflr';
+const CLOUDINARY_UPLOAD_PRESET =
+  import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'election_users';
 
-// helper: upload image file to Cloudinary
+// helper: upload image file to Cloudinary (unsigned upload)
 async function uploadAvatarToCloudinary(file) {
   if (!file) return null;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-    throw new Error('Cloudinary config missing. Set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.');
+    throw new Error(
+      'Cloudinary config missing. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET.'
+    );
   }
 
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -103,7 +107,9 @@ export default function AdminUsers({ onCreated }) {
   }, []);
 
   const onToggleDb = (id) => {
-    setAllowed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setAllowed((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const handleAvatarChange = (e) => {
@@ -249,7 +255,9 @@ export default function AdminUsers({ onCreated }) {
       closePwdModal();
       setStatus({ type: 'ok', text: 'Password updated' });
       await loadAll();
-      window.alert(`New password set successfully.\nShare this one-time value with the user:\n\n${newPwd}`);
+      window.alert(
+        `New password set successfully.\nShare this one-time value with the user:\n\n${newPwd}`
+      );
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     }
@@ -258,7 +266,9 @@ export default function AdminUsers({ onCreated }) {
   return (
     <Stack spacing={3}>
       {status.text && (
-        <Alert severity={status.type === 'error' ? 'error' : 'success'}>{status.text}</Alert>
+        <Alert severity={status.type === 'error' ? 'error' : 'success'}>
+          {status.text}
+        </Alert>
       )}
 
       <Card variant="outlined">
@@ -318,11 +328,21 @@ export default function AdminUsers({ onCreated }) {
                   />
                 </Button>
                 {avatarPreview && (
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ mt: 1 }}
+                  >
                     <img
                       src={avatarPreview}
                       alt="Preview"
-                      style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                      }}
                     />
                     <Typography variant="body2" color="text.secondary">
                       Image selected
@@ -347,11 +367,7 @@ export default function AdminUsers({ onCreated }) {
               ))}
             </Stack>
             <Stack direction="row" justifyContent="flex-end" sx={{ mt: 3 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={uploadingAvatar}
-              >
+              <Button type="submit" variant="contained" disabled={uploadingAvatar}>
                 {uploadingAvatar ? 'Uploading…' : 'Create user'}
               </Button>
             </Stack>
@@ -372,7 +388,9 @@ export default function AdminUsers({ onCreated }) {
                 const id = getId(u);
                 const isRoleEditing = roleEditing[id] !== undefined;
                 const isDbEditing = dbEditing[id] !== undefined;
-                const dbSet = isDbEditing ? dbEditing[id] : new Set(u?.allowedDatabaseIds || []);
+                const dbSet = isDbEditing
+                  ? dbEditing[id]
+                  : new Set(u?.allowedDatabaseIds || []);
                 const dbList = Array.from(dbSet);
 
                 return (
@@ -393,7 +411,11 @@ export default function AdminUsers({ onCreated }) {
                           </Stack>
                           <Stack direction="row" spacing={1}>
                             <Chip label={getRole(u)} color="primary" variant="outlined" />
-                            <Button size="small" variant="outlined" onClick={() => openPwdModal(id)}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => openPwdModal(id)}
+                            >
                               Change password
                             </Button>
                             <Button
@@ -455,7 +477,11 @@ export default function AdminUsers({ onCreated }) {
                                 alignItems="center"
                                 sx={{ mt: 1 }}
                               >
-                                <Chip label={getRole(u)} color="primary" variant="filled" />
+                                <Chip
+                                  label={getRole(u)}
+                                  color="primary"
+                                  variant="filled"
+                                />
                                 <Button
                                   variant="outlined"
                                   size="small"
@@ -508,7 +534,10 @@ export default function AdminUsers({ onCreated }) {
                                 alignItems="center"
                                 sx={{ mt: 1 }}
                               >
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
                                   {dbList.length ? dbList.join(', ') : '—'}
                                 </Typography>
                                 <Button

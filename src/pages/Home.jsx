@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Avatar,
   Box,
   Button,
   Card,
@@ -163,6 +164,8 @@ export default function Home() {
 
   const collectionName = assignedName || "Unassigned collection";
   const userName = user?.username || user?.name || "User";
+  const userRole = (user?.role || "").toUpperCase();
+  const avatarUrl = user?.avatarUrl || user?.avatar || null;
 
   const handleMenuOpen = (event) => setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
@@ -180,6 +183,8 @@ export default function Home() {
       <TopNavbar
         collectionName={collectionName}
         userName={userName}
+        // optional prop if you later want to use avatar in TopNavbar
+        userAvatar={avatarUrl}
         busy={syncing}
         onMenuOpen={handleMenuOpen}
         onPull={syncAssigned}
@@ -208,8 +213,54 @@ export default function Home() {
 
       <Container maxWidth="lg">
         <Stack spacing={4}>
-          {/* Header + user card */}
-          
+          {/* Header + user card (shows avatar from Cloudinary) */}
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={5}>
+              <Card>
+                <CardContent>
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    alignItems="center"
+                    justifyContent="flex-start"
+                  >
+                    <Avatar
+                      src={avatarUrl || undefined}
+                      alt={userName}
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        bgcolor: "#1976d2",
+                        fontSize: 24,
+                      }}
+                    >
+                      {!avatarUrl && userName?.[0]?.toUpperCase?.()}
+                    </Avatar>
+                    <Stack spacing={0.5}>
+                      <Typography variant="h6">{userName}</Typography>
+                      {userRole && (
+                        <Chip
+                          label={userRole}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      )}
+                      {assignedName && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          Assigned DB: {assignedName}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
 
           {/* Main metrics + sync button on left */}
           <Grid container spacing={3}>
@@ -242,8 +293,7 @@ export default function Home() {
                             left: 24,
                             right: 24,
                             bottom: `${g * 100}%`,
-                            borderTop:
-                              "1px dashed rgba(15,111,255,0.2)",
+                            borderTop: "1px dashed rgba(15,111,255,0.2)",
                           }}
                         />
                       ))}
