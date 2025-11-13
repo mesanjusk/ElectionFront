@@ -31,7 +31,7 @@ export default function TopNavbar({
         borderBottom: "1px solid rgba(15,23,42,0.08)",
       }}
     >
-      <Toolbar sx={{ justifyContent: "space-between", minHeight: 72 }}>
+      <Toolbar sx={{ justifyContent: "space-between", minHeight: 60 }}>
         {/* Left: Menu + Collection name + User name */}
         <Stack direction="row" spacing={1.5} alignItems="center">
           <IconButton
@@ -43,9 +43,9 @@ export default function TopNavbar({
           </IconButton>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              {collectionName || "Collection"}
+              {userName} {collectionName || "Collection"}
             </Typography>
-            <Typography variant="h6">{userName}</Typography>
+            
           </Box>
         </Stack>
 
