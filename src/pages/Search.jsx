@@ -1,5 +1,11 @@
-// client/src/pages/Search.jsx 
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+// client/src/pages/Search.jsx
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import {
   AppBar,
   Box,
@@ -15,7 +21,6 @@ import {
   IconButton,
   InputAdornment,
   Menu,
-  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -36,7 +41,13 @@ import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { setAuthToken } from "../services/api";
-import { lockSession, getActiveDatabase, getUser } from "../auth"; // ✅ added getUser
+import {
+  lockSession,
+  getActiveDatabase,
+  getUser,
+  getAvailableDatabases,
+  setActiveDatabase,
+} from "../auth";
 import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -78,7 +89,7 @@ const getPart = (r) =>
   pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
   "";
 
-/* Serial */
+/* Serial helpers */
 const getSerialText = (r) => {
   const v =
     pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
@@ -94,19 +105,21 @@ const getSerialText = (r) => {
     "";
   return v == null ? "" : String(v);
 };
-const num = (s) => {
+
+const parseLastNumber = (s) => {
   const m = String(s || "").match(/\d+/g);
   if (!m) return NaN;
   const n = parseInt(m[m.length - 1], 10);
   return Number.isNaN(n) ? NaN : n;
 };
+
 const getSerialNum = (r) => {
   const t = getSerialText(r);
-  if (t) return num(t);
+  if (t) return parseLastNumber(t);
   const rps = getRPS(r);
   if (rps && /\d+\/\d+\/\d+/.test(rps)) {
     const last = rps.split("/").pop();
-    return num(last);
+    return parseLastNumber(last);
   }
   return NaN;
 };
@@ -151,7 +164,6 @@ const getCareOf = (r) =>
   pick(r?.__raw, [
     "वडिलांचे नाव",
     "वडिलांचे नांव",
-    "পতির নাম",
     "पतीचे नाव",
     "पतीचे नांव",
     "Guardians Name",
@@ -166,12 +178,82 @@ const getCareOf = (r) =>
 /* Phone (DB fields only) */
 const getMobile = (r) =>
   pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
+
 const normalizePhone = (raw) => {
   if (!raw) return "";
   let d = String(raw).replace(/[^\d]/g, "");
   if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
   if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
   return d.length === 10 ? d : "";
+};
+
+/* Simple transliteration: Devanagari to Latin (approx) */
+const DEV_TO_LATIN = {
+  अ: "a",
+  आ: "aa",
+  इ: "i",
+  ई: "ii",
+  उ: "u",
+  ऊ: "uu",
+  ए: "e",
+  ऐ: "ai",
+  ओ: "o",
+  औ: "au",
+  क: "k",
+  ख: "kh",
+  ग: "g",
+  घ: "gh",
+  च: "ch",
+  छ: "chh",
+  ज: "j",
+  झ: "jh",
+  ट: "t",
+  ठ: "th",
+  ड: "d",
+  ढ: "dh",
+  त: "t",
+  थ: "th",
+  द: "d",
+  ध: "dh",
+  न: "n",
+  प: "p",
+  फ: "ph",
+  ब: "b",
+  भ: "bh",
+  म: "m",
+  य: "y",
+  र: "r",
+  ल: "l",
+  व: "v",
+  स: "s",
+  श: "sh",
+  ष: "sh",
+  ह: "h",
+  ङ: "n",
+  ञ: "n",
+  ऱ: "r",
+  "्": "",
+  "ा": "a",
+  "ि": "i",
+  "ी": "i",
+  "ु": "u",
+  "ू": "u",
+  "े": "e",
+  "ै": "ai",
+  "ो": "o",
+  "ौ": "au",
+  "ं": "n",
+  "ँ": "n",
+};
+
+const transliterate = (text) => {
+  const s = String(text || "");
+  let out = "";
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    out += DEV_TO_LATIN[ch] || ch.toLowerCase();
+  }
+  return out;
 };
 
 /* Share text for WhatsApp */
@@ -187,10 +269,12 @@ const buildShareText = (r) => {
   const co = getCareOf(r);
 
   const lines = [
-    `Voter Details`,
+    "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
-    `Part: ${part || "—"}  Serial: ${!Number.isNaN(serial) ? serial : "—"}`,
+    `Part: ${part || "—"}  Serial: ${
+      !Number.isNaN(serial) ? serial : "—"
+    }`,
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
     house ? `House: ${house}` : null,
@@ -338,8 +422,10 @@ export default function Search() {
     if (t) setAuthToken(t);
   }, []);
 
-  // ✅ Proper username (from auth + localStorage)
+  // username and collection
   const [userName, setUserName] = useState("User");
+  const [collectionName, setCollectionName] = useState("");
+
   useEffect(() => {
     try {
       const authUser = getUser && getUser();
@@ -354,20 +440,34 @@ export default function Search() {
     }
   }, []);
 
-  // ✅ read active DB id for pull/push
-  const [activeDb, setActiveDb] = useState(() => getActiveDatabase() || "");
+  const [activeDb, setActiveDbState] = useState(() => getActiveDatabase() || "");
   useEffect(() => {
-    // in case it was changed elsewhere (e.g., Home auto-select)
     const id = getActiveDatabase() || "";
-    if (id && id !== activeDb) setActiveDb(id);
+    if (id && id !== activeDb) {
+      setActiveDbState(id);
+    }
+    try {
+      const dbs = getAvailableDatabases ? getAvailableDatabases() : [];
+      const found = dbs.find((d) => (d.id || d._id) === (id || activeDb));
+      const label =
+        found?.name ||
+        found?.title ||
+        found?.label ||
+        (id || activeDb
+          ? `Collection ${id || activeDb}`
+          : "Unassigned collection");
+      if (label) setCollectionName(label);
+    } catch {
+      // ignore
+    }
   }, [activeDb]);
 
-  const [voiceLang, setVoiceLang] = useState("mr-IN");
+  const voiceLang = "mr-IN"; // fixed (no selector)
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState("all"); // all | male | female | surname
-  const [ageBand, setAgeBand] = useState("all"); // all | 18-30 | 30-45 | 45-60 | 60+
+  const [tab, setTab] = useState("all"); // all | male | female
+  const [ageBand, setAgeBand] = useState("all");
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -375,13 +475,14 @@ export default function Search() {
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
   const sentinelRef = useRef(null);
+
   const handleMenuOpen = (event) => setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
 
   const logout = () => {
     handleMenuClose();
     lockSession();
-    location.href = "/login";
+    window.location.href = "/login";
   };
 
   const loadAll = useCallback(async () => {
@@ -403,17 +504,10 @@ export default function Search() {
     loadAll();
   }, [loadAll]);
 
-  // surname helper (last token)
-  const getSurname = (r) => {
-    const n = (getName(r) || "").trim();
-    if (!n) return "";
-    const parts = n.split(/\s+/);
-    return parts[parts.length - 1].toLowerCase();
-  };
-
-  // Combined filter: text + tab + age band
+  // Combined filter: text + tab + age band with transliteration
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const termTrans = transliterate(term);
 
     const inAgeBand = (r) => {
       if (ageBand === "all") return true;
@@ -429,33 +523,38 @@ export default function Search() {
     const passesTab = (r) => {
       if (tab === "male") return getGender(r) === "M";
       if (tab === "female") return getGender(r) === "F";
-      if (tab === "surname") {
-        if (!term) return true; // if no term, show all (age filter still applies)
-        return getSurname(r).startsWith(term);
-      }
-      return true; // 'all'
+      return true; // all
     };
 
     const textMatch = (r) => {
       if (!term) return true;
-      if (tab === "surname") {
-        // surname tab uses surname-only matching
-        return getSurname(r).startsWith(term);
-      }
-      // normal wide search
-      const name = getName(r).toLowerCase();
-      const epic = getEPIC(r).toLowerCase();
-      const mob = (getMobile(r) || "").toLowerCase();
-      const rps = (getRPS(r) || "").toLowerCase();
-      const part = (getPart(r) || "").toLowerCase();
-      const serialTxt = String(getSerialText(r) ?? "").toLowerCase();
+
+      const name = getName(r) || "";
+      const epic = getEPIC(r) || "";
+      const mob = getMobile(r) || "";
+      const rps = getRPS(r) || "";
+      const part = getPart(r) || "";
+      const serialTxt = String(getSerialText(r) ?? "");
+
+      const nameL = name.toLowerCase();
+      const epicL = epic.toLowerCase();
+      const mobL = mob.toLowerCase();
+      const rpsL = rps.toLowerCase();
+      const partL = part.toLowerCase();
+      const serialL = serialTxt.toLowerCase();
+
+      const nameT = transliterate(nameL);
+      const partT = transliterate(partL);
+
       return (
-        name.includes(term) ||
-        epic.includes(term) ||
-        mob.includes(term) ||
-        rps.includes(term) ||
-        part.includes(term) ||
-        serialTxt.includes(term)
+        nameL.includes(term) ||
+        epicL.includes(term) ||
+        mobL.includes(term) ||
+        rpsL.includes(term) ||
+        partL.includes(term) ||
+        serialL.includes(term) ||
+        nameT.includes(termTrans) ||
+        partT.includes(termTrans)
       );
     };
 
@@ -492,7 +591,6 @@ export default function Search() {
     return { male: maleCount, female: femaleCount, total: filtered.length };
   }, [filtered]);
 
-  const visibleTotal = visible.length;
   const matchedTotal = filtered.length;
   const syncedTotal = allRows.length;
 
@@ -500,7 +598,6 @@ export default function Search() {
     { key: "all", label: "All" },
     { key: "male", label: "Male" },
     { key: "female", label: "Female" },
-    { key: "surname", label: "Surname" },
   ];
   const ageFilters = [
     { key: "all", label: "All" },
@@ -528,9 +625,9 @@ export default function Search() {
             </IconButton>
             <Box>
               <Typography variant="subtitle2" color="text.secondary">
-                Assigned search
+                {collectionName || "Collection"}
               </Typography>
-              <Typography variant="h6">Hello, {userName}</Typography>
+              <Typography variant="h6">{userName}</Typography>
             </Box>
           </Stack>
           <Stack direction="row" spacing={1}>
@@ -539,10 +636,15 @@ export default function Search() {
                 <IconButton
                   color="primary"
                   onClick={async () => {
-                    if (!activeDb) return alert("No database selected.");
+                    const id = getActiveDatabase();
+                    if (!id) return alert("No database selected.");
+                    if (id !== activeDb) {
+                      setActiveDatabase(id);
+                      setActiveDbState(id);
+                    }
                     setBusy(true);
                     try {
-                      const c = await pullAll({ databaseId: activeDb });
+                      const c = await pullAll({ databaseId: id });
                       alert(`Pulled ${c} changes from server.`);
                       await loadAll();
                     } catch (e) {
@@ -562,10 +664,15 @@ export default function Search() {
                 <IconButton
                   color="primary"
                   onClick={async () => {
-                    if (!activeDb) return alert("No database selected.");
+                    const id = getActiveDatabase();
+                    if (!id) return alert("No database selected.");
+                    if (id !== activeDb) {
+                      setActiveDatabase(id);
+                      setActiveDbState(id);
+                    }
                     setBusy(true);
                     try {
-                      const res = await pushOutbox({ databaseId: activeDb });
+                      const res = await pushOutbox({ databaseId: id });
                       alert(
                         `Pushed: ${res.pushed}${
                           res.failed?.length
@@ -596,26 +703,12 @@ export default function Search() {
         keepMounted
       >
         <Box sx={{ px: 2, py: 1.5, width: 280 }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            Voice language
-          </Typography>
-          <TextField
-            select
-            size="small"
-            fullWidth
-            sx={{ mt: 1.5 }}
-            value={voiceLang}
-            onChange={(e) => setVoiceLang(e.target.value)}
-          >
-            <MenuItem value="mr-IN">Marathi (mr-IN)</MenuItem>
-            <MenuItem value="hi-IN">Hindi (hi-IN)</MenuItem>
-            <MenuItem value="en-IN">English (en-IN)</MenuItem>
-          </TextField>
           <Button
             variant="outlined"
             startIcon={<LogoutRoundedIcon />}
-            sx={{ mt: 2 }}
+            sx={{ mt: 1 }}
             onClick={logout}
+            fullWidth
           >
             Logout
           </Button>
@@ -670,18 +763,14 @@ export default function Search() {
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  <Chip label={`Visible ${visibleTotal.toLocaleString()}`} />
-                  <Chip label={`Matches ${matchedTotal.toLocaleString()}`} />
-                  <Chip label={`Synced ${syncedTotal.toLocaleString()}`} />
-                </Stack>
+                {/* Visible / Matches / Synced chips hidden as requested */}
               </Stack>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent>
-              <Stack spacing={1.5}>
+              <Stack spacing={1.25}>
                 {visible.length === 0 ? (
                   <Typography color="text.secondary">
                     No voters match your filters yet.
@@ -703,86 +792,96 @@ export default function Search() {
                           shareText
                         )}`;
 
+                    const serialDisplay = !Number.isNaN(serialNum)
+                      ? serialNum
+                      : serialTxt || "—";
+                    const part = getPart(r) || "—";
+
                     return (
                       <Paper
                         key={r._id || `${i}-${serialTxt}`}
                         sx={{
-                          p: 1.5, // ✅ slightly smaller padding for narrower card
+                          p: 1.25,
                           display: "flex",
-                          flexDirection: {
-                            xs: "column",
-                            md: "row",
-                          },
-                          justifyContent: "space-between",
-                          gap: 1.5, // slightly tighter gap
+                          flexDirection: "column",
+                          gap: 0.5,
                         }}
                       >
-                        <Stack spacing={0.25}>
-                          <Typography variant="overline" color="text.secondary">
-                            Serial / Part
+                        {/* Row 1: Serial · Part · Age · Sex */}
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                          flexWrap="wrap"
+                        >
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            Serial {serialDisplay} · Part {part}
                           </Typography>
-                          <Typography variant="subtitle1">
-                            {!Number.isNaN(serialNum)
-                              ? serialNum
-                              : serialTxt || "—"}{" "}
-                            · {getPart(r) || "—"}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Age {age || "—"} · {gender || "—"}
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            · Age {age || "—"} · {gender || "—"}
                           </Typography>
                         </Stack>
+
+                        {/* Row 2: Name */}
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          {name}
+                        </Typography>
+
+                        {/* Row 3: EPIC */}
+                        <Typography variant="body2" color="text.secondary">
+                          EPIC {getEPIC(r)}
+                        </Typography>
+
+                        {/* Row 4: Actions */}
                         <Stack
-                          spacing={0.5}
-                          alignItems={{ xs: "flex-start", md: "flex-end" }}
+                          direction="row"
+                          spacing={1}
+                          flexWrap="wrap"
+                          sx={{ mt: 0.25 }}
                         >
-                          <Typography variant="subtitle1">{name}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            EPIC {getEPIC(r)}
-                          </Typography>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            flexWrap="wrap"
-                            sx={{ mt: 0.5 }}
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<CallRoundedIcon />}
+                            disabled={!mob}
+                            component={mob ? "a" : "button"}
+                            href={mob ? `tel:${mob}` : undefined}
                           >
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<CallRoundedIcon />}
-                              disabled={!mob}
-                              component={mob ? "a" : "button"}
-                              href={mob ? `tel:${mob}` : undefined}
-                            >
-                              Call
-                            </Button>
-                            <Button
-                              variant="contained"
-                              color="success"
-                              size="small"
-                              startIcon={<WhatsAppIcon />}
-                              component="a"
-                              href={waHref}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Share
-                            </Button>
-                            <Button
-                              variant="text"
-                              size="small"
-                              startIcon={<SearchRoundedIcon />}
-                              onClick={() => setDetail(r)}
-                            >
-                              Details
-                            </Button>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => setSelected(r)}
-                            >
-                              <EditRoundedIcon />
-                            </IconButton>
-                          </Stack>
+                            Call
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<WhatsAppIcon />}
+                            component="a"
+                            href={waHref}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Share
+                          </Button>
+                          <Button
+                            variant="text"
+                            size="small"
+                            startIcon={<SearchRoundedIcon />}
+                            onClick={() => setDetail(r)}
+                          >
+                            Details
+                          </Button>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => setSelected(r)}
+                          >
+                            <EditRoundedIcon />
+                          </IconButton>
                         </Stack>
                       </Paper>
                     );
