@@ -26,7 +26,6 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
@@ -203,8 +202,7 @@ const getCareOf = (r) =>
 
 /* Phone (DB fields only) */
 const getMobile = (r) =>
-  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) ||
-  "";
+  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
 
 const normalizePhone = (raw) => {
   if (!raw) return "";
@@ -585,6 +583,8 @@ export default function Search() {
 
   // 🔽 Load Google Transliteration for the search input
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     // if already loaded
     if (window.google && window.google.load) {
       initGoogleTransliteration();
@@ -619,6 +619,11 @@ export default function Search() {
             );
           control.makeTransliteratable(["searchBox"]);
           translitControlRef.current = control;
+          // sync state with actual control
+          const enabled = control.isTransliterationEnabled
+            ? control.isTransliterationEnabled()
+            : false;
+          setHindiMode(Boolean(enabled));
           setTranslitReady(true);
         },
       });
@@ -626,17 +631,26 @@ export default function Search() {
   }, []);
 
   const handleToggleHindi = () => {
-    if (!translitControlRef.current) return;
+    const c = translitControlRef.current;
+    if (!c) return;
 
-    setHindiMode((prev) => {
-      const next = !prev;
-      if (next) {
-        translitControlRef.current.enableTransliteration();
-      } else {
-        translitControlRef.current.disableTransliteration();
+    // Use the built-in toggle and status instead of manual enable/disable
+    const currentlyOn = c.isTransliterationEnabled
+      ? c.isTransliterationEnabled()
+      : false;
+
+    if (c.toggleTransliteration) {
+      c.toggleTransliteration();
+    } else {
+      // Fallback just in case
+      if (currentlyOn && c.disableTransliteration) {
+        c.disableTransliteration();
+      } else if (!currentlyOn && c.enableTransliteration) {
+        c.enableTransliteration();
       }
-      return next;
-    });
+    }
+
+    setHindiMode(!currentlyOn);
   };
 
   // Combined filter: text + tab + age band with transliteration
@@ -726,7 +740,6 @@ export default function Search() {
     return { male: maleCount, female: femaleCount, total: filtered.length };
   }, [filtered]);
 
-  const matchedTotal = filtered.length;
   const syncedTotal = allRows.length;
 
   const filterTabs = [
