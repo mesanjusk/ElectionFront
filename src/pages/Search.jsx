@@ -168,7 +168,7 @@ const getAgeNum = (r) => {
 const getGender = (r) => {
   const g =
     pick(r, ["gender", "Gender"]) ||
-    pick(r?.__raw, ["Gender", "gender", "লিংগ", "लिंग"]) ||
+    pick(r?.__raw, ["Gender", "gender", "लिंग"]) ||
     "";
   const s = String(g).toLowerCase();
   if (!s) return "";
@@ -204,6 +204,23 @@ const getCareOf = (r) =>
 const getMobile = (r) =>
   pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
 
+/* Image URL – used in WhatsApp share text */
+const getPhotoUrl = (r) =>
+  pick(r, [
+    "photoUrl",
+    "photo",
+    "Photo",
+    "image",
+    "Image",
+    "img",
+    "Img",
+    "avatar",
+    "Avatar",
+  ]) ||
+  pick(r?.__raw, ["photoUrl", "photo", "Photo", "image", "Image", "img"]) ||
+  "";
+
+/* Normalize phone for tel:/WhatsApp */
 const normalizePhone = (raw) => {
   if (!raw) return "";
   let d = String(raw).replace(/[^\d]/g, "");
@@ -212,7 +229,7 @@ const normalizePhone = (raw) => {
   return d.length === 10 ? d : "";
 };
 
-/* Simple transliteration: Devanagari to Latin (approx) */
+/* Simple transliteration: Devanagari to Latin (approx) – for text search */
 const DEV_TO_LATIN = {
   अ: "a",
   आ: "aa",
@@ -281,7 +298,7 @@ const transliterate = (text) => {
   return out;
 };
 
-/* Share text for WhatsApp */
+/* Share text for WhatsApp – now includes Photo URL if available */
 const buildShareText = (r) => {
   const name = getName(r);
   const epic = getEPIC(r);
@@ -292,6 +309,7 @@ const buildShareText = (r) => {
   const gender = getGender(r);
   const house = getHouseNo(r);
   const co = getCareOf(r);
+  const photo = getPhotoUrl(r);
 
   const lines = [
     "Voter Details",
@@ -304,6 +322,7 @@ const buildShareText = (r) => {
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
     house ? `House: ${house}` : null,
     co ? `C/O: ${co}` : null,
+    photo ? `Photo: ${photo}` : null, // 👈 image URL included for WhatsApp
   ].filter(Boolean);
   return lines.join("\n");
 };
@@ -384,6 +403,7 @@ function RecordModal({ open, voter, onClose }) {
     ["House", getHouseNo(voter) || "—"],
     ["C/O", getCareOf(voter) || "—"],
     ["Mobile", getMobile(voter) || "—"],
+    ["Photo", getPhotoUrl(voter) || "—"],
   ];
   const shareText = buildShareText(voter);
 
@@ -447,10 +467,6 @@ export default function Search() {
     if (t) setAuthToken(t);
   }, []);
 
-  // 🔽 Hindi typing toggle state
-  const [hindiMode, setHindiMode] = useState(false);
-  const [translitReady, setTranslitReady] = useState(false);
-
   // username and collection
   const [userName, setUserName] = useState("User");
   const [collectionName, setCollectionName] = useState("");
@@ -491,7 +507,7 @@ export default function Search() {
     }
   }, [activeDb]);
 
-  const voiceLang = "mr-IN"; // fixed (no selector)
+  const voiceLang = "hi-IN"; // Hindi voice search
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   const [q, setQ] = useState("");
@@ -580,11 +596,30 @@ export default function Search() {
     }
   };
 
-  // 🔽 Load Google Transliteration for the Hindi search input
+  // 🔽 Load Google Transliteration for the Hindi search input (single box)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // If google already loaded
+    function initGoogleTransliteration() {
+      window.google.load("elements", "1", {
+        packages: "transliteration",
+        callback: () => {
+          const langCode =
+            window.google.elements.transliteration.LanguageCode;
+          const options = {
+            sourceLanguage: langCode.ENGLISH,
+            destinationLanguage: [langCode.HINDI],
+            transliterationEnabled: true,
+          };
+          const control =
+            new window.google.elements.transliteration.TransliterationControl(
+              options
+            );
+          control.makeTransliteratable(["searchBoxHindi"]);
+        },
+      });
+    }
+
     if (window.google && window.google.load) {
       initGoogleTransliteration();
       return;
@@ -599,36 +634,9 @@ export default function Search() {
       }
     };
     document.body.appendChild(script);
-
-    function initGoogleTransliteration() {
-      window.google.load("elements", "1", {
-        packages: "transliteration",
-        callback: () => {
-          const langCode =
-            window.google.elements.transliteration.LanguageCode;
-          const options = {
-            sourceLanguage: langCode.ENGLISH,
-            destinationLanguage: [langCode.HINDI],
-            transliterationEnabled: true, // always ON for Hindi box
-          };
-
-          const control =
-            new window.google.elements.transliteration.TransliterationControl(
-              options
-            );
-          // Attach only to Hindi input
-          control.makeTransliteratable(["searchBoxHindi"]);
-          setTranslitReady(true);
-        },
-      });
-    }
   }, []);
 
-  const handleToggleHindi = () => {
-    setHindiMode((prev) => !prev);
-  };
-
-  // Combined filter: text + tab + age band with transliteration
+  // Combined filter: text + tab + age band with transliteration (for search)
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     const termTrans = transliterate(term);
@@ -732,7 +740,7 @@ export default function Search() {
 
   return (
     <Box sx={{ minHeight: "100vh", pb: 8 }}>
-      {/* Reusable top navbar */}
+      {/* Top navbar */}
       <TopNavbar
         collectionName={collectionName}
         userName={userName}
@@ -742,19 +750,19 @@ export default function Search() {
         onPush={handlePush}
       />
 
-      {/* Sticky block: filters (tabs + age + totals) + search, just under navbar */}
+      {/* Sticky block: filters + search, directly under navbar (no gap) */}
       <Box
-        sx={(theme) => ({
+        sx={{
           position: "sticky",
-          top: theme.mixins.toolbar?.minHeight || 52,
-          zIndex: theme.zIndex.appBar - 1,
+          top: 0, // 👈 no extra gap now
+          zIndex: (theme) => theme.zIndex.appBar - 1,
           bgcolor: "background.paper",
           borderBottom: "1px solid rgba(15,23,42,0.08)",
-        })}
+        }}
       >
         <Container maxWidth="lg" sx={{ py: 0.75 }}>
           <Stack spacing={0.75}>
-            {/* Row 1: ALL/MALE/FEMALE tabs + stacked totals on right */}
+            {/* Row 1: ALL/MALE/FEMALE tabs + totals in ONE LINE */}
             <Stack
               direction="row"
               alignItems="flex-end"
@@ -783,27 +791,15 @@ export default function Search() {
                 ))}
               </Tabs>
 
-              <Stack
-                spacing={0}
-                sx={{
-                  ml: 1,
-                  minWidth: 90,
-                  textAlign: "right",
-                }}
+              {/* M / F / Total / Synced in single row */}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ whiteSpace: "nowrap" }}
               >
-                <Typography variant="caption" color="text.secondary">
-                  M {male.toLocaleString()} ·
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  F {female.toLocaleString()}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Total {total.toLocaleString()}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Synced {syncedTotal.toLocaleString()}
-                </Typography>
-              </Stack>
+                M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
+                {total.toLocaleString()} · Synced {syncedTotal.toLocaleString()}
+              </Typography>
             </Stack>
 
             {/* Row 2: age filter pill group */}
@@ -823,73 +819,41 @@ export default function Search() {
               ))}
             </ToggleButtonGroup>
 
-            {/* Row 3: search + Hindi toggle + clear button */}
+            {/* Row 3: single Hindi search + clear button */}
             <Stack
               direction="row"
               spacing={1}
               alignItems="center"
               sx={{ width: "100%", pt: 0.25 }}
             >
-              {hindiMode ? (
-                <TextField
-                  id="searchBoxHindi" // Google transliteration attaches here
-                  size="small"
-                  fullWidth
-                  label="Search voters (Hindi)"
-                  placeholder="नाम / EPIC / मोबाइल"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    maxWidth: { xs: "100%", sm: 420 },
-                  }}
-                />
-              ) : (
-                <TextField
-                  id="searchBoxEnglish"
-                  size="small"
-                  fullWidth
-                  label="Search voters"
-                  placeholder="Search by name, EPIC or phone"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <VoiceSearchButton
-                          onResult={(text) => setQ(text)}
-                          lang={voiceLang}
-                          disabled={busy}
-                        />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    maxWidth: { xs: "100%", sm: 420 },
-                  }}
-                />
-              )}
-
-              <Button
-                variant={hindiMode ? "contained" : "outlined"}
+              <TextField
+                id="searchBoxHindi" // Google transliteration attaches here
                 size="small"
-                onClick={handleToggleHindi}
-                disabled={!translitReady}
-              >
-                {hindiMode ? "Type in English" : "Type in Hindi"}
-              </Button>
-
+                fullWidth
+                label="Search voters (Hindi)"
+                placeholder="नाम / EPIC / मोबाइल"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <VoiceSearchButton
+                        onResult={(text) => setQ(text)}
+                        lang={voiceLang}
+                        disabled={busy}
+                      />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  maxWidth: { xs: "100%", sm: 420 },
+                }}
+              />
               <Button
                 variant="outlined"
                 size="small"
@@ -923,9 +887,9 @@ export default function Search() {
         </Box>
       </Menu>
 
+      {/* Results */}
       <Container maxWidth="lg" sx={{ py: 3 }}>
         <Stack spacing={3}>
-          {/* Results list */}
           <Card>
             <CardContent>
               <Stack spacing={1.25}>
@@ -940,7 +904,8 @@ export default function Search() {
                     const serialNum = getSerialNum(r);
                     const age = getAge(r);
                     const gender = getGender(r);
-                    const mob = getMobile(r);
+                    const mobRaw = getMobile(r);
+                    const mob = normalizePhone(mobRaw);
                     const shareText = buildShareText(r);
                     const waHref = mob
                       ? `https://wa.me/91${mob}?text=${encodeURIComponent(
