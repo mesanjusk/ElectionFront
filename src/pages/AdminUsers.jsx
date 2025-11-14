@@ -28,7 +28,8 @@ import {
   adminResetUserDevice,
 } from '../api';
 
-const ROLES = ['user', 'operator', 'candidate', 'admin'];
+// 👉 includes "volunteer"
+const ROLES = ['user', 'operator', 'candidate', 'volunteer', 'admin'];
 
 const getId = (u) => u?.id || u?._id;
 const getRole = (u) => (u?.role || '').toLowerCase();
@@ -73,21 +74,35 @@ export default function AdminUsers({ onCreated }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', text: '' });
 
+  // main create-user fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
   const [allowed, setAllowed] = useState([]);
+
+  // 👉 NEW: max volunteers allowed for this account
+  const [maxVolunteers, setMaxVolunteers] = useState('');
 
   // 🖼 avatar states for create-user
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  // password modal
   const [pwdUserId, setPwdUserId] = useState(null);
   const [newPwd, setNewPwd] = useState('');
 
+  // role/db inline editing
   const [roleEditing, setRoleEditing] = useState({});
   const [dbEditing, setDbEditing] = useState({});
+
+  // 👉 NEW: volunteer creation dialog states
+  const [volDialogUser, setVolDialogUser] = useState(null);
+  const [volUsername, setVolUsername] = useState('');
+  const [volPassword, setVolPassword] = useState('');
+  const [volAvatarFile, setVolAvatarFile] = useState(null);
+  const [volAvatarPreview, setVolAvatarPreview] = useState('');
+  const [volUploadingAvatar, setVolUploadingAvatar] = useState(false);
 
   async function loadAll() {
     setLoading(true);
@@ -127,6 +142,7 @@ export default function AdminUsers({ onCreated }) {
     setAvatarFile(null);
     setAvatarPreview('');
     setUploadingAvatar(false);
+    setMaxVolunteers('');
   };
 
   const onCreate = async (e) => {
@@ -144,12 +160,23 @@ export default function AdminUsers({ onCreated }) {
         avatarUrl = await uploadAvatarToCloudinary(avatarFile);
       }
 
+      // Parse maxVolunteers as number
+      let maxVol = 0;
+      if (maxVolunteers !== '') {
+        const parsed = Number(maxVolunteers);
+        if (Number.isNaN(parsed) || parsed < 0) {
+          throw new Error('Max volunteers must be a positive number');
+        }
+        maxVol = Math.min(parsed, 50); // hard cap
+      }
+
       await adminCreateUser({
         username: username.trim(),
         password,
         role,
         allowedDatabaseIds: allowed,
-        avatarUrl, // 👈 send Cloudinary URL to backend
+        avatarUrl,
+        maxVolunteers: maxVol, // 👈 how many volunteer logins allowed
       });
 
       resetCreateForm();
@@ -263,6 +290,83 @@ export default function AdminUsers({ onCreated }) {
     }
   };
 
+  // 👉 volunteer dialog helpers
+  const openVolunteerDialog = (user) => {
+    setVolDialogUser(user);
+    setVolUsername('');
+    setVolPassword('');
+    setVolAvatarFile(null);
+    setVolAvatarPreview('');
+    setVolUploadingAvatar(false);
+  };
+
+  const closeVolunteerDialog = () => {
+    setVolDialogUser(null);
+    setVolUsername('');
+    setVolPassword('');
+    setVolAvatarFile(null);
+    setVolAvatarPreview('');
+    setVolUploadingAvatar(false);
+  };
+
+  const handleVolAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVolAvatarFile(file);
+    setVolAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const onCreateVolunteer = async (e) => {
+    e.preventDefault();
+    if (!volDialogUser) return;
+
+    setStatus({ type: '', text: '' });
+
+    try {
+      if (!volUsername.trim()) throw new Error('Volunteer username required');
+      if (volPassword.length < 4)
+        throw new Error('Password must be at least 4 chars');
+
+      // capacity check (frontend-side)
+      const maxVol = volDialogUser?.maxVolunteers ?? 0;
+      const usedVol = volDialogUser?.volunteerCount ?? 0;
+      if (maxVol && usedVol >= maxVol) {
+        throw new Error('Volunteer limit reached for this account');
+      }
+
+      let avatarUrl = null;
+      if (volAvatarFile) {
+        setVolUploadingAvatar(true);
+        avatarUrl = await uploadAvatarToCloudinary(volAvatarFile);
+      }
+
+      const parentId = getId(volDialogUser);
+      const parentUsername = volDialogUser.username;
+      const parentAllowed = volDialogUser?.allowedDatabaseIds || [];
+
+      await adminCreateUser({
+        username: volUsername.trim(),
+        password: volPassword,
+        role: 'volunteer',
+        avatarUrl,
+        parentUserId: parentId,
+        parentUsername,
+        allowedDatabaseIds: parentAllowed,
+      });
+
+      setStatus({
+        type: 'ok',
+        text: `Volunteer created for ${parentUsername}`,
+      });
+      closeVolunteerDialog();
+      await loadAll();
+    } catch (e) {
+      setStatus({ type: 'error', text: e?.message || String(e) });
+    } finally {
+      setVolUploadingAvatar(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       {status.text && (
@@ -271,6 +375,7 @@ export default function AdminUsers({ onCreated }) {
         </Alert>
       )}
 
+      {/* CREATE NEW USER */}
       <Card variant="outlined">
         <CardContent>
           <Typography variant="h6">Create new user</Typography>
@@ -309,6 +414,19 @@ export default function AdminUsers({ onCreated }) {
                     </MenuItem>
                   ))}
                 </TextField>
+              </Grid>
+
+              {/* Max volunteers allowed */}
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Max volunteers (logins)"
+                  type="number"
+                  value={maxVolunteers}
+                  onChange={(e) => setMaxVolunteers(e.target.value)}
+                  fullWidth
+                  helperText="Set 5–10 for most candidates. Leave blank for 0."
+                  inputProps={{ min: 0 }}
+                />
               </Grid>
 
               {/* Avatar upload */}
@@ -375,6 +493,7 @@ export default function AdminUsers({ onCreated }) {
         </CardContent>
       </Card>
 
+      {/* ALL USERS */}
       <Card variant="outlined">
         <CardContent>
           <Typography variant="h6">All users</Typography>
@@ -393,6 +512,15 @@ export default function AdminUsers({ onCreated }) {
                   : new Set(u?.allowedDatabaseIds || []);
                 const dbList = Array.from(dbSet);
 
+                const role = getRole(u);
+
+                const maxVol = u?.maxVolunteers ?? 0;
+                const usedVol = u?.volunteerCount ?? 0;
+                const parentUsername = u?.parentUsername;
+                const parentUserId = u?.parentUserId;
+
+                const volunteerLimitReached = maxVol && usedVol >= maxVol;
+
                 return (
                   <Card key={id} variant="outlined">
                     <CardContent>
@@ -405,12 +533,32 @@ export default function AdminUsers({ onCreated }) {
                         >
                           <Stack spacing={0.5}>
                             <Typography variant="h6">{u.username}</Typography>
+                            {/* volunteer tagging */}
+                            {role === 'volunteer' && (
+                              <Typography variant="body2" color="text.secondary">
+                                Volunteer for:{' '}
+                                {parentUsername || parentUserId || '—'}
+                              </Typography>
+                            )}
                             <Typography variant="body2" color="text.secondary">
                               Passwords stored securely (hashed)
                             </Typography>
                           </Stack>
-                          <Stack direction="row" spacing={1}>
-                            <Chip label={getRole(u)} color="primary" variant="outlined" />
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            <Chip label={role} color="primary" variant="outlined" />
+                            {/* Only show "Create volunteer" for non-volunteer accounts */}
+                            {role !== 'volunteer' && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                disabled={volunteerLimitReached}
+                                onClick={() => openVolunteerDialog(u)}
+                              >
+                                {volunteerLimitReached
+                                  ? 'Volunteer limit reached'
+                                  : 'Create volunteer'}
+                              </Button>
+                            )}
                             <Button
                               size="small"
                               variant="outlined"
@@ -478,14 +626,14 @@ export default function AdminUsers({ onCreated }) {
                                 sx={{ mt: 1 }}
                               >
                                 <Chip
-                                  label={getRole(u)}
+                                  label={role}
                                   color="primary"
                                   variant="filled"
                                 />
                                 <Button
                                   variant="outlined"
                                   size="small"
-                                  onClick={() => beginRoleEdit(id, getRole(u))}
+                                  onClick={() => beginRoleEdit(id, role)}
                                 >
                                   Edit
                                 </Button>
@@ -543,13 +691,33 @@ export default function AdminUsers({ onCreated }) {
                                 <Button
                                   variant="outlined"
                                   size="small"
-                                  onClick={() => beginDbEdit(id, u?.allowedDatabaseIds)}
+                                  onClick={() =>
+                                    beginDbEdit(id, u?.allowedDatabaseIds)
+                                  }
                                 >
                                   Edit
                                 </Button>
                               </Stack>
                             )}
                           </Grid>
+
+                          {/* Volunteer slots summary for non-volunteer accounts */}
+                          {role !== 'volunteer' && (
+                            <Grid item xs={12} md={4}>
+                              <Typography variant="caption" color="text.secondary">
+                                Volunteer logins
+                              </Typography>
+                              <Typography sx={{ mt: 1 }}>
+                                {maxVol
+                                  ? `${usedVol} / ${maxVol} volunteers in use`
+                                  : 'No volunteer limit set'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Each volunteer has separate credentials and is
+                                device-locked like a normal user.
+                              </Typography>
+                            </Grid>
+                          )}
 
                           <Grid item xs={12} md={4}>
                             <Typography variant="caption" color="text.secondary">
@@ -603,6 +771,7 @@ export default function AdminUsers({ onCreated }) {
         </CardContent>
       </Card>
 
+      {/* PASSWORD MODAL */}
       <Dialog open={!!pwdUserId} onClose={closePwdModal} fullWidth maxWidth="xs">
         <DialogTitle>Change password</DialogTitle>
         <Box component="form" onSubmit={savePassword}>
@@ -617,8 +786,8 @@ export default function AdminUsers({ onCreated }) {
                 required
               />
               <Typography variant="body2" color="text.secondary">
-                Passwords are stored securely. After saving, you will see the new password once to
-                share with the user.
+                Passwords are stored securely. After saving, you will see the new
+                password once to share with the user.
               </Typography>
             </Stack>
           </DialogContent>
@@ -626,6 +795,90 @@ export default function AdminUsers({ onCreated }) {
             <Button onClick={closePwdModal}>Cancel</Button>
             <Button type="submit" variant="contained">
               Save
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* 👉 CREATE VOLUNTEER MODAL */}
+      <Dialog
+        open={!!volDialogUser}
+        onClose={closeVolunteerDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Create volunteer for{' '}
+          <strong>{volDialogUser?.username || ''}</strong>
+        </DialogTitle>
+        <Box component="form" onSubmit={onCreateVolunteer}>
+          <DialogContent>
+            <Stack spacing={2}>
+              <TextField
+                label="Volunteer username"
+                value={volUsername}
+                onChange={(e) => setVolUsername(e.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label="Password"
+                type="password"
+                value={volPassword}
+                onChange={(e) => setVolPassword(e.target.value)}
+                required
+                fullWidth
+              />
+              <Button
+                variant="outlined"
+                component="label"
+                fullWidth
+                disabled={volUploadingAvatar}
+              >
+                {volUploadingAvatar ? 'Uploading image…' : 'Upload volunteer image'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleVolAvatarChange}
+                />
+              </Button>
+              {volAvatarPreview && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ mt: 1 }}
+                >
+                  <img
+                    src={volAvatarPreview}
+                    alt="Preview"
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    Image selected
+                  </Typography>
+                </Stack>
+              )}
+              <Typography variant="body2" color="text.secondary">
+                Volunteer will inherit allowed databases from this account and
+                will be device-locked after first activation.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeVolunteerDialog}>Cancel</Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={volUploadingAvatar}
+            >
+              {volUploadingAvatar ? 'Creating…' : 'Create volunteer'}
             </Button>
           </DialogActions>
         </Box>
