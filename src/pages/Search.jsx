@@ -65,19 +65,48 @@ const getName = (r) =>
   pick(r?.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) ||
   "—";
 
+/** EPIC == Voter ID in your DB */
 const getEPIC = (r) =>
-  pick(r, ["voter_id", "EPIC"]) ||
-  pick(r?.__raw, ["EPIC", "voter_id", "कार्ड नं"]) ||
+  pick(r, [
+    "voter_id",
+    "VoterID",
+    "VoterId",
+    "Voter ID",
+    "Voter Id",
+    "voter id",
+    "EPIC",
+  ]) ||
+  pick(r?.__raw, [
+    "EPIC",
+    "voter_id",
+    "VoterID",
+    "VoterId",
+    "Voter ID",
+    "Voter Id",
+    "voter id",
+    "कार्ड नं",
+  ]) ||
   "—";
 
+/** Roll / Part / Serial mapping */
 const getRPS = (r) =>
-  pick(r, ["RPS", "RollPartSerial"]) ||
+  pick(r, [
+    "RPS",
+    "RollPartSerial",
+    "Roll/Part/Serial",
+    "Roll / Part / Serial",
+    "Roll-Part-Serial",
+    "Roll_Part_Serial",
+    "RollPartSr",
+  ]) ||
   pick(r?.__raw, [
     "RPS",
+    "RollPartSerial",
     "Roll/Part/Serial",
     "Roll / Part / Serial",
     "R/P/S",
     "Roll-Part-Serial",
+    "Roll_Part_Serial",
   ]) ||
   "";
 
@@ -174,7 +203,8 @@ const getCareOf = (r) =>
 
 /* Phone (DB fields only) */
 const getMobile = (r) =>
-  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
+  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) ||
+  "";
 
 const normalizePhone = (raw) => {
   if (!raw) return "";
@@ -419,6 +449,11 @@ export default function Search() {
     if (t) setAuthToken(t);
   }, []);
 
+  // 🔽 Hindi typing toggle state + transliteration control
+  const [hindiMode, setHindiMode] = useState(false);
+  const [translitReady, setTranslitReady] = useState(false);
+  const translitControlRef = useRef(null);
+
   // username and collection
   const [userName, setUserName] = useState("User");
   const [collectionName, setCollectionName] = useState("");
@@ -546,6 +581,62 @@ export default function Search() {
     } finally {
       setBusy(false);
     }
+  };
+
+  // 🔽 Load Google Transliteration for the search input
+  useEffect(() => {
+    // if already loaded
+    if (window.google && window.google.load) {
+      initGoogleTransliteration();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://www.google.com/jsapi";
+    script.async = true;
+    script.onload = () => {
+      if (window.google && window.google.load) {
+        initGoogleTransliteration();
+      }
+    };
+    document.body.appendChild(script);
+
+    function initGoogleTransliteration() {
+      window.google.load("elements", "1", {
+        packages: "transliteration",
+        callback: () => {
+          const langCode =
+            window.google.elements.transliteration.LanguageCode;
+          const options = {
+            sourceLanguage: langCode.ENGLISH,
+            destinationLanguage: [langCode.HINDI],
+            transliterationEnabled: false, // start in English
+          };
+
+          const control =
+            new window.google.elements.transliteration.TransliterationControl(
+              options
+            );
+          control.makeTransliteratable(["searchBox"]);
+          translitControlRef.current = control;
+          setTranslitReady(true);
+        },
+      });
+    }
+  }, []);
+
+  const handleToggleHindi = () => {
+    if (!translitControlRef.current) return;
+
+    setHindiMode((prev) => {
+      const next = !prev;
+      if (next) {
+        translitControlRef.current.enableTransliteration();
+      } else {
+        translitControlRef.current.disableTransliteration();
+      }
+      return next;
+    });
   };
 
   // Combined filter: text + tab + age band with transliteration
@@ -744,7 +835,7 @@ export default function Search() {
               ))}
             </ToggleButtonGroup>
 
-            {/* Row 3: search + clear button */}
+            {/* Row 3: search + Hindi toggle + clear button */}
             <Stack
               direction="row"
               spacing={1}
@@ -752,6 +843,7 @@ export default function Search() {
               sx={{ width: "100%", pt: 0.25 }}
             >
               <TextField
+                id="searchBox"
                 size="small"
                 fullWidth
                 label="Search voters"
@@ -778,6 +870,16 @@ export default function Search() {
                   maxWidth: { xs: "100%", sm: 420 },
                 }}
               />
+
+              <Button
+                variant={hindiMode ? "contained" : "outlined"}
+                size="small"
+                onClick={handleToggleHindi}
+                disabled={!translitReady}
+              >
+                {hindiMode ? "Type in English" : "Type in Hindi"}
+              </Button>
+
               <Button
                 variant="outlined"
                 size="small"
@@ -902,8 +1004,6 @@ export default function Search() {
                         >
                           {name}
                         </Typography>
-
-                        {/* EPIC hidden here; shown only in details modal */}
 
                         {/* Row 3: Actions - Call, Share, Edit icon in one row */}
                         <Stack
