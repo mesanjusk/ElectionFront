@@ -447,10 +447,9 @@ export default function Search() {
     if (t) setAuthToken(t);
   }, []);
 
-  // 🔽 Hindi typing toggle state + transliteration control
+  // 🔽 Hindi typing toggle state
   const [hindiMode, setHindiMode] = useState(false);
   const [translitReady, setTranslitReady] = useState(false);
-  const translitControlRef = useRef(null);
 
   // username and collection
   const [userName, setUserName] = useState("User");
@@ -581,11 +580,11 @@ export default function Search() {
     }
   };
 
-  // 🔽 Load Google Transliteration for the search input
+  // 🔽 Load Google Transliteration for the Hindi search input
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // if already loaded
+    // If google already loaded
     if (window.google && window.google.load) {
       initGoogleTransliteration();
       return;
@@ -610,20 +609,15 @@ export default function Search() {
           const options = {
             sourceLanguage: langCode.ENGLISH,
             destinationLanguage: [langCode.HINDI],
-            transliterationEnabled: false, // start in English
+            transliterationEnabled: true, // always ON for Hindi box
           };
 
           const control =
             new window.google.elements.transliteration.TransliterationControl(
               options
             );
-          control.makeTransliteratable(["searchBox"]);
-          translitControlRef.current = control;
-          // sync state with actual control
-          const enabled = control.isTransliterationEnabled
-            ? control.isTransliterationEnabled()
-            : false;
-          setHindiMode(Boolean(enabled));
+          // Attach only to Hindi input
+          control.makeTransliteratable(["searchBoxHindi"]);
           setTranslitReady(true);
         },
       });
@@ -631,26 +625,7 @@ export default function Search() {
   }, []);
 
   const handleToggleHindi = () => {
-    const c = translitControlRef.current;
-    if (!c) return;
-
-    // Use the built-in toggle and status instead of manual enable/disable
-    const currentlyOn = c.isTransliterationEnabled
-      ? c.isTransliterationEnabled()
-      : false;
-
-    if (c.toggleTransliteration) {
-      c.toggleTransliteration();
-    } else {
-      // Fallback just in case
-      if (currentlyOn && c.disableTransliteration) {
-        c.disableTransliteration();
-      } else if (!currentlyOn && c.enableTransliteration) {
-        c.enableTransliteration();
-      }
-    }
-
-    setHindiMode(!currentlyOn);
+    setHindiMode((prev) => !prev);
   };
 
   // Combined filter: text + tab + age band with transliteration
@@ -855,34 +830,56 @@ export default function Search() {
               alignItems="center"
               sx={{ width: "100%", pt: 0.25 }}
             >
-              <TextField
-                id="searchBox"
-                size="small"
-                fullWidth
-                label="Search voters"
-                placeholder="Search by name, EPIC or phone"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <VoiceSearchButton
-                        onResult={(text) => setQ(text)}
-                        lang={voiceLang}
-                        disabled={busy}
-                      />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  maxWidth: { xs: "100%", sm: 420 },
-                }}
-              />
+              {hindiMode ? (
+                <TextField
+                  id="searchBoxHindi" // Google transliteration attaches here
+                  size="small"
+                  fullWidth
+                  label="Search voters (Hindi)"
+                  placeholder="नाम / EPIC / मोबाइल"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    maxWidth: { xs: "100%", sm: 420 },
+                  }}
+                />
+              ) : (
+                <TextField
+                  id="searchBoxEnglish"
+                  size="small"
+                  fullWidth
+                  label="Search voters"
+                  placeholder="Search by name, EPIC or phone"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <VoiceSearchButton
+                          onResult={(text) => setQ(text)}
+                          lang={voiceLang}
+                          disabled={busy}
+                        />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    maxWidth: { xs: "100%", sm: 420 },
+                  }}
+                />
+              )}
 
               <Button
                 variant={hindiMode ? "contained" : "outlined"}
