@@ -26,6 +26,7 @@ import {
   adminUpdateUserPassword,
   adminUpdateUserDatabases,
   adminResetUserDevice,
+  adminToggleUserEnabled, // 👈 NEW
 } from '../api';
 
 // 👉 includes "volunteer"
@@ -107,9 +108,12 @@ export default function AdminUsers({ onCreated }) {
   async function loadAll() {
     setLoading(true);
     try {
-      const [u, d] = await Promise.all([adminListUsers(), adminListDatabases()]);
-      setUsers(u || []);
-      setDbs(d || []);
+      const [uRes, dRes] = await Promise.all([
+        adminListUsers(),
+        adminListDatabases(),
+      ]);
+      setUsers(uRes || []);
+      setDbs(dRes || []);
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     } finally {
@@ -191,10 +195,10 @@ export default function AdminUsers({ onCreated }) {
   };
 
   const onDelete = async (id) => {
-    if (!window.confirm('Delete this user?')) return;
+    if (!window.confirm('Delete this user and their volunteers + DBs?')) return;
     try {
       await adminDeleteUser(id);
-      setStatus({ type: 'ok', text: 'User deleted' });
+      setStatus({ type: 'ok', text: 'User deleted (and private DBs removed)' });
       await loadAll();
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
@@ -351,7 +355,7 @@ export default function AdminUsers({ onCreated }) {
         avatarUrl,
         parentUserId: parentId,
         parentUsername,
-        allowedDatabaseIds: parentAllowed,
+        allowedDatabaseIds: parentAllowed, // inherit cloned DBs
       });
 
       setStatus({
@@ -364,6 +368,22 @@ export default function AdminUsers({ onCreated }) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     } finally {
       setVolUploadingAvatar(false);
+    }
+  };
+
+  // 👉 enable / disable user (and all volunteers)
+  const onToggleEnabled = async (id, enable) => {
+    try {
+      await adminToggleUserEnabled(id, enable);
+      setStatus({
+        type: 'ok',
+        text: enable
+          ? 'User enabled (and their volunteers)'
+          : 'User disabled (and their volunteers)',
+      });
+      await loadAll();
+    } catch (e) {
+      setStatus({ type: 'error', text: e?.message || String(e) });
     }
   };
 
@@ -471,7 +491,7 @@ export default function AdminUsers({ onCreated }) {
             </Grid>
 
             <Typography variant="subtitle2" sx={{ mt: 3 }}>
-              Allowed databases
+              Allowed databases (master DBs – app will clone per user)
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
               {dbs.map((d) => (
@@ -513,6 +533,7 @@ export default function AdminUsers({ onCreated }) {
                 const dbList = Array.from(dbSet);
 
                 const role = getRole(u);
+                const isEnabled = u.enabled !== false;
 
                 const maxVol = u?.maxVolunteers ?? 0;
                 const usedVol = u?.volunteerCount ?? 0;
@@ -545,13 +566,22 @@ export default function AdminUsers({ onCreated }) {
                             </Typography>
                           </Stack>
                           <Stack direction="row" spacing={1} flexWrap="wrap">
-                            <Chip label={role} color="primary" variant="outlined" />
+                            <Chip
+                              label={role}
+                              color="primary"
+                              variant="outlined"
+                            />
+                            <Chip
+                              label={isEnabled ? 'Active' : 'Disabled'}
+                              color={isEnabled ? 'success' : 'default'}
+                              variant={isEnabled ? 'filled' : 'outlined'}
+                            />
                             {/* Only show "Create volunteer" for non-volunteer accounts */}
                             {role !== 'volunteer' && (
                               <Button
                                 size="small"
                                 variant="outlined"
-                                disabled={volunteerLimitReached}
+                                disabled={volunteerLimitReached || !isEnabled}
                                 onClick={() => openVolunteerDialog(u)}
                               >
                                 {volunteerLimitReached
@@ -559,6 +589,14 @@ export default function AdminUsers({ onCreated }) {
                                   : 'Create volunteer'}
                               </Button>
                             )}
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color={isEnabled ? 'warning' : 'success'}
+                              onClick={() => onToggleEnabled(id, !isEnabled)}
+                            >
+                              {isEnabled ? 'Disable user' : 'Enable user'}
+                            </Button>
                             <Button
                               size="small"
                               variant="outlined"
@@ -686,7 +724,9 @@ export default function AdminUsers({ onCreated }) {
                                   variant="body2"
                                   color="text.secondary"
                                 >
-                                  {dbList.length ? dbList.join(', ') : '—'}
+                                  {dbList.length
+                                    ? dbList.join(', ')
+                                    : '—'}
                                 </Typography>
                                 <Button
                                   variant="outlined"
@@ -714,7 +754,8 @@ export default function AdminUsers({ onCreated }) {
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
                                 Each volunteer has separate credentials and is
-                                device-locked like a normal user.
+                                device-locked like a normal user. Enabling/disabling
+                                this user affects all their volunteers.
                               </Typography>
                             </Grid>
                           )}
@@ -866,7 +907,7 @@ export default function AdminUsers({ onCreated }) {
                 </Stack>
               )}
               <Typography variant="body2" color="text.secondary">
-                Volunteer will inherit allowed databases from this account and
+                Volunteer will inherit cloned databases from this account and
                 will be device-locked after first activation.
               </Typography>
             </Stack>

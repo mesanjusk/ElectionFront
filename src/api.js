@@ -36,15 +36,21 @@ api.interceptors.response.use(
     if (status === 401 || status === 403) {
       clearToken();
       lockSession();
-      markActivationRevoked('Your session expired. Reactivate with your credentials.');
+      markActivationRevoked(
+        'Your session expired. Reactivate with your credentials.'
+      );
     } else if (status === 409) {
       clearToken();
       lockSession();
-      markActivationRevoked('You signed in on another device. Reactivate here to resume.');
+      markActivationRevoked(
+        'You signed in on another device. Reactivate here to resume.'
+      );
     } else if (status === 423) {
       clearToken();
       lockSession();
-      markActivationRevoked('This account is activated on another device. Ask admin to reset device binding.');
+      markActivationRevoked(
+        'This account is activated on another device. Ask admin to reset device binding.'
+      );
     }
     return Promise.reject(error);
   }
@@ -68,7 +74,9 @@ export async function adminListUsers() {
 
 /**
  * Create user
- * @param {{username:string, password:string, role?:'user'|'operator'|'candidate'|'admin', allowedDatabaseIds?:string[], email?:string}} payload
+ * @param {{username:string, password:string, role?:
+ *  'user'|'operator'|'candidate'|'volunteer'|'admin',
+ *  allowedDatabaseIds?:string[], email?:string}} payload
  */
 export async function adminCreateUser(payload) {
   const { data } = await api.post('/api/admin/users', payload);
@@ -95,13 +103,23 @@ export async function adminUpdateUserPassword(userId, password) {
 
 /** Update user database access */
 export async function adminUpdateUserDatabases(userId, allowedDatabaseIds) {
-  const { data } = await api.patch(`/api/admin/users/${userId}/databases`, { allowedDatabaseIds });
+  const { data } = await api.patch(`/api/admin/users/${userId}/databases`, {
+    allowedDatabaseIds,
+  });
   return data?.user;
 }
 
 /** Reset device binding (for candidate re-activation) */
 export async function adminResetUserDevice(userId) {
   const { data } = await api.patch(`/api/admin/users/${userId}/reset-device`);
+  return data?.user;
+}
+
+/** Enable / disable a user (and all their volunteers) */
+export async function adminToggleUserEnabled(userId, enabled) {
+  const { data } = await api.patch(`/api/admin/users/${userId}/enabled`, {
+    enabled,
+  });
   return data?.user;
 }
 
