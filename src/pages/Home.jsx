@@ -42,7 +42,7 @@ export default function Home() {
   const navigate = useNavigate();
   const user = useMemo(() => getUser(), []);
 
-  // Pick the single assigned DB (no UI to change)
+  // Pick the single assigned per-user DB (no UI to change)
   const assignedDb = useMemo(() => {
     if (!databases || databases.length === 0) return null;
     if (databases.length === 1) return databases[0];

@@ -50,7 +50,12 @@ const PIN_REGEX_2DIGIT = /^\d{2}$/;
  * Priority:
  *  1) activeDatabaseId from server or previously stored active DB
  *  2) first database from stored list (setSession -> getAvailableDatabases)
- *  3) first allowedDatabaseIds on user
+ *  3) first per-user cloned DB on user.userDatabases (if present)
+ *
+ * NOTE:
+ * We intentionally do NOT fall back to allowedDatabaseIds here, because those
+ * refer to master DB templates (e.g. "booth_17"), while sync must always use
+ * the per-user cloned database id (e.g. "voters_u_<userId>_booth_17").
  */
 function chooseEffectiveDatabase({ activeDatabaseId, user } = {}) {
   const active = activeDatabaseId || getActiveDatabase();
@@ -59,8 +64,11 @@ function chooseEffectiveDatabase({ activeDatabaseId, user } = {}) {
   const stored = getAvailableDatabases();
   if (stored && stored.length) return stored[0].id || stored[0]._id;
 
-  const allowed = user?.allowedDatabaseIds;
-  if (allowed && allowed.length) return allowed[0];
+  const userDbs = user?.userDatabases || user?.databases;
+  if (userDbs && userDbs.length) {
+    const first = userDbs[0];
+    return first.id || first._id || first.databaseId || null;
+  }
 
   return null;
 }
@@ -155,7 +163,12 @@ export default function Login() {
       if (existing && existing.length) {
         available = existing;
       } else {
-        available = user?.databases || [];
+        // New multi-tenant model: backend usually stores per-user clones under user.userDatabases
+        if (user?.userDatabases && user.userDatabases.length) {
+          available = user.userDatabases;
+        } else {
+          available = user?.databases || [];
+        }
       }
     }
 
