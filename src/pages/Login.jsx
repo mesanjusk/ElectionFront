@@ -27,6 +27,7 @@ import {
   isSessionUnlocked,
   lockSession,
   clearToken,
+  getUser, // 👈 added so we can reuse existing user on PIN login
 } from "../auth";
 import {
   clearActivationState,
@@ -137,14 +138,27 @@ export default function Login() {
     return navigate("/", { replace: true });
   };
 
+  /**
+   * Full login + sync (used ONLY for username/password activation)
+   */
   const completeLogin = async ({
     token,
     user,
     databases = [],
     activeDatabaseId,
-    skipSync = false, // NEW FLAG
+    skipSync = false,
   }) => {
-    const available = databases.length ? databases : user?.databases || [];
+    // 🔐 Preserve existing databases if none are passed
+    let available = databases;
+    if (!available || !available.length) {
+      const existing = getAvailableDatabases();
+      if (existing && existing.length) {
+        available = existing;
+      } else {
+        available = user?.databases || [];
+      }
+    }
+
     setSession({ token, user, databases: available });
     setAuthToken(token);
 
@@ -171,7 +185,7 @@ export default function Login() {
 
     const shouldSync = !skipSync && effectiveDatabase;
 
-    // 🔁 Only sync when NOT skipping (i.e., on activation login, NOT on PIN unlock)
+    // 🔁 Full push + pull only when NOT skipping (i.e., on activation login)
     if (shouldSync) {
       setProgress(0);
       setProgressLabel("Uploading offline updates…");
@@ -255,11 +269,15 @@ export default function Login() {
         pin,
       });
 
+      // 🔐 Store richer activation info so future PIN unlock can reuse it
       await storeActivation({
         username,
         pin,
         deviceId,
         userType: res?.user?.userType,
+        user: res?.user,
+        databases: res?.databases,
+        activeDatabaseId: res?.activeDatabaseId,
       });
 
       // For full login (activation) => do sync
@@ -274,7 +292,7 @@ export default function Login() {
     }
   };
 
-  // PIN unlock submit (NO SYNC HERE)
+  // PIN unlock submit (NO sync, NO session reset)
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -297,16 +315,34 @@ export default function Login() {
         return;
       }
 
-      const user = activation?.user;
-      const activeDatabaseId = getActiveDatabase();
+      // Restore axios auth header using existing token
+      setAuthToken(token);
 
-      // ✅ QUICK UNLOCK: skipSync = true → NO push/pull
-      await completeLogin({
-        token,
-        user,
-        activeDatabaseId,
-        skipSync: true,
+      // Clear revoked flag and keep language
+      const updatedActivation = setActivationState({
+        language: DEFAULT_LANGUAGE,
+        revoked: false,
       });
+      setActivation(updatedActivation);
+
+      // Unlock existing session WITHOUT touching databases/user
+      unlockSession();
+
+      // Reuse existing user (and DBs) from previous activation login
+      let user = null;
+      try {
+        user = getUser && getUser();
+      } catch {
+        // ignore
+      }
+
+      const fallbackType =
+        activation?.userType || updatedActivation?.userType;
+      goAfterLogin(user || updatedActivation?.user, fallbackType);
+
+      setLoading(false);
+      setProgress(0);
+      setProgressLabel("");
     } catch (err) {
       setError(err?.message || "PIN verification failed.");
       setLoading(false);
