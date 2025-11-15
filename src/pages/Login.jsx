@@ -209,7 +209,8 @@ export default function Login() {
         deviceId: getDeviceId(),
       });
 
-      const { token, user, databases, activeDatabaseId } = resp.data;
+      const { token, user, databases, activeDatabaseId } = resp;
+
 
       setAuthToken(token);
       await completeLogin({
