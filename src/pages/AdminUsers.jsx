@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Card,
@@ -17,7 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import {
+import api, {
   adminListUsers,
   adminListDatabases,
   adminCreateUser,
@@ -88,6 +89,10 @@ export default function AdminUsers({ onCreated }) {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // 👉 NEW: per-user avatar + volunteer-limit editing
+  const [updatingAvatarId, setUpdatingAvatarId] = useState(null);
+  const [volLimitEditing, setVolLimitEditing] = useState({});
 
   // password modal
   const [pwdUserId, setPwdUserId] = useState(null);
@@ -387,6 +392,88 @@ export default function AdminUsers({ onCreated }) {
     }
   };
 
+  // 👉 per-user avatar update (edit existing user image)
+  const handleUserAvatarChange = async (e, user) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const userId = getId(user);
+    if (!userId) return;
+
+    setStatus({ type: '', text: '' });
+    setUpdatingAvatarId(userId);
+
+    try {
+      const url = await uploadAvatarToCloudinary(file);
+      await api.patch(`/api/admin/users/${userId}/profile`, { avatarUrl: url });
+      setStatus({ type: 'ok', text: 'User image updated' });
+      await loadAll();
+    } catch (err) {
+      setStatus({
+        type: 'error',
+        text:
+          err?.response?.data?.error ||
+          err?.message ||
+          'Failed to update user image',
+      });
+    } finally {
+      setUpdatingAvatarId(null);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // 👉 volunteer-limit editing helpers
+  const beginVolLimitEdit = (id, current) => {
+    setVolLimitEditing((prev) => ({
+      ...prev,
+      [id]:
+        current === null || current === undefined || current === 0
+          ? ''
+          : String(current),
+    }));
+  };
+
+  const cancelVolLimitEdit = (id) => {
+    setVolLimitEditing((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const saveVolLimit = async (id) => {
+    const raw = volLimitEditing[id];
+    let n = 0;
+
+    if (raw !== '' && raw !== undefined) {
+      n = Number(raw);
+      if (Number.isNaN(n) || n < 0) {
+        setStatus({
+          type: 'error',
+          text: 'Volunteer limit must be a non-negative number',
+        });
+        return;
+      }
+    }
+
+    try {
+      await api.patch(`/api/admin/users/${id}/profile`, {
+        maxVolunteers: n,
+      });
+      setStatus({ type: 'ok', text: 'Volunteer limit updated' });
+      cancelVolLimitEdit(id);
+      await loadAll();
+    } catch (err) {
+      setStatus({
+        type: 'error',
+        text:
+          err?.response?.data?.error ||
+          err?.message ||
+          'Failed to update volunteer limit',
+      });
+    }
+  };
+
   return (
     <Stack spacing={3}>
       {status.text && (
@@ -527,6 +614,8 @@ export default function AdminUsers({ onCreated }) {
                 const id = getId(u);
                 const isRoleEditing = roleEditing[id] !== undefined;
                 const isDbEditing = dbEditing[id] !== undefined;
+                const isEditingVolLimit = volLimitEditing[id] !== undefined;
+
                 const dbSet = isDbEditing
                   ? dbEditing[id]
                   : new Set(u?.allowedDatabaseIds || []);
@@ -552,18 +641,36 @@ export default function AdminUsers({ onCreated }) {
                           alignItems="center"
                           justifyContent="space-between"
                         >
-                          <Stack spacing={0.5}>
-                            <Typography variant="h6">{u.username}</Typography>
-                            {/* volunteer tagging */}
-                            {role === 'volunteer' && (
-                              <Typography variant="body2" color="text.secondary">
-                                Volunteer for:{' '}
-                                {parentUsername || parentUserId || '—'}
+                          <Stack
+                            direction="row"
+                            spacing={2}
+                            alignItems="center"
+                          >
+                            <Avatar
+                              src={u.avatarUrl || undefined}
+                              sx={{ width: 40, height: 40 }}
+                            >
+                              {u.username?.[0]?.toUpperCase() || '?'}
+                            </Avatar>
+                            <Stack spacing={0.5}>
+                              <Typography variant="h6">{u.username}</Typography>
+                              {/* volunteer tagging */}
+                              {role === 'volunteer' && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  Volunteer for:{' '}
+                                  {parentUsername || parentUserId || '—'}
+                                </Typography>
+                              )}
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Passwords stored securely (hashed)
                               </Typography>
-                            )}
-                            <Typography variant="body2" color="text.secondary">
-                              Passwords stored securely (hashed)
-                            </Typography>
+                            </Stack>
                           </Stack>
                           <Stack direction="row" spacing={1} flexWrap="wrap">
                             <Chip
@@ -589,11 +696,38 @@ export default function AdminUsers({ onCreated }) {
                                   : 'Create volunteer'}
                               </Button>
                             )}
+
+                            {/* Change image for this user */}
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              component="label"
+                              disabled={updatingAvatarId === id}
+                            >
+                              {u.avatarUrl
+                                ? updatingAvatarId === id
+                                  ? 'Updating image…'
+                                  : 'Replace image'
+                                : updatingAvatarId === id
+                                ? 'Uploading image…'
+                                : 'Upload image'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={(e) =>
+                                  handleUserAvatarChange(e, u)
+                                }
+                              />
+                            </Button>
+
                             <Button
                               size="small"
                               variant="outlined"
                               color={isEnabled ? 'warning' : 'success'}
-                              onClick={() => onToggleEnabled(id, !isEnabled)}
+                              onClick={() =>
+                                onToggleEnabled(id, !isEnabled)
+                              }
                             >
                               {isEnabled ? 'Disable user' : 'Enable user'}
                             </Button>
@@ -617,7 +751,10 @@ export default function AdminUsers({ onCreated }) {
 
                         <Grid container spacing={2}>
                           <Grid item xs={12} md={4}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               Role
                             </Typography>
                             {isRoleEditing ? (
@@ -680,19 +817,36 @@ export default function AdminUsers({ onCreated }) {
                           </Grid>
 
                           <Grid item xs={12} md={4}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               Allowed DBs
                             </Typography>
                             {isDbEditing ? (
                               <Stack spacing={1} sx={{ mt: 1 }}>
-                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  flexWrap="wrap"
+                                >
                                   {dbs.map((d) => (
                                     <Chip
                                       key={d.id}
                                       label={d.name || d.id}
-                                      color={dbSet.has(d.id) ? 'primary' : 'default'}
-                                      variant={dbSet.has(d.id) ? 'filled' : 'outlined'}
-                                      onClick={() => toggleDbForUser(id, d.id)}
+                                      color={
+                                        dbSet.has(d.id)
+                                          ? 'primary'
+                                          : 'default'
+                                      }
+                                      variant={
+                                        dbSet.has(d.id)
+                                          ? 'filled'
+                                          : 'outlined'
+                                      }
+                                      onClick={() =>
+                                        toggleDbForUser(id, d.id)
+                                      }
                                     />
                                   ))}
                                 </Stack>
@@ -744,7 +898,10 @@ export default function AdminUsers({ onCreated }) {
                           {/* Volunteer slots summary for non-volunteer accounts */}
                           {role !== 'volunteer' && (
                             <Grid item xs={12} md={4}>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
                                 Volunteer logins
                               </Typography>
                               <Typography sx={{ mt: 1 }}>
@@ -752,16 +909,69 @@ export default function AdminUsers({ onCreated }) {
                                   ? `${usedVol} / ${maxVol} volunteers in use`
                                   : 'No volunteer limit set'}
                               </Typography>
-                              <Typography variant="body2" color="text.secondary">
+
+                              {isEditingVolLimit ? (
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  sx={{ mt: 1 }}
+                                >
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    label="Max volunteers"
+                                    value={volLimitEditing[id]}
+                                    onChange={(e) =>
+                                      setVolLimitEditing((prev) => ({
+                                        ...prev,
+                                        [id]: e.target.value,
+                                      }))
+                                    }
+                                    inputProps={{ min: 0 }}
+                                  />
+                                  <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={() => saveVolLimit(id)}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => cancelVolLimitEdit(id)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </Stack>
+                              ) : (
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  sx={{ mt: 1 }}
+                                  onClick={() => beginVolLimitEdit(id, maxVol)}
+                                >
+                                  Edit limit
+                                </Button>
+                              )}
+
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mt: 1 }}
+                              >
                                 Each volunteer has separate credentials and is
-                                device-locked like a normal user. Enabling/disabling
-                                this user affects all their volunteers.
+                                device-locked like a normal user. Enabling /
+                                disabling this user affects all their volunteers.
                               </Typography>
                             </Grid>
                           )}
 
                           <Grid item xs={12} md={4}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               Device
                             </Typography>
                             <Stack spacing={0.5} sx={{ mt: 1 }}>
@@ -770,12 +980,18 @@ export default function AdminUsers({ onCreated }) {
                                   <Typography fontFamily="monospace">
                                     bound: {u.deviceIdBound}
                                   </Typography>
-                                  <Typography variant="body2" color="text.secondary">
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
                                     at: {fmt(u.deviceBoundAt)}
                                   </Typography>
                                 </>
                               ) : (
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
                                   —
                                 </Typography>
                               )}
@@ -790,13 +1006,19 @@ export default function AdminUsers({ onCreated }) {
                           </Grid>
 
                           <Grid item xs={12} md={4}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               Created
                             </Typography>
                             <Typography>{fmt(u.createdAt)}</Typography>
                           </Grid>
                           <Grid item xs={12} md={4}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               Updated
                             </Typography>
                             <Typography>{fmt(u.updatedAt)}</Typography>
@@ -849,8 +1071,7 @@ export default function AdminUsers({ onCreated }) {
         maxWidth="sm"
       >
         <DialogTitle>
-          Create volunteer for{' '}
-          <strong>{volDialogUser?.username || ''}</strong>
+          Create volunteer for <strong>{volDialogUser?.username || ''}</strong>
         </DialogTitle>
         <Box component="form" onSubmit={onCreateVolunteer}>
           <DialogContent>
@@ -907,8 +1128,8 @@ export default function AdminUsers({ onCreated }) {
                 </Stack>
               )}
               <Typography variant="body2" color="text.secondary">
-                Volunteer will inherit cloned databases from this account and
-                will be device-locked after first activation.
+                Volunteer will inherit cloned databases from this account and will
+                be device-locked after first activation.
               </Typography>
             </Stack>
           </DialogContent>

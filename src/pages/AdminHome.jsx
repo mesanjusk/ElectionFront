@@ -116,9 +116,9 @@ export default function AdminHome() {
     setUsers((prev) => prev.map((u) => (resolveId(u) === id ? updater(u) : u)));
   };
 
+  // 🔹 no more volunteer → operator conversion
   const onRoleChange = (id, role) => {
-    const normalized = role === 'volunteer' ? 'operator' : role;
-    updateUserField(id, (u) => ({ ...u, role: normalized }));
+    updateUserField(id, (u) => ({ ...u, role }));
   };
 
   const onToggleDatabase = (id, databaseId, checked) => {
@@ -180,9 +180,18 @@ export default function AdminHome() {
           <Card>
             <CardContent>
               <Stack spacing={3}>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={3}
+                  justifyContent="space-between"
+                  alignItems={{ xs: 'flex-start', md: 'center' }}
+                >
                   <Stack spacing={0.5}>
-                    <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
+                    <Typography
+                      variant="overline"
+                      color="text.secondary"
+                      sx={{ letterSpacing: 2 }}
+                    >
                       Admin workspace
                     </Typography>
                     <Typography variant="h4">Dashboard</Typography>
@@ -191,14 +200,30 @@ export default function AdminHome() {
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={2} alignItems="center">
-                    <Chip icon={<AdminPanelSettingsRoundedIcon />} label={currentUser?.username || 'Admin'} color="primary" variant="outlined" />
-                    <IconButton onClick={() => { loadDatabases(); loadUsers(); }} aria-label="Refresh">
+                    <Chip
+                      icon={<AdminPanelSettingsRoundedIcon />}
+                      label={currentUser?.username || 'Admin'}
+                      color="primary"
+                      variant="outlined"
+                    />
+                    <IconButton
+                      onClick={() => {
+                        loadDatabases();
+                        loadUsers();
+                      }}
+                      aria-label="Refresh"
+                    >
                       <RefreshRoundedIcon />
                     </IconButton>
                   </Stack>
                 </Stack>
 
-                <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile>
+                <Tabs
+                  value={tab}
+                  onChange={(_, value) => setTab(value)}
+                  variant="scrollable"
+                  allowScrollButtonsMobile
+                >
                   {tabOptions.map(([key, label]) => (
                     <Tab key={key} label={label} value={key} />
                   ))}
@@ -211,22 +236,52 @@ export default function AdminHome() {
             <Stack spacing={3}>
               <Grid container spacing={3}>
                 <Grid item xs={12} md={4}>
-                  <StatCard title="Total Accounts" value={totalUsers} hint="All members" icon={<DashboardRoundedIcon color="primary" />} />
+                  <StatCard
+                    title="Total Accounts"
+                    value={totalUsers}
+                    hint="All members"
+                    icon={<DashboardRoundedIcon color="primary" />}
+                  />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <StatCard title="Admins" value={totalAdmins} hint="Full access" icon={<AdminPanelSettingsRoundedIcon color="primary" />} />
+                  <StatCard
+                    title="Admins"
+                    value={totalAdmins}
+                    hint="Full access"
+                    icon={<AdminPanelSettingsRoundedIcon color="primary" />}
+                  />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <StatCard title="Operators" value={totalOperators} hint="On-ground users" icon={<FolderSharedRoundedIcon color="primary" />} />
+                  <StatCard
+                    title="Operators"
+                    value={totalOperators}
+                    hint="On-ground users"
+                    icon={<FolderSharedRoundedIcon color="primary" />}
+                  />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <StatCard title="Candidates" value={totalCandidates} hint="Candidate logins" icon={<FolderSharedRoundedIcon color="secondary" />} />
+                  <StatCard
+                    title="Candidates"
+                    value={totalCandidates}
+                    hint="Candidate logins"
+                    icon={<FolderSharedRoundedIcon color="secondary" />}
+                  />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <StatCard title="Users" value={totalPlainUsers} hint="General role" icon={<FolderSharedRoundedIcon color="action" />} />
+                  <StatCard
+                    title="Users"
+                    value={totalPlainUsers}
+                    hint="General role"
+                    icon={<FolderSharedRoundedIcon color="action" />}
+                  />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <StatCard title="Databases" value={totalDatabases} hint="Available lists" icon={<SearchRoundedIcon color="primary" />} />
+                  <StatCard
+                    title="Databases"
+                    value={totalDatabases}
+                    hint="Available lists"
+                    icon={<SearchRoundedIcon color="primary" />}
+                  />
                 </Grid>
               </Grid>
 
@@ -237,13 +292,26 @@ export default function AdminHome() {
                       <Typography variant="h6">Quick actions</Typography>
                       <Divider sx={{ my: 2 }} />
                       <Stack spacing={1.5}>
-                        <Button component={Link} to="/search" variant="outlined" startIcon={<SearchRoundedIcon />}>
+                        <Button
+                          component={Link}
+                          to="/search"
+                          variant="outlined"
+                          startIcon={<SearchRoundedIcon />}
+                        >
                           Open voter search
                         </Button>
-                        <Button variant="outlined" onClick={() => setTab('team')} startIcon={<FolderSharedRoundedIcon />}>
+                        <Button
+                          variant="outlined"
+                          onClick={() => setTab('team')}
+                          startIcon={<FolderSharedRoundedIcon />}
+                        >
                           Manage users & roles
                         </Button>
-                        <Button variant="outlined" onClick={() => setTab('databases')} startIcon={<DashboardRoundedIcon />}>
+                        <Button
+                          variant="outlined"
+                          onClick={() => setTab('databases')}
+                          startIcon={<DashboardRoundedIcon />}
+                        >
                           Assign databases
                         </Button>
                       </Stack>
@@ -271,7 +339,8 @@ export default function AdminHome() {
                 <CardContent>
                   <Typography variant="h5">Team management</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Create users, assign a role, and decide which databases each person can access.
+                    Create users, assign a role, and decide which databases each person can
+                    access.
                   </Typography>
                   <AdminUsers onCreated={onUserCreated} />
                 </CardContent>
@@ -283,9 +352,13 @@ export default function AdminHome() {
                     <Typography variant="h6">User access & databases</Typography>
                     {renderStatus()}
                     {loading ? (
-                      <Typography variant="body2" color="text.secondary">Loading users…</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Loading users…
+                      </Typography>
                     ) : users.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">No team members found yet.</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        No team members found yet.
+                      </Typography>
                     ) : (
                       <Table size="small">
                         <TableHead>
@@ -299,12 +372,17 @@ export default function AdminHome() {
                         <TableBody>
                           {users.map((user) => {
                             const userId = resolveId(user);
-                            const assigned = new Set(user?.allowedDatabaseIds || user?.databaseIds || []);
-                            const isAdmin = (user?.role || '').toLowerCase() === 'admin';
+                            const assigned = new Set(
+                              user?.allowedDatabaseIds || user?.databaseIds || []
+                            );
+                            const isAdmin =
+                              (user?.role || '').toLowerCase() === 'admin';
                             return (
                               <TableRow key={userId || Math.random()}>
                                 <TableCell>
-                                  <Typography fontWeight={600}>{user?.username || '—'}</Typography>
+                                  <Typography fontWeight={600}>
+                                    {user?.username || '—'}
+                                  </Typography>
                                 </TableCell>
                                 <TableCell sx={{ minWidth: 150 }}>
                                   <TextField
@@ -312,24 +390,44 @@ export default function AdminHome() {
                                     size="small"
                                     value={user?.role || 'user'}
                                     disabled={isAdmin}
-                                    onChange={(e) => onRoleChange(userId, e.target.value)}
+                                    onChange={(e) =>
+                                      onRoleChange(userId, e.target.value)
+                                    }
                                     fullWidth
                                   >
                                     {isAdmin ? (
                                       <MenuItem value="admin">Admin</MenuItem>
                                     ) : (
                                       [
-                                        <MenuItem key="user" value="user">User</MenuItem>,
-                                        <MenuItem key="candidate" value="candidate">Candidate</MenuItem>,
-                                        <MenuItem key="operator" value="operator">Operator</MenuItem>,
+                                        <MenuItem key="user" value="user">
+                                          User
+                                        </MenuItem>,
+                                        <MenuItem key="candidate" value="candidate">
+                                          Candidate
+                                        </MenuItem>,
+                                        <MenuItem key="operator" value="operator">
+                                          Operator
+                                        </MenuItem>,
+                                        <MenuItem key="volunteer" value="volunteer">
+                                          Volunteer
+                                        </MenuItem>,
                                       ]
                                     )}
                                   </TextField>
                                 </TableCell>
                                 <TableCell>
-                                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    flexWrap="wrap"
+                                  >
                                     {databases.length === 0 ? (
-                                      <Typography variant="body2" color="text.secondary">No databases available.</Typography>
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                      >
+                                        No databases available.
+                                      </Typography>
                                     ) : (
                                       databases.map((db) => {
                                         const id = resolveId(db);
@@ -340,7 +438,9 @@ export default function AdminHome() {
                                             label={databaseDisplayName(db)}
                                             color={checked ? 'primary' : 'default'}
                                             variant={checked ? 'filled' : 'outlined'}
-                                            onClick={() => onToggleDatabase(userId, id, !checked)}
+                                            onClick={() =>
+                                              onToggleDatabase(userId, id, !checked)
+                                            }
                                           />
                                         );
                                       })
@@ -377,18 +477,37 @@ export default function AdminHome() {
                   Assign these lists to team members from the Team tab.
                 </Typography>
                 {databases.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">No voter databases available.</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    No voter databases available.
+                  </Typography>
                 ) : (
                   <Grid container spacing={3}>
                     {databases.map((db) => (
-                      <Grid item xs={12} md={6} lg={4} key={resolveId(db)}>
+                      <Grid
+                        item
+                        xs={12}
+                        md={6}
+                        lg={4}
+                        key={resolveId(db)}
+                      >
                         <Card variant="outlined">
                           <CardContent>
-                            <Typography fontWeight={600}>{databaseDisplayName(db)}</Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ my: 1 }}>
+                            <Typography fontWeight={600}>
+                              {databaseDisplayName(db)}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ my: 1 }}
+                            >
                               ID: <code>{resolveId(db)}</code>
                             </Typography>
-                            <Button component={Link} to="/search" variant="outlined" size="small">
+                            <Button
+                              component={Link}
+                              to="/search"
+                              variant="outlined"
+                              size="small"
+                            >
                               Open in search
                             </Button>
                           </CardContent>
@@ -414,7 +533,8 @@ export default function AdminHome() {
                       <CardContent>
                         <Typography fontWeight={600}>Theme</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Using a light, professional palette (blue / green accents).
+                          Using a light, professional palette (blue / green
+                          accents).
                         </Typography>
                       </CardContent>
                     </Card>
@@ -424,10 +544,17 @@ export default function AdminHome() {
                       <CardContent>
                         <Typography fontWeight={600}>Shortcuts</Typography>
                         <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-                          <Button component={Link} to="/search" variant="outlined">
+                          <Button
+                            component={Link}
+                            to="/search"
+                            variant="outlined"
+                          >
                             Go to search
                           </Button>
-                          <Button variant="outlined" onClick={() => setTab('team')}>
+                          <Button
+                            variant="outlined"
+                            onClick={() => setTab('team')}
+                          >
                             Manage users
                           </Button>
                         </Stack>
