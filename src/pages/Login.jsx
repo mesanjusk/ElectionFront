@@ -10,12 +10,11 @@ import {
   Container,
   LinearProgress,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
-import { apiLogin, setAuthToken } from "../services/api";
+
+import { apiLogin } from "../services/api";
 import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
 import {
   setSession,
@@ -23,47 +22,38 @@ import {
   getActiveDatabase,
   getAvailableDatabases,
   unlockSession,
-  getToken,
-  isSessionUnlocked,
   lockSession,
   clearToken,
-  getUser, // 👈 reuse existing user on PIN login
 } from "../auth";
 import {
   clearActivationState,
-  clearRevocationFlag,
   getActivationState,
   getDeviceId,
   setActivationState,
-  storeActivation,
-  verifyPin,
+  clearRevocationFlag,
 } from "../services/activation";
 
-// Fixed defaults per requirement
 const DEFAULT_LANGUAGE = "en";
-const DEFAULT_PIN = "11";
-
-const PIN_REGEX_2DIGIT = /^\d{2}$/;
 
 /**
- * Choose a concrete database id to use for syncing.
- * Priority:
- *  1) activeDatabaseId from server or previously stored active DB
- *  2) first database from stored list (setSession -> getAvailableDatabases)
- *  3) first per-user cloned DB on user.userDatabases (if present)
- *
- * NOTE:
- * We intentionally do NOT fall back to allowedDatabaseIds here, because those
- * refer to master DB templates (e.g. "booth_17"), while sync must always use
- * the per-user cloned database id (e.g. "voters_u_<userId>_booth_17").
+ * Decide which database id to use for sync.
  */
-function chooseEffectiveDatabase({ activeDatabaseId, user } = {}) {
-  const active = activeDatabaseId || getActiveDatabase();
-  if (active) return active;
+function chooseEffectiveDatabase({ activeDatabaseId, user, databases }) {
+  // 1) explicit activeDatabaseId from server or previously stored
+  if (activeDatabaseId) return activeDatabaseId;
 
+  // 2) previously selected DB in local storage
+  const existing = getActiveDatabase();
+  if (existing) return existing;
+
+  // 3) any databases already stored locally
   const stored = getAvailableDatabases();
-  if (stored && stored.length) return stored[0].id || stored[0]._id;
+  if (stored && stored.length) {
+    const first = stored[0];
+    return first.id || first._id || first.databaseId || null;
+  }
 
+  // 4) per-user databases, if backend sends them
   const userDbs = user?.userDatabases || user?.databases;
   if (userDbs && userDbs.length) {
     const first = userDbs[0];
@@ -77,223 +67,95 @@ export default function Login() {
   const navigate = useNavigate();
 
   const [activation, setActivation] = useState(() => getActivationState());
-
-  // If any user is already activated (has a pinHash and not revoked), default to PIN screen.
-  const initialMode = (() => {
-    if (activation?.pinHash && !activation?.revoked) return "pin";
-    return "activate";
-  })();
-  const [mode, setMode] = useState(initialMode);
-  const showPinTab = Boolean(activation?.pinHash && !activation?.revoked);
-
-  useEffect(() => {
-    if (!showPinTab && mode === "pin") {
-      setMode("activate");
-    }
-  }, [showPinTab, mode]);
-
-  // Language is fixed to English — no UI controls
-  const [language] = useState(DEFAULT_LANGUAGE);
-
-  // Username/password only for activation
   const [username, setUsername] = useState(() => activation?.username || "");
   const [password, setPassword] = useState("");
 
-  // PIN entry (we now always use DEFAULT_PIN = "11" in code)
-  const [pinInput, setPinInput] = useState("");
-
-  // Basic UI state
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
+  const [deviceId, setDeviceIdState] = useState("");
 
-  // ---------------------------------------------------------------------------
-  // Helper: where to go after login
-  // ---------------------------------------------------------------------------
-  const goAfterLogin = (user, fallbackUserType) => {
-    const userType = user?.userType || fallbackUserType;
-    if (user?.role === "admin") return navigate("/admin", { replace: true });
-    if (userType === "candidate") return navigate("/search", { replace: true });
-    return navigate("/", { replace: true });
-  };
+  useEffect(() => {
+    const id = getDeviceId();
+    if (id) setDeviceIdState(id);
 
-  /**
-   * Full login + sync (used ONLY for username/password activation)
-   */
-  const completeLogin = async ({
-    token,
-    user,
-    databases = [],
-    activeDatabaseId,
-    skipSync = false,
-  }) => {
-    // 🔐 Preserve existing databases if none are passed
-    let available = databases;
-    if (!available || !available.length) {
-      const existing = getAvailableDatabases();
-      if (existing && existing.length) {
-        available = existing;
-      } else {
-        // New multi-tenant model: backend usually stores per-user clones under user.userDatabases
-        if (user?.userDatabases && user.userDatabases.length) {
-          available = user.userDatabases;
-        } else {
-          available = user?.databases || [];
-        }
-      }
+    // Clear revocation banner if any
+    if (activation?.revoked) {
+      setInfoMessage(activation.revokedMessage || "");
+      clearRevocationFlag();
+      const fresh = getActivationState();
+      setActivation(fresh);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    const effectiveDbId = chooseEffectiveDatabase({ activeDatabaseId, user });
-
-    // Persist session + DB choice
-    setSession({
-      token,
-      user,
-      databases: available,
-      activeDatabaseId: effectiveDbId,
-    });
-    if (effectiveDbId) {
-      setActiveDatabase(effectiveDbId);
-    }
-
-    // Mark this device as activated with a fixed PIN '11'
-    const deviceId = getDeviceId();
-    const activationPayload = {
-      deviceId,
-      username: user?.username || username,
-      userId: user?._id,
-      language,
-      pinHash: null, // backend may store hash; frontend still uses verifyPin(DEFAULT_PIN)
-      userType: user?.userType,
-      activeDatabaseId: effectiveDbId,
-      revoked: false,
-    };
-    const stored = storeActivation(activationPayload);
-    setActivation(stored);
-    clearRevocationFlag();
-
-    if (!skipSync) {
-      setProgress(10);
-      setProgressLabel("Pushing offline changes…");
-      await pushOutbox({ databaseId: effectiveDbId });
-
-      setProgress(60);
-      setProgressLabel("Pulling latest data…");
-      await pullAll({ databaseId: effectiveDbId });
-
-      setProgress(100);
-      setProgressLabel("Done.");
-    }
-
-    goAfterLogin(user, user?.userType || stored?.userType);
-  };
-
-  /**
-   * Username/password login (activation only)
-   */
-  const handleActivateSubmit = async (event) => {
-    event.preventDefault();
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setError("");
     setInfoMessage("");
     setLoading(true);
     setProgress(0);
-    setProgressLabel("Contacting server…");
+    setProgressLabel("Logging in…");
 
     try {
+      const trimmedUser = (username || "").trim().toLowerCase();
+      if (!trimmedUser || !password) {
+        setError("Please enter username and password.");
+        setLoading(false);
+        return;
+      }
+
       const resp = await apiLogin({
-        username,
+        username: trimmedUser,
         password,
-        userType: activation?.userType,
-        deviceId: getDeviceId(),
+        // userType omitted – backend infers from role
       });
 
-      const { token, user, databases, activeDatabaseId } = resp;
-
-
-      setAuthToken(token);
-      await completeLogin({
+      const {
         token,
         user,
-        databases,
+        databases = [],
         activeDatabaseId,
-        skipSync: false,
-      });
-    } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "Login failed.");
-    } finally {
-      setLoading(false);
-      setProgress(0);
-      setProgressLabel("");
-    }
-  };
+      } = resp || {};
 
-  /**
-   * PIN login (unlock)
-   * Now:
-   *  - uses fixed DEFAULT_PIN = "11"
-   *  - always runs PUSH then PULL on login
-   */
-  const handlePinSubmit = async (event) => {
-    event.preventDefault();
-    setError("");
-    setLoading(true);
-    setProgress(0);
-    setProgressLabel("Logging you in…");
-
-    try {
-      // Always use fixed PIN '11' as per requirement
-      const ok = await verifyPin(DEFAULT_PIN);
-      if (!ok) {
-        setError(
-          "This device is not activated. Please login with username & password once."
-        );
+      if (!token || !user) {
+        setError("Invalid response from server. Login failed.");
         setLoading(false);
         return;
       }
 
-      const token = getToken();
-      if (!token) {
-        setError(
-          "Session expired. Reactivate this device with username & password."
-        );
-        setLoading(false);
-        return;
-      }
+      // Store token + user + database list
+      setSession({ token, user, databases });
 
-      // Restore axios auth header using existing token
-      setAuthToken(token);
-
-      // Clear revoked flag and keep language (always English)
-      const updatedActivation = setActivationState({
-        language: DEFAULT_LANGUAGE,
-        revoked: false,
-      });
-      setActivation(updatedActivation);
-
-      // Unlock existing session WITHOUT touching databases/user
-      unlockSession();
-
-      // Reuse existing user (and DBs) from previous activation login
-      let user = null;
-      try {
-        user = getUser && getUser();
-      } catch {
-        // ignore
-      }
-
-      // Decide which DB to use and persist as active
+      // Decide and store active database id
       const effectiveDbId = chooseEffectiveDatabase({
-        activeDatabaseId: updatedActivation?.activeDatabaseId,
+        activeDatabaseId,
         user,
+        databases,
       });
-
       if (effectiveDbId) {
         setActiveDatabase(effectiveDbId);
       }
 
-      // 🔄 On every login run PUSH then PULL so Search/Home get fresh data
+      // Store activation locally (no PIN UI, but keep language & DB info)
+      const nextActivation = setActivationState({
+        ...(activation || {}),
+        username: user.username || trimmedUser,
+        language: DEFAULT_LANGUAGE,
+        userType: user.role || null,
+        activeDatabaseId: effectiveDbId,
+        revoked: false,
+      });
+      setActivation(nextActivation);
+
+      // Mark session as unlocked
+      unlockSession();
+
+      // Sync: PUSH then PULL
+      setProgress(20);
+      setProgressLabel("Pushing offline changes…");
       try {
         if (effectiveDbId) {
           await pushOutbox({ databaseId: effectiveDbId });
@@ -301,9 +163,12 @@ export default function Login() {
           await pushOutbox();
         }
       } catch (err) {
-        console.error("Push on login failed:", err);
+        // Do not block login
+        console.error("Push failed:", err);
       }
 
+      setProgress(60);
+      setProgressLabel("Pulling latest records…");
       try {
         if (effectiveDbId) {
           await pullAll({ databaseId: effectiveDbId });
@@ -311,154 +176,171 @@ export default function Login() {
           await pullAll();
         }
       } catch (err) {
-        console.error("Pull on login failed:", err);
+        console.error("Pull failed:", err);
       }
 
-      const fallbackType =
-        updatedActivation?.userType ||
-        user?.userType ||
-        activation?.userType;
-      goAfterLogin(user || updatedActivation?.user, fallbackType);
+      setProgress(100);
+      setProgressLabel("Done!");
 
-      setLoading(false);
-      setProgress(0);
-      setProgressLabel("");
+      setTimeout(() => {
+        // Go straight to Search; change to "/home" if you prefer
+        navigate("/search", { replace: true });
+      }, 300);
     } catch (err) {
-      setError(err?.message || "PIN login failed.");
+      console.error("LOGIN_ERROR", err);
+      const msg =
+        err?.message ||
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Login failed.";
+      setError(msg);
+    } finally {
       setLoading(false);
       setProgress(0);
       setProgressLabel("");
     }
   };
 
-  const startReactivation = () => {
-    // Full local reset: logout + clear activation + clear local sync state
-    lockSession();
-    clearToken();
-    clearActivationState();
-    resetSyncState();
+  const handleResetDevice = () => {
+    try {
+      lockSession();
+      clearToken();
+      clearActivationState();
+      resetSyncState?.();
+    } catch (err) {
+      console.error("RESET_DEVICE_ERROR", err);
+    }
     setActivation(null);
-    setMode("activate");
-    setPinInput("");
+    setUsername("");
     setPassword("");
     setError("");
-    setInfoMessage(
-      "Device reset. Please login again with your username and password."
-    );
-  };
-
-  const currentTab = showPinTab ? mode : "activate";
-  const isActivationView = currentTab === "activate";
-
-  const handlePinInputChange = (value) => {
-    setPinInput(value.replace(/[^0-9]/g, "").slice(0, 2));
+    setInfoMessage("Device reset. Please login again with username & password.");
   };
 
   return (
     <Box
       sx={{
         minHeight: "100vh",
+        bgcolor: "#0b1726",
         display: "flex",
         alignItems: "center",
-        bgcolor: "background.default",
+        justifyContent: "center",
+        p: 2,
       }}
     >
-      <Container maxWidth="sm">
-        <Card>
-          <CardContent>
-            <Stack spacing={3}>
-              <Stack spacing={0.5} alignItems="center">
-                <Typography variant="h5" fontWeight={700}>
-                  Digital Voter Book
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  
-                </Typography>
-              </Stack>
+      <Container maxWidth="xs">
+        <Card
+          sx={{
+            borderRadius: 3,
+            boxShadow: 6,
+            overflow: "hidden",
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Stack spacing={2}>
+              <Typography
+                variant="h5"
+                fontWeight={700}
+                textAlign="center"
+                gutterBottom
+              >
+                Smart Book Login
+              </Typography>
 
-              {(infoMessage || error) && (
-                <Stack spacing={1}>
-                  {infoMessage && (
-                    <Alert severity="info">{infoMessage}</Alert>
-                  )}
-                  {error && <Alert severity="error">{error}</Alert>}
-                </Stack>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                textAlign="center"
+              >
+                Use your election username & password to continue.
+              </Typography>
+
+              {deviceId ? (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  textAlign="center"
+                  sx={{ wordBreak: "break-all" }}
+                >
+                  Device ID: {deviceId}
+                </Typography>
+              ) : null}
+
+              {infoMessage && (
+                <Alert
+                  severity="info"
+                  onClose={() => setInfoMessage("")}
+                  sx={{ mt: 1 }}
+                >
+                  {infoMessage}
+                </Alert>
               )}
 
-              <Tabs
-                value={currentTab}
-                onChange={(_, value) => setMode(value)}
-                variant="fullWidth"
-                textColor="primary"
-                indicatorColor="primary"
-              >
-                <Tab label="Activate device" value="activate" />
-                {showPinTab && (
-                  <Tab label="Unlock with PIN" value="pin" />
-                )}
-              </Tabs>
-
-              {isActivationView ? (
-                <Stack
-                  component="form"
-                  spacing={2}
-                  onSubmit={handleActivateSubmit}
+              {error && (
+                <Alert
+                  severity="error"
+                  onClose={() => setError("")}
+                  sx={{ mt: 1 }}
                 >
+                  {error}
+                </Alert>
+              )}
+
+              <Box component="form" onSubmit={handleLogin}>
+                <Stack spacing={2}>
                   <TextField
                     label="Username"
+                    fullWidth
+                    size="small"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     autoComplete="username"
-                    required
-                    fullWidth
                   />
                   <TextField
                     label="Password"
                     type="password"
+                    fullWidth
+                    size="small"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
-                    required
-                    fullWidth
                   />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    disabled={loading}
+
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    justifyContent="center"
+                    sx={{ mt: 1 }}
                   >
-                    {loading ? "Syncing data…" : "Activate & sync"}
-                  </Button>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={loading}
+                    >
+                      {loading ? "Logging in…" : "Login"}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="text"
+                      color="secondary"
+                      disabled={loading}
+                      onClick={handleResetDevice}
+                    >
+                      Reset Device
+                    </Button>
+                  </Stack>
                 </Stack>
-              ) : (
-                <Stack
-                  component="form"
-                  spacing={2}
-                  onSubmit={handlePinSubmit}
-                >
-                  <Button type="submit" variant="contained" size="large">
-                    Login
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={startReactivation}
-                  >
-                    Reset this device
-                  </Button>
-                </Stack>
-              )}
+              </Box>
 
               {loading && (
                 <Stack spacing={1}>
                   <LinearProgress
-                    variant={
-                      progress > 0 && progress < 100 ? "determinate" : "indeterminate"
-                    }
+                    variant={progress ? "determinate" : "indeterminate"}
                     value={progress || undefined}
                   />
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     color="text.secondary"
                     textAlign="center"
                   >
