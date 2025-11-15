@@ -992,7 +992,7 @@ export default function Search() {
                       flexWrap="wrap"
                     >
                       <Typography variant="caption" color="text.secondary">
-                        Serial {serialDisplay}
+                        Sn. {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC{" "}
