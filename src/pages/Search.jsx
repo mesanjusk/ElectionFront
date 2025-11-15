@@ -295,8 +295,7 @@ const buildShareText = (r, collectionName) => {
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
-    `Part: ${part || "—"}  Serial: ${
-      !Number.isNaN(serial) ? serial : "—"
+    `Part: ${part || "—"}  Serial: ${!Number.isNaN(serial) ? serial : "—"
     }`,
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
@@ -641,7 +640,7 @@ export default function Search() {
   }, []);
 
   useEffect(() => {
-    loadAll().catch(() => {});
+    loadAll().catch(() => { });
   }, [loadAll]);
 
   // infinite scroll
@@ -736,33 +735,33 @@ export default function Search() {
   };
 
   const onPush = async () => {
-  setBusy(true);
-  try {
-    const id = getActiveDatabase();
-    if (!id) {
-      showSnack("No voter database is assigned to this device.");
-    } else {
-      const res = await pushOutbox({ databaseId: id });
-      const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
-      if (pushed != null) {
-        showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
+    setBusy(true);
+    try {
+      const id = getActiveDatabase();
+      if (!id) {
+        showSnack("No voter database is assigned to this device.");
       } else {
-        showSnack("Push completed.");
+        const res = await pushOutbox({ databaseId: id });
+        const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
+        if (pushed != null) {
+          showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
+        } else {
+          showSnack("Push completed.");
+        }
+        await loadAll();
       }
-      await loadAll();
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e.message ||
+        "Push failed. Please try again.";
+      console.error("Push error:", e?.response || e);
+      showSnack(msg);
+    } finally {
+      setBusy(false);
     }
-  } catch (e) {
-    const msg =
-      e?.response?.data?.message ||
-      e?.response?.data?.error ||
-      e.message ||
-      "Push failed. Please try again.";
-    console.error("Push error:", e?.response || e);
-    showSnack(msg);
-  } finally {
-    setBusy(false);
-  }
-};
+  };
 
 
   const filterTabs = [
@@ -837,105 +836,105 @@ export default function Search() {
               borderRadius: 0,
             }}
           >
-            
-              <Stack spacing={1}>
-                
 
-                {/* Filters row */}
-                <TextField
-                  id="searchBoxHindi"
-                  fullWidth
-                  size="medium"
-                  placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <VoiceSearchButton
-                          onResult={(text) => setQ(text)}
-                          lang={voiceLang}
-                          disabled={busy}
-                        />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1}
-                > 
-                
-                  <Tabs
-                    value={tab}
-                    onChange={(_, value) => setTab(value)}
-                    variant="scrollable"
-                    allowScrollButtonsMobile
-                    sx={{
-                      minHeight: 32,
-                      "& .MuiTab-root": {
-                        minHeight: 32,
-                        paddingY: 0,
-                        fontSize: 13,
-                      },
-                    }}
-                  >
-                    {filterTabs.map((filter) => (
-                      <Tab
-                        key={filter.key}
-                        label={filter.label}
-                        value={filter.key}
+            <Stack spacing={1}>
+
+
+              {/* Filters row */}
+              <TextField
+                id="searchBoxHindi"
+                fullWidth
+                size="medium"
+                placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <VoiceSearchButton
+                        onResult={(text) => setQ(text)}
+                        lang={voiceLang}
+                        disabled={busy}
                       />
-                    ))}
-                  </Tabs>
-                </Stack>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={1}
+              >
 
-                {/* Age band filter */}
-                <ToggleButtonGroup
-                  value={ageBand}
-                  exclusive
-                  onChange={(_, val) => val && setAgeBand(val)}
-                  size="small"
-                  sx={{ flexWrap: "wrap" }}
+                <Tabs
+                  value={tab}
+                  onChange={(_, value) => setTab(value)}
+                  variant="scrollable"
+                  allowScrollButtonsMobile
+                  sx={{
+                    minHeight: 32,
+                    "& .MuiTab-root": {
+                      minHeight: 32,
+                      paddingY: 0,
+                      fontSize: 13,
+                    },
+                  }}
                 >
-                  <ToggleButton value="all">All</ToggleButton>
-                  <ToggleButton value="18-25">18–25</ToggleButton>
-                  <ToggleButton value="26-35">26–35</ToggleButton>
-                  <ToggleButton value="36-50">36–50</ToggleButton>
-                  <ToggleButton value="51+">51+</ToggleButton>
-                </ToggleButtonGroup>
-                {visible.length === 0 ? (
-                  <Typography color="text.secondary" variant="caption">
-                    No voters match your filters yet.
-                  </Typography>
-                ) : (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ fontWeight: 500 }}
-                  >
-                    M {male.toLocaleString()} · F {female.toLocaleString()} ·
-                    Total {total.toLocaleString()} · Synced{" "}
-                    {allRows.length.toLocaleString()}
-                  </Typography>
-                )}
+                  {filterTabs.map((filter) => (
+                    <Tab
+                      key={filter.key}
+                      label={filter.label}
+                      value={filter.key}
+                    />
+                  ))}
+                </Tabs>
               </Stack>
-            
+
+              {/* Age band filter */}
+              <ToggleButtonGroup
+                value={ageBand}
+                exclusive
+                onChange={(_, val) => val && setAgeBand(val)}
+                size="small"
+                sx={{ flexWrap: "wrap" }}
+              >
+                <ToggleButton value="all">All</ToggleButton>
+                <ToggleButton value="18-25">18–25</ToggleButton>
+                <ToggleButton value="26-35">26–35</ToggleButton>
+                <ToggleButton value="36-50">36–50</ToggleButton>
+                <ToggleButton value="51+">51+</ToggleButton>
+              </ToggleButtonGroup>
+              {visible.length === 0 ? (
+                <Typography color="text.secondary" variant="caption">
+                  No voters match your filters yet.
+                </Typography>
+              ) : (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 500 }}
+                >
+                  M {male.toLocaleString()} · F {female.toLocaleString()} ·
+                  Total {total.toLocaleString()} · Synced{" "}
+                  {allRows.length.toLocaleString()}
+                </Typography>
+              )}
+            </Stack>
+
           </Box>
 
           {/* Search box */}
-          
-              <Stack spacing={1}>
-                
-              </Stack>
-            
+
+          <Stack spacing={1}>
+
+          </Stack>
+
 
           {/* Voter list */}
           <Stack spacing={0.75}>
@@ -950,8 +949,8 @@ export default function Search() {
               const shareText = buildShareText(r, collectionName);
               const waHref = mob
                 ? `https://wa.me/91${mob}?text=${encodeURIComponent(
-                    shareText
-                  )}`
+                  shareText
+                )}`
                 : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
               const serialDisplay = !Number.isNaN(serialNum)
@@ -969,7 +968,7 @@ export default function Search() {
                     borderRadius: 1,
                   }}
                 >
-                  {/* Row 1: Serial · Age · Sex + + button (Part removed) */}
+                  {/* Row 1: Serial · Age · Sex + + button */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -990,6 +989,7 @@ export default function Search() {
                         · Age {age || "—"} · {gender || "—"}
                       </Typography>
                     </Stack>
+
                     <IconButton
                       size="small"
                       onClick={() => setTagsVoter(r)}
@@ -999,50 +999,66 @@ export default function Search() {
                     </IconButton>
                   </Stack>
 
-                  {/* Row 2: Name (clickable -> details) */}
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={600}
-                    sx={{
-                      cursor: "pointer",
-                      textDecoration: "none",
-                      "&:hover": { textDecoration: "underline" },
-                    }}
-                    onClick={() => setDetail(r)}
+                  {/* Row 2: Name + Call + WhatsApp + Edit (Merged Row 3 inside Row 2) */}
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ width: "100%" }}
                   >
-                    {name}
-                  </Typography>
+                    {/* Name */}
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={600}
+                      sx={{
+                        cursor: "pointer",
+                        textDecoration: "none",
+                        "&:hover": { textDecoration: "underline" },
+                        flex: 1,
+                        pr: 1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      onClick={() => setDetail(r)}
+                    >
+                      {name}
+                    </Typography>
 
-                     <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<CallRoundedIcon />}
-                      disabled={!mob}
-                      component={mob ? "a" : "button"}
-                      href={mob ? `tel:${mob}` : undefined}
-                    >
-                      
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<WhatsAppIcon />}
-                      component="a"
-                      href={waHref}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      
-                    </Button>
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => setSelected(r)}
-                    >
-                      <EditRoundedIcon />
-                    </IconButton>
-                  
+                    {/* Actions */}
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<CallRoundedIcon />}
+                        disabled={!mob}
+                        component={mob ? "a" : "button"}
+                        href={mob ? `tel:${mob}` : undefined}
+                        sx={{ minWidth: "32px", px: 1 }}
+                      />
+
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<WhatsAppIcon />}
+                        component="a"
+                        href={waHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        sx={{ minWidth: "32px", px: 1 }}
+                      />
+
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => setSelected(r)}
+                      >
+                        <EditRoundedIcon />
+                      </IconButton>
+                    </Stack>
+                  </Stack>
                 </Paper>
+
               );
             })}
             <Box ref={sentinelRef} sx={{ height: 32 }} />
