@@ -736,27 +736,34 @@ export default function Search() {
   };
 
   const onPush = async () => {
-    setBusy(true);
-    try {
-      const id = getActiveDatabase();
-      if (!id) {
-        showSnack("No voter database is assigned to this device.");
+  setBusy(true);
+  try {
+    const id = getActiveDatabase();
+    if (!id) {
+      showSnack("No voter database is assigned to this device.");
+    } else {
+      const res = await pushOutbox({ databaseId: id });
+      const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
+      if (pushed != null) {
+        showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
       } else {
-        const res = await pushOutbox({ databaseId: id });
-        const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
-        if (pushed != null) {
-          showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
-        } else {
-          showSnack("Push completed.");
-        }
-        await loadAll();
+        showSnack("Push completed.");
       }
-    } catch (e) {
-      showSnack("Push failed. Please try again.");
-    } finally {
-      setBusy(false);
+      await loadAll();
     }
-  };
+  } catch (e) {
+    const msg =
+      e?.response?.data?.message ||
+      e?.response?.data?.error ||
+      e.message ||
+      "Push failed. Please try again.";
+    console.error("Push error:", e?.response || e);
+    showSnack(msg);
+  } finally {
+    setBusy(false);
+  }
+};
+
 
   const filterTabs = [
     { key: "all", label: "All" },
@@ -827,7 +834,7 @@ export default function Search() {
           {/* Stats + filters */}
           <Card
             sx={{
-              borderRadius: 2,
+              borderRadius: 1,
             }}
           >
             <CardContent sx={{ py: 1.5 }}>
@@ -854,7 +861,31 @@ export default function Search() {
                   alignItems="center"
                   justifyContent="space-between"
                   spacing={1}
-                >
+                > 
+                <TextField
+                  id="searchBoxHindi"
+                  fullWidth
+                  size="medium"
+                  placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <VoiceSearchButton
+                          onResult={(text) => setQ(text)}
+                          lang={voiceLang}
+                          disabled={busy}
+                        />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
                   <Tabs
                     value={tab}
                     onChange={(_, value) => setTab(value)}
@@ -898,40 +929,11 @@ export default function Search() {
           </Card>
 
           {/* Search box */}
-          <Card
-            sx={{
-              borderRadius: 2,
-            }}
-          >
-            <CardContent sx={{ py: 1.25 }}>
+          
               <Stack spacing={1}>
-                <TextField
-                  id="searchBoxHindi"
-                  fullWidth
-                  size="medium"
-                  placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <VoiceSearchButton
-                          onResult={(text) => setQ(text)}
-                          lang={voiceLang}
-                          disabled={busy}
-                        />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                
               </Stack>
-            </CardContent>
-          </Card>
+            
 
           {/* Voter list */}
           <Stack spacing={0.75}>
@@ -962,7 +964,7 @@ export default function Search() {
                     display: "flex",
                     flexDirection: "column",
                     gap: 0.4,
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   {/* Row 1: Serial · Age · Sex + + button (Part removed) */}
