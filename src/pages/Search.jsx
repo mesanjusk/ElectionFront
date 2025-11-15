@@ -672,8 +672,9 @@ export default function Search() {
       const ageNum = getAgeNum(r);
       if (ageBand === "18-25" && !(ageNum >= 18 && ageNum <= 25)) return false;
       if (ageBand === "26-35" && !(ageNum >= 26 && ageNum <= 35)) return false;
-      if (ageBand === "36-50" && !(ageNum >= 36 && ageNum <= 50)) return false;
-      if (ageBand === "51+" && !(ageNum >= 51)) return false;
+      if (ageBand === "36-45" && !(ageNum >= 36 && ageNum <= 45)) return false;
+      if (ageBand === "46-60" && !(ageNum >= 46 && ageNum <= 60)) return false;
+      if (ageBand === "61+" && !(ageNum >= 61)) return false;
 
       if (!term) return true;
 
@@ -938,8 +939,9 @@ export default function Search() {
                 <ToggleButton value="all">All</ToggleButton>
                 <ToggleButton value="18-25">18–25</ToggleButton>
                 <ToggleButton value="26-35">26–35</ToggleButton>
-                <ToggleButton value="36-50">36–50</ToggleButton>
-                <ToggleButton value="51+">51+</ToggleButton>
+                <ToggleButton value="36-45">36–45</ToggleButton>
+                <ToggleButton value="46-60">46–60</ToggleButton>
+                <ToggleButton value="61+">61+</ToggleButton>
               </ToggleButtonGroup>
             </Stack>
           </Box>
