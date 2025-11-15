@@ -839,29 +839,9 @@ export default function Search() {
           >
             <CardContent sx={{ py: 1.5 }}>
               <Stack spacing={1}>
-                {visible.length === 0 ? (
-                  <Typography color="text.secondary" variant="caption">
-                    No voters match your filters yet.
-                  </Typography>
-                ) : (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ fontWeight: 500 }}
-                  >
-                    M {male.toLocaleString()} · F {female.toLocaleString()} ·
-                    Total {total.toLocaleString()} · Synced{" "}
-                    {allRows.length.toLocaleString()}
-                  </Typography>
-                )}
+                
 
                 {/* Filters row */}
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1}
-                > 
                 <TextField
                   id="searchBoxHindi"
                   fullWidth
@@ -886,6 +866,13 @@ export default function Search() {
                     ),
                   }}
                 />
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1}
+                > 
+                
                   <Tabs
                     value={tab}
                     onChange={(_, value) => setTab(value)}
@@ -924,6 +911,21 @@ export default function Search() {
                   <ToggleButton value="36-50">36–50</ToggleButton>
                   <ToggleButton value="51+">51+</ToggleButton>
                 </ToggleButtonGroup>
+                {visible.length === 0 ? (
+                  <Typography color="text.secondary" variant="caption">
+                    No voters match your filters yet.
+                  </Typography>
+                ) : (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    M {male.toLocaleString()} · F {female.toLocaleString()} ·
+                    Total {total.toLocaleString()} · Synced{" "}
+                    {allRows.length.toLocaleString()}
+                  </Typography>
+                )}
               </Stack>
             </CardContent>
           </Card>
