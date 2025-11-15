@@ -717,55 +717,6 @@ export default function Search() {
     }
   };
 
-  // transliteration for Hindi input id="searchBoxHindi"
-  useEffect(() => {
-    const initGoogleTransliteration = () => {
-      if (
-        window.google &&
-        window.google.load &&
-        window.google.elements &&
-        window.google.elements.transliteration
-      ) {
-        window.google.load("elements", "1", {
-          packages: "transliteration",
-          callback: () => {
-            const langCode =
-              window.google.elements.transliteration.LanguageCode;
-            const options = {
-              sourceLanguage: langCode.ENGLISH,
-              destinationLanguage: [langCode.HINDI],
-              transliterationEnabled: true,
-            };
-            const control =
-              new window.google.elements.transliteration.TransliterationControl(
-                options
-              );
-            control.makeTransliteratable(["searchBoxHindi"]);
-          },
-        });
-      }
-    };
-
-    if (window.google && window.google.load) {
-      initGoogleTransliteration();
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://www.google.com/jsapi";
-    script.async = true;
-    script.onload = () => {
-      if (window.google && window.google.load) {
-        initGoogleTransliteration();
-      }
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
   const filterTabs = [
     { key: "all", label: "All" },
     { key: "male", label: "Male" },
@@ -785,7 +736,7 @@ export default function Search() {
       }}
     >
       <TopNavbar
-        collectionName={collectionName || "Smart Book"}
+        collectionName={collectionName}
         userName={userName}
         busy={busy}
         onMenuOpen={handleMenuOpen}
@@ -895,7 +846,7 @@ export default function Search() {
                   id="searchBoxHindi"
                   fullWidth
                   size="medium"
-                  placeholder="Search by name, EPIC, house, mobile..."
+                  placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   InputProps={{
