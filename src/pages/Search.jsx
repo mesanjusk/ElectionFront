@@ -19,6 +19,7 @@ import {
   IconButton,
   InputAdornment,
   Menu,
+  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -60,45 +61,52 @@ const pick = (obj, keys) => {
 };
 
 const getName = (r) =>
-  pick(r, ["name", "Name"]) ||
-  pick(r?.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) ||
-  "—";
+  pick(r, ["Name", "name", "FullName"]) ||
+  pick(r?.__raw, ["Name", "नाम", "पूर्ण नाव"]) ||
+  "";
 
-/** EPIC == Voter ID in your DB */
 const getEPIC = (r) =>
+  pick(r, ["EPIC", "voter_id", "VoterID", "VoterId"]) ||
+  pick(r?.__raw, ["EPIC", "Epic", "voter_id", "कार्ड नं"]) ||
+  "";
+
+const getPart = (r) =>
+  pick(r, ["Part", "part", "Booth", "booth"]) ||
+  pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
+  "";
+
+const getSerialText = (r) =>
   pick(r, [
-    "voter_id",
-    "VoterID",
-    "VoterId",
-    "Voter ID",
-    "Voter Id",
-    "voter id",
-    "EPIC",
+    "Serial No",
+    "serial",
+    "Serial",
+    "Sr No",
+    "SrNo",
+    "अनुक्रमांक",
+    "अनु. क्र.",
   ]) ||
   pick(r?.__raw, [
-    "EPIC",
-    "voter_id",
-    "VoterID",
-    "VoterId",
-    "Voter ID",
-    "Voter Id",
-    "voter id",
-    "कार्ड नं",
+    "Serial No",
+    "Serial",
+    "SrNo",
+    "Sr No",
+    "अनु क्र",
+    "अनु. नं.",
+    "अनुक्रमांक",
+    "अनुक्रमांक नं.",
   ]) ||
-  "—";
+  "";
+
+const parseLastNumber = (s) => {
+  const m = String(s || "").match(/\d+/g);
+  if (!m) return NaN;
+  const n = parseInt(m[m.length - 1], 10);
+  return Number.isNaN(n) ? NaN : n;
+};
 
 /** Roll / Part / Serial mapping */
 const getRPS = (r) =>
   pick(r, [
-    "RPS",
-    "RollPartSerial",
-    "Roll/Part/Serial",
-    "Roll / Part / Serial",
-    "Roll-Part-Serial",
-    "Roll_Part_Serial",
-    "RollPartSr",
-  ]) ||
-  pick(r?.__raw, [
     "RPS",
     "RollPartSerial",
     "Roll/Part/Serial",
@@ -109,35 +117,7 @@ const getRPS = (r) =>
   ]) ||
   "";
 
-const getPart = (r) =>
-  pick(r, ["Part", "part", "Booth", "booth"]) ||
-  pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
-  "";
-
-/* Serial helpers */
-const getSerialText = (r) => {
-  const v =
-    pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
-    pick(r?.__raw, [
-      "Serial No",
-      "Serial",
-      "Sr No",
-      "SrNo",
-      "अनु. नं.",
-      "अनुक्रमांक",
-      "अनुक्रमांक नं.",
-    ]) ||
-    "";
-  return v == null ? "" : String(v);
-};
-
-const parseLastNumber = (s) => {
-  const m = String(s || "").match(/\d+/g);
-  if (!m) return NaN;
-  const n = parseInt(m[m.length - 1], 10);
-  return Number.isNaN(n) ? NaN : n;
-};
-
+/** Serial as number (for sorting) */
 const getSerialNum = (r) => {
   const t = getSerialText(r);
   if (t) return parseLastNumber(t);
@@ -178,31 +158,25 @@ const getGender = (r) => {
 };
 
 const getCareOf = (r) =>
-  pick(r, [
-    "Father Name",
-    "Husband Name",
-    "Guardian Name",
-    "CareOf",
-    "C_O",
-    "C/O",
-  ]) ||
+  pick(r, ["CareOf", "careof", "C/O", "CO", "Father", "Husband"]) ||
   pick(r?.__raw, [
-    "वडिलांचे नाव",
-    "वडिलांचे नांव",
-    "पतीचे नाव",
-    "पतीचे नांव",
-    "Guardians Name",
-    "Guardian Name",
-    "Father Name",
-    "Father's Name",
-    "Husband Name",
-    "Husband's Name",
+    "Father",
+    "Husband",
+    "Care Of",
+    "C/O",
+    "वडील",
+    "पती",
+    "पुत्र",
+    "पु...",
   ]) ||
   "";
 
-/* Phone (DB fields only) */
+/* Mobile – stored in our local DB */
 const getMobile = (r) =>
-  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
+  r?.mobile ||
+  pick(r, ["Mobile", "mobile", "Phone"]) ||
+  pick(r?.__raw, ["Mobile", "mobile", "Phone"]) ||
+  "";
 
 /* Image URL – used in WhatsApp share text */
 const getPhotoUrl = (r) =>
@@ -218,6 +192,22 @@ const getPhotoUrl = (r) =>
     "Avatar",
   ]) ||
   pick(r?.__raw, ["photoUrl", "photo", "Photo", "image", "Image", "img"]) ||
+  "";
+
+// NEW: caste / political interest / volunteer getters
+const getCaste = (r) =>
+  pick(r, ["caste", "Caste"]) ||
+  pick(r?.__raw, ["caste", "Caste", "जात"]) ||
+  "";
+
+const getPoliticalInterest = (r) =>
+  pick(r, ["politicalInterest", "PoliticalInterest", "interest"]) ||
+  pick(r?.__raw, ["politicalInterest", "PoliticalInterest", "interest"]) ||
+  "";
+
+const getVolunteer = (r) =>
+  pick(r, ["volunteer", "Volunteer", "assignedVolunteer"]) ||
+  pick(r?.__raw, ["volunteer", "Volunteer", "assignedVolunteer"]) ||
   "";
 
 /* Normalize phone for tel:/WhatsApp */
@@ -267,29 +257,14 @@ const DEV_TO_LATIN = {
   र: "r",
   ल: "l",
   व: "v",
-  स: "s",
   श: "sh",
-  ष: "sh",
+  ष: "shh",
+  स: "s",
   ह: "h",
-  ङ: "n",
-  ञ: "n",
-  ऱ: "r",
-  "्": "",
-  "ा": "a",
-  "ि": "i",
-  "ी": "i",
-  "ु": "u",
-  "ू": "u",
-  "े": "e",
-  "ै": "ai",
-  "ो": "o",
-  "ौ": "au",
-  "ं": "n",
-  "ँ": "n",
 };
 
-const transliterate = (text) => {
-  const s = String(text || "");
+const devToLatin = (s) => {
+  if (!s) return "";
   let out = "";
   for (let i = 0; i < s.length; i += 1) {
     const ch = s[i];
@@ -298,8 +273,8 @@ const transliterate = (text) => {
   return out;
 };
 
-/* Share text for WhatsApp – now includes Photo URL if available */
-const buildShareText = (r) => {
+/* Share text for WhatsApp – includes photo, caste, interest, volunteer, DB */
+const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
   const part = getPart(r);
@@ -310,6 +285,11 @@ const buildShareText = (r) => {
   const house = getHouseNo(r);
   const co = getCareOf(r);
   const photo = getPhotoUrl(r);
+
+  const caste = getCaste(r) || "OPEN";
+  const interest = getPoliticalInterest(r) || "—";
+  const volunteer = getVolunteer(r) || "";
+  const dbName = collectionName || "";
 
   const lines = [
     "Voter Details",
@@ -322,7 +302,11 @@ const buildShareText = (r) => {
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
     house ? `House: ${house}` : null,
     co ? `C/O: ${co}` : null,
-    photo ? `Photo: ${photo}` : null, // 👈 image URL included for WhatsApp
+    `Caste: ${caste}`,
+    `Political interest: ${interest}`,
+    volunteer ? `Volunteer: ${volunteer}` : null,
+    dbName ? `Database: ${dbName}` : null,
+    photo ? `Photo: ${photo}` : null, // image URL
   ].filter(Boolean);
   return lines.join("\n");
 };
@@ -384,8 +368,99 @@ function MobileEditModal({ open, voter, onClose }) {
   );
 }
 
+/* ---------------- Voter tags (caste / interest / volunteer) ----------- */
+
+const CASTE_OPTIONS = ["OPEN", "OBC", "SC", "ST", "NT", "VJ", "SBC"];
+
+const INTEREST_OPTIONS = [
+  "Pro ruling party",
+  "Pro opposition",
+  "Neutral",
+  "Non voter",
+];
+
+function VoterTagsModal({ open, voter, onClose }) {
+  const [caste, setCaste] = useState(getCaste(voter) || "OPEN");
+  const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
+  const [volunteer, setVolunteer] = useState(getVolunteer(voter) || "");
+
+  useEffect(() => {
+    if (voter) {
+      setCaste(getCaste(voter) || "OPEN");
+      setInterest(getPoliticalInterest(voter) || "");
+      setVolunteer(getVolunteer(voter) || "");
+    }
+  }, [voter]);
+
+  if (!open || !voter) return null;
+
+  const handleSave = async () => {
+    await updateVoterLocal(voter._id, {
+      caste: caste || "OPEN",
+      politicalInterest: interest || "",
+      volunteer: volunteer || "",
+    });
+    onClose(true);
+  };
+
+  return (
+    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
+      <DialogTitle>Voter tags</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {getName(voter)}
+          </Typography>
+
+          <TextField
+            select
+            label="Caste"
+            value={caste}
+            onChange={(e) => setCaste(e.target.value)}
+            fullWidth
+          >
+            {CASTE_OPTIONS.map((c) => (
+              <MenuItem key={c} value={c}>
+                {c}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Political interest"
+            value={interest}
+            onChange={(e) => setInterest(e.target.value)}
+            fullWidth
+          >
+            {INTEREST_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            label="Volunteer"
+            value={volunteer}
+            onChange={(e) => setVolunteer(e.target.value)}
+            placeholder="Volunteer / party worker name"
+            fullWidth
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onClose(false)}>Cancel</Button>
+        <Button onClick={handleSave} variant="contained">
+          Save tags
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /* ---------------- Full Record Details modal ---------------- */
-function RecordModal({ open, voter, onClose }) {
+function RecordModal({ open, voter, onClose, collectionName }) {
   if (!open || !voter) return null;
   const fields = [
     ["Name", getName(voter)],
@@ -404,8 +479,11 @@ function RecordModal({ open, voter, onClose }) {
     ["C/O", getCareOf(voter) || "—"],
     ["Mobile", getMobile(voter) || "—"],
     ["Photo", getPhotoUrl(voter) || "—"],
+    ["Caste", getCaste(voter) || "OPEN"],
+    ["Interest", getPoliticalInterest(voter) || "—"],
+    ["Volunteer", getVolunteer(voter) || "—"],
   ];
-  const shareText = buildShareText(voter);
+  const shareText = buildShareText(voter, collectionName);
 
   const mob = getMobile(voter);
   const waUrl = mob
@@ -430,19 +508,10 @@ function RecordModal({ open, voter, onClose }) {
               <Typography fontWeight={600}>{String(v)}</Typography>
             </Stack>
           ))}
-          <TextField
-            label="Share text"
-            value={shareText}
-            multiline
-            minRows={3}
-            fullWidth
-            InputProps={{ readOnly: true }}
-          />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
+      <DialogActions>
         <Button
-          component="a"
           href={waUrl}
           target="_blank"
           rel="noreferrer"
@@ -474,10 +543,12 @@ export default function Search() {
   useEffect(() => {
     try {
       const authUser = getUser && getUser();
+      if (authUser?.name) setUserName(authUser.name);
+    } catch {
+      // ignore
+    }
+    try {
       const fromStorage =
-        window.localStorage.getItem("userName") ||
-        window.localStorage.getItem("name") ||
-        (authUser && (authUser.username || authUser.name)) ||
         JSON.parse(window.localStorage.getItem("user") || "{}").name;
       if (fromStorage) setUserName(fromStorage);
     } catch {
@@ -492,7 +563,7 @@ export default function Search() {
       setActiveDbState(id);
     }
     try {
-      const dbs = getAvailableDatabases ? getAvailableDatabases() : [];
+      const dbs = getAvailableDatabases() || [];
       const found = dbs.find((d) => (d.id || d._id) === (id || activeDb));
       const label =
         found?.name ||
@@ -507,7 +578,7 @@ export default function Search() {
     }
   }, [activeDb]);
 
-  const voiceLang = "hi-IN"; // Hindi voice search
+  const voiceLang = "hi-IN"; // Hindi voice search (for button)
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   const [q, setQ] = useState("");
@@ -518,6 +589,7 @@ export default function Search() {
   const [busy, setBusy] = useState(false);
 
   const [selected, setSelected] = useState(null);
+  const [tagsVoter, setTagsVoter] = useState(null);
   const [detail, setDetail] = useState(null);
   const sentinelRef = useRef(null);
 
@@ -535,90 +607,132 @@ export default function Search() {
     arr.sort((a, b) => {
       const sa = getSerialNum(a);
       const sb = getSerialNum(b);
-      const aNaN = Number.isNaN(sa);
-      const bNaN = Number.isNaN(sb);
-      if (aNaN && bNaN) return 0;
-      if (aNaN) return 1;
-      if (bNaN) return -1;
-      return sa - sb;
+      if (!Number.isNaN(sa) && !Number.isNaN(sb)) return sa - sb;
+      return 0;
     });
     setAllRows(arr);
   }, []);
 
   useEffect(() => {
-    loadAll();
+    loadAll().catch(() => {});
   }, [loadAll]);
 
-  const handlePull = async () => {
-    const id = getActiveDatabase();
-    if (!id) {
-      alert("No database selected.");
-      return;
-    }
-    if (id !== activeDb) {
-      setActiveDatabase(id);
-      setActiveDbState(id);
-    }
-    setBusy(true);
-    try {
-      const c = await pullAll({ databaseId: id });
-      alert(`Pulled ${c} changes from server.`);
-      await loadAll();
-    } catch (e) {
-      alert("Pull failed: " + (e?.message || e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handlePush = async () => {
-    const id = getActiveDatabase();
-    if (!id) {
-      alert("No database selected.");
-      return;
-    }
-    if (id !== activeDb) {
-      setActiveDatabase(id);
-      setActiveDbState(id);
-    }
-    setBusy(true);
-    try {
-      const res = await pushOutbox({ databaseId: id });
-      alert(
-        `Pushed: ${res.pushed}${
-          res.failed?.length ? `, Failed: ${res.failed.length}` : ""
-        }`
-      );
-    } catch (e) {
-      alert("Push failed: " + (e?.message || e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // 🔽 Load Google Transliteration for the Hindi search input (single box)
+  // infinite scroll
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          setVisibleCount((v) => v + 200);
+        }
+      }
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [allRows.length]);
 
-    function initGoogleTransliteration() {
-      window.google.load("elements", "1", {
-        packages: "transliteration",
-        callback: () => {
-          const langCode =
-            window.google.elements.transliteration.LanguageCode;
-          const options = {
-            sourceLanguage: langCode.ENGLISH,
-            destinationLanguage: [langCode.HINDI],
-            transliterationEnabled: true,
-          };
-          const control =
-            new window.google.elements.transliteration.TransliterationControl(
-              options
-            );
-          control.makeTransliteratable(["searchBoxHindi"]);
-        },
-      });
+  // filters + search
+  const filtered = useMemo(() => {
+    const term = q.trim();
+    const lt = term ? devToLatin(term) : "";
+
+    return allRows.filter((r) => {
+      // gender filter
+      const g = getGender(r);
+      if (tab === "male" && g !== "M") return false;
+      if (tab === "female" && g !== "F") return false;
+
+      // age band filter
+      const ageNum = getAgeNum(r);
+      if (ageBand === "18-25" && !(ageNum >= 18 && ageNum <= 25)) return false;
+      if (ageBand === "26-35" && !(ageNum >= 26 && ageNum <= 35)) return false;
+      if (ageBand === "36-50" && !(ageNum >= 36 && ageNum <= 50)) return false;
+      if (ageBand === "51+" && !(ageNum >= 51)) return false;
+
+      if (!term) return true;
+
+      const fields = [
+        getName(r),
+        getEPIC(r),
+        getPart(r),
+        getSerialText(r),
+        getHouseNo(r),
+        getCareOf(r),
+        getMobile(r),
+      ];
+
+      const hay = fields
+        .filter(Boolean)
+        .map((x) => String(x).toLowerCase())
+        .join(" ");
+
+      if (hay.includes(term.toLowerCase())) return true;
+
+      const devHay = devToLatin(hay);
+      return devHay.includes(lt);
+    });
+  }, [allRows, q, tab, ageBand]);
+
+  const { male, female, total } = useMemo(() => {
+    let maleCount = 0;
+    let femaleCount = 0;
+    for (const row of filtered) {
+      const g = getGender(row);
+      if (g === "M") maleCount += 1;
+      if (g === "F") femaleCount += 1;
     }
+    return { male: maleCount, female: femaleCount, total: filtered.length };
+  }, [filtered]);
+
+  const onPull = async () => {
+    setBusy(true);
+    try {
+      await pullAll();
+      await loadAll();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPush = async () => {
+    setBusy(true);
+    try {
+      await pushOutbox();
+      await loadAll();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // transliteration for Hindi input id="searchBoxHindi"
+  useEffect(() => {
+    const initGoogleTransliteration = () => {
+      if (
+        window.google &&
+        window.google.load &&
+        window.google.elements &&
+        window.google.elements.transliteration
+      ) {
+        window.google.load("elements", "1", {
+          packages: "transliteration",
+          callback: () => {
+            const langCode =
+              window.google.elements.transliteration.LanguageCode;
+            const options = {
+              sourceLanguage: langCode.ENGLISH,
+              destinationLanguage: [langCode.HINDI],
+              transliterationEnabled: true,
+            };
+            const control =
+              new window.google.elements.transliteration.TransliterationControl(
+                options
+              );
+            control.makeTransliteratable(["searchBoxHindi"]);
+          },
+        });
+      }
+    };
 
     if (window.google && window.google.load) {
       initGoogleTransliteration();
@@ -634,240 +748,36 @@ export default function Search() {
       }
     };
     document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
   }, []);
 
-  // Combined filter: text + tab + age band with transliteration (for search)
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    const termTrans = transliterate(term);
-
-    const inAgeBand = (r) => {
-      if (ageBand === "all") return true;
-      const a = getAgeNum(r);
-      if (a == null) return false;
-      if (ageBand === "18-30") return a >= 18 && a <= 30;
-      if (ageBand === "30-45") return a >= 30 && a <= 45;
-      if (ageBand === "45-60") return a >= 45 && a <= 60;
-      if (ageBand === "60+") return a >= 61;
-      return true;
-    };
-
-    const passesTab = (r) => {
-      if (tab === "male") return getGender(r) === "M";
-      if (tab === "female") return getGender(r) === "F";
-      return true; // all
-    };
-
-    const textMatch = (r) => {
-      if (!term) return true;
-
-      const name = getName(r) || "";
-      const epic = getEPIC(r) || "";
-      const mob = getMobile(r) || "";
-      const rps = getRPS(r) || "";
-      const part = getPart(r) || "";
-      const serialTxt = String(getSerialText(r) ?? "");
-
-      const nameL = name.toLowerCase();
-      const epicL = epic.toLowerCase();
-      const mobL = mob.toLowerCase();
-      const rpsL = rps.toLowerCase();
-      const partL = part.toLowerCase();
-      const serialL = serialTxt.toLowerCase();
-
-      const nameT = transliterate(nameL);
-      const partT = transliterate(partL);
-
-      return (
-        nameL.includes(term) ||
-        epicL.includes(term) ||
-        mobL.includes(term) ||
-        rpsL.includes(term) ||
-        partL.includes(term) ||
-        serialL.includes(term) ||
-        nameT.includes(termTrans) ||
-        partT.includes(termTrans)
-      );
-    };
-
-    return allRows.filter((r) => textMatch(r) && passesTab(r) && inAgeBand(r));
-  }, [q, tab, ageBand, allRows]);
-
-  // Reset window on any filter change
-  useEffect(() => setVisibleCount(200), [q, tab, ageBand]);
-
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-    const el = sentinelRef.current;
-    const io = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setVisibleCount((c) =>
-          Math.min(c + 300, filtered.length || c + 300)
-        );
-      }
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [filtered.length]);
+  const filterTabs = [
+    { key: "all", label: "All" },
+    { key: "male", label: "Male" },
+    { key: "female", label: "Female" },
+  ];
 
   const visible = filtered.slice(0, visibleCount);
 
-  const { male, female, total } = useMemo(() => {
-    let maleCount = 0;
-    let femaleCount = 0;
-    for (const row of filtered) {
-      const g = getGender(row);
-      if (g === "M") maleCount += 1;
-      else if (g === "F") femaleCount += 1;
-    }
-    return { male: maleCount, female: femaleCount, total: filtered.length };
-  }, [filtered]);
-
-  const syncedTotal = allRows.length;
-
-  const filterTabs = [
-    { key: "all", label: "ALL" },
-    { key: "male", label: "MALE" },
-    { key: "female", label: "FEMALE" },
-  ];
-  const ageFilters = [
-    { key: "all", label: "ALL" },
-    { key: "18-30", label: "18–30" },
-    { key: "30-45", label: "30–45" },
-    { key: "45-60", label: "45–60" },
-    { key: "60+", label: "60+" },
-  ];
-
   return (
-    <Box sx={{ minHeight: "100vh", pb: 8 }}>
-      {/* Top navbar */}
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: (theme) =>
+          theme.palette.mode === "dark"
+            ? "linear-gradient(to bottom, #020617, #0f172a)"
+            : "linear-gradient(to bottom, #f9fafb, #e5e7eb)",
+      }}
+    >
       <TopNavbar
-        collectionName={collectionName}
-        userName={userName}
-        busy={busy}
         onMenuOpen={handleMenuOpen}
-        onPull={handlePull}
-        onPush={handlePush}
+        title={collectionName || "Smart Book"}
       />
 
-      {/* Sticky block: filters + search, directly under navbar (no gap) */}
-      <Box
-        sx={{
-          position: "sticky",
-          top: 0, // 👈 no extra gap now
-          zIndex: (theme) => theme.zIndex.appBar - 1,
-          bgcolor: "background.paper",
-          borderBottom: "1px solid rgba(15,23,42,0.08)",
-        }}
-      >
-        <Container maxWidth="lg" sx={{ py: 0.75 }}>
-          <Stack spacing={0.75}>
-            {/* Row 1: ALL/MALE/FEMALE tabs + totals in ONE LINE */}
-            <Stack
-              direction="row"
-              alignItems="flex-end"
-              justifyContent="space-between"
-              spacing={1}
-            >
-              <Tabs
-                value={tab}
-                onChange={(_, value) => setTab(value)}
-                variant="scrollable"
-                allowScrollButtonsMobile
-                sx={{
-                  minHeight: 32,
-                  "& .MuiTab-root": {
-                    minHeight: 32,
-                    paddingY: 0,
-                  },
-                }}
-              >
-                {filterTabs.map((filter) => (
-                  <Tab
-                    key={filter.key}
-                    label={filter.label}
-                    value={filter.key}
-                  />
-                ))}
-              </Tabs>
-
-              {/* M / F / Total / Synced in single row */}
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ whiteSpace: "nowrap" }}
-              >
-                M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
-                {total.toLocaleString()} · Synced {syncedTotal.toLocaleString()}
-              </Typography>
-            </Stack>
-
-            {/* Row 2: age filter pill group */}
-            <ToggleButtonGroup
-              value={ageBand}
-              exclusive
-              onChange={(_, value) => value && setAgeBand(value)}
-              size="small"
-              sx={{
-                alignSelf: "flex-start",
-              }}
-            >
-              {ageFilters.map((filter) => (
-                <ToggleButton key={filter.key} value={filter.key}>
-                  {filter.label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-
-            {/* Row 3: single Hindi search + clear button */}
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ width: "100%", pt: 0.25 }}
-            >
-              <TextField
-                id="searchBoxHindi" // Google transliteration attaches here
-                size="small"
-                fullWidth
-                label="Search voters (Hindi)"
-                placeholder="नाम / EPIC / मोबाइल"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <VoiceSearchButton
-                        onResult={(text) => setQ(text)}
-                        lang={voiceLang}
-                        disabled={busy}
-                      />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  maxWidth: { xs: "100%", sm: 420 },
-                }}
-              />
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setQ("")}
-                disabled={!q}
-              >
-                Clear
-              </Button>
-            </Stack>
-          </Stack>
-        </Container>
-      </Box>
-
-      {/* Menu for logout */}
+      {/* Menu for logout and DB info */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -875,10 +785,14 @@ export default function Search() {
         keepMounted
       >
         <Box sx={{ px: 2, py: 1.5, width: 280 }}>
+          <Typography variant="subtitle2">{userName}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Database: {collectionName || "Unassigned"}
+          </Typography>
           <Button
             variant="outlined"
             startIcon={<LogoutRoundedIcon />}
-            sx={{ mt: 1 }}
+            sx={{ mt: 1.5 }}
             onClick={logout}
             fullWidth
           >
@@ -898,134 +812,259 @@ export default function Search() {
                     No voters match your filters yet.
                   </Typography>
                 ) : (
-                  visible.map((r, i) => {
-                    const name = getName(r);
-                    const serialTxt = getSerialText(r);
-                    const serialNum = getSerialNum(r);
-                    const age = getAge(r);
-                    const gender = getGender(r);
-                    const mobRaw = getMobile(r);
-                    const mob = normalizePhone(mobRaw);
-                    const shareText = buildShareText(r);
-                    const waHref = mob
-                      ? `https://wa.me/91${mob}?text=${encodeURIComponent(
-                          shareText
-                        )}`
-                      : `whatsapp://send?text=${encodeURIComponent(
-                          shareText
-                        )}`;
-
-                    const serialDisplay = !Number.isNaN(serialNum)
-                      ? serialNum
-                      : serialTxt || "—";
-                    const part = getPart(r) || "—";
-
-                    return (
-                      <Paper
-                        key={r._id || `${i}-${serialTxt}`}
-                        sx={{
-                          p: 1.25,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 0.5,
-                        }}
-                      >
-                        {/* Row 1: Serial · Part · Age · Sex + + button */}
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          alignItems="center"
-                          justifyContent="space-between"
-                          flexWrap="wrap"
-                        >
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                            flexWrap="wrap"
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Serial {serialDisplay} · Part {part}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              · Age {age || "—"} · {gender || "—"}
-                            </Typography>
-                          </Stack>
-                          <IconButton
-                            size="small"
-                            onClick={() => setSelected(r)}
-                            sx={{ ml: 1 }}
-                          >
-                            <AddRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-
-                        {/* Row 2: Name (clickable -> details) */}
-                        <Typography
-                          variant="subtitle1"
-                          fontWeight={600}
-                          sx={{
-                            cursor: "pointer",
-                            textDecoration: "none",
-                            "&:hover": { textDecoration: "underline" },
-                          }}
-                          onClick={() => setDetail(r)}
-                        >
-                          {name}
-                        </Typography>
-
-                        {/* Row 3: Actions - Call, Share, Edit icon in one row */}
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          flexWrap="wrap"
-                          sx={{ mt: 0.25 }}
-                          alignItems="center"
-                        >
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<CallRoundedIcon />}
-                            disabled={!mob}
-                            component={mob ? "a" : "button"}
-                            href={mob ? `tel:${mob}` : undefined}
-                          >
-                            Call
-                          </Button>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            size="small"
-                            startIcon={<WhatsAppIcon />}
-                            component="a"
-                            href={waHref}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Share
-                          </Button>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => setSelected(r)}
-                          >
-                            <EditRoundedIcon />
-                          </IconButton>
-                        </Stack>
-                      </Paper>
-                    );
-                  })
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    M {male.toLocaleString()} · F {female.toLocaleString()} ·
+                    Total {total.toLocaleString()} · Synced{" "}
+                    {allRows.length.toLocaleString()}
+                  </Typography>
                 )}
-                <Box ref={sentinelRef} sx={{ height: 32 }} />
+
+                {/* Filters row */}
+                <Stack
+                  direction="row"
+                  alignItems="flex-end"
+                  justifyContent="space-between"
+                  spacing={1}
+                >
+                  <Tabs
+                    value={tab}
+                    onChange={(_, value) => setTab(value)}
+                    variant="scrollable"
+                    allowScrollButtonsMobile
+                    sx={{
+                      minHeight: 32,
+                      "& .MuiTab-root": {
+                        minHeight: 32,
+                        paddingY: 0,
+                      },
+                    }}
+                  >
+                    {filterTabs.map((filter) => (
+                      <Tab
+                        key={filter.key}
+                        label={filter.label}
+                        value={filter.key}
+                      />
+                    ))}
+                  </Tabs>
+
+                  {/* M / F / Total / Synced in single row */}
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      flexShrink: 0,
+                      textAlign: "right",
+                      display: { xs: "none", sm: "block" },
+                    }}
+                  >
+                    M {male.toLocaleString()} · F {female.toLocaleString()} ·
+                    Total {total.toLocaleString()} · Synced{" "}
+                    {allRows.length.toLocaleString()}
+                  </Typography>
+                </Stack>
+
+                {/* Age band filter */}
+                <ToggleButtonGroup
+                  value={ageBand}
+                  exclusive
+                  onChange={(_, val) => val && setAgeBand(val)}
+                  size="small"
+                  sx={{ flexWrap: "wrap" }}
+                >
+                  <ToggleButton value="all">All ages</ToggleButton>
+                  <ToggleButton value="18-25">18–25</ToggleButton>
+                  <ToggleButton value="26-35">26–35</ToggleButton>
+                  <ToggleButton value="36-50">36–50</ToggleButton>
+                  <ToggleButton value="51+">51+</ToggleButton>
+                </ToggleButtonGroup>
               </Stack>
             </CardContent>
           </Card>
+
+          {/* Search box */}
+          <Card>
+            <CardContent>
+              <Stack spacing={1.5}>
+                <TextField
+                  id="searchBoxHindi"
+                  fullWidth
+                  size="medium"
+                  placeholder="Search by name, EPIC, house, mobile..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <VoiceSearchButton
+                          onResult={(text) => setQ(text)}
+                          lang={voiceLang}
+                          disabled={busy}
+                        />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/* Pull / Push buttons */}
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={onPull}
+                    disabled={busy}
+                  >
+                    Pull
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={onPush}
+                    disabled={busy}
+                  >
+                    Push
+                  </Button>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Voter list */}
+          <Stack spacing={1}>
+            {visible.map((r, i) => {
+              const name = getName(r);
+              const serialTxt = getSerialText(r);
+              const serialNum = getSerialNum(r);
+              const age = getAge(r);
+              const gender = getGender(r);
+              const mobRaw = getMobile(r);
+              const mob = normalizePhone(mobRaw);
+              const shareText = buildShareText(r, collectionName);
+              const waHref = mob
+                ? `https://wa.me/91${mob}?text=${encodeURIComponent(
+                    shareText
+                  )}`
+                : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+              const serialDisplay = !Number.isNaN(serialNum)
+                ? serialNum
+                : serialTxt || "—";
+              const part = getPart(r) || "—";
+
+              return (
+                <Paper
+                  key={r._id || `${i}-${serialTxt}`}
+                  sx={{
+                    p: 1.25,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 0.5,
+                  }}
+                >
+                  {/* Row 1: Serial · Part · Age · Sex + + button */}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    justifyContent="space-between"
+                    flexWrap="wrap"
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      flexWrap="wrap"
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Serial {serialDisplay} · Part {part}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        · Age {age || "—"} · {gender || "—"}
+                      </Typography>
+                    </Stack>
+                    <IconButton
+                      size="small"
+                      onClick={() => setTagsVoter(r)}
+                      sx={{ ml: 1 }}
+                    >
+                      <AddRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+
+                  {/* Row 2: Name (clickable -> details) */}
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={600}
+                    sx={{
+                      cursor: "pointer",
+                      textDecoration: "none",
+                      "&:hover": { textDecoration: "underline" },
+                    }}
+                    onClick={() => setDetail(r)}
+                  >
+                    {name}
+                  </Typography>
+
+                  {/* NEW line: caste / interest / volunteer */}
+                  <Typography variant="caption" color="text.secondary">
+                    Caste: {getCaste(r) || "OPEN"} · Interest:{" "}
+                    {getPoliticalInterest(r) || "—"}
+                    {getVolunteer(r)
+                      ? ` · Volunteer: ${getVolunteer(r)}`
+                      : ""}
+                  </Typography>
+
+                  {/* Row 3: Actions - Call, Share, Edit icon in one row */}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    flexWrap="wrap"
+                    sx={{ mt: 0.25 }}
+                    alignItems="center"
+                  >
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<CallRoundedIcon />}
+                      disabled={!mob}
+                      component={mob ? "a" : "button"}
+                      href={mob ? `tel:${mob}` : undefined}
+                    >
+                      Call
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<WhatsAppIcon />}
+                      component="a"
+                      href={waHref}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Share
+                    </Button>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => setSelected(r)}
+                    >
+                      <EditRoundedIcon />
+                    </IconButton>
+                  </Stack>
+                </Paper>
+              );
+            })}
+            <Box ref={sentinelRef} sx={{ height: 32 }} />
+          </Stack>
         </Stack>
       </Container>
 
@@ -1037,10 +1076,19 @@ export default function Search() {
           if (ok) await loadAll();
         }}
       />
+      <VoterTagsModal
+        open={!!tagsVoter}
+        voter={tagsVoter}
+        onClose={async (ok) => {
+          setTagsVoter(null);
+          if (ok) await loadAll();
+        }}
+      />
       <RecordModal
         open={!!detail}
         voter={detail}
         onClose={() => setDetail(null)}
+        collectionName={collectionName}
       />
 
       <PWAInstallPrompt bottom={120} />
