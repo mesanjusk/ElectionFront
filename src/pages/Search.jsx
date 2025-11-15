@@ -42,7 +42,6 @@ import {
   getActiveDatabase,
   getUser,
   getAvailableDatabases,
-  setActiveDatabase,
 } from "../auth";
 import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
@@ -544,6 +543,7 @@ export default function Search() {
     try {
       const authUser = getUser && getUser();
       if (authUser?.name) setUserName(authUser.name);
+      else if (authUser?.username) setUserName(authUser.username);
     } catch {
       // ignore
     }
@@ -556,7 +556,9 @@ export default function Search() {
     }
   }, []);
 
-  const [activeDb, setActiveDbState] = useState(() => getActiveDatabase() || "");
+  const [activeDb, setActiveDbState] = useState(
+    () => getActiveDatabase() || ""
+  );
   useEffect(() => {
     const id = getActiveDatabase() || "";
     if (id && id !== activeDb) {
@@ -688,8 +690,13 @@ export default function Search() {
   const onPull = async () => {
     setBusy(true);
     try {
-      await pullAll();
-      await loadAll();
+      const id = getActiveDatabase();
+      if (!id) {
+        alert("No voter database is assigned to this device.");
+      } else {
+        await pullAll({ databaseId: id });
+        await loadAll();
+      }
     } finally {
       setBusy(false);
     }
@@ -698,8 +705,13 @@ export default function Search() {
   const onPush = async () => {
     setBusy(true);
     try {
-      await pushOutbox();
-      await loadAll();
+      const id = getActiveDatabase();
+      if (!id) {
+        alert("No voter database is assigned to this device.");
+      } else {
+        await pushOutbox({ databaseId: id });
+        await loadAll();
+      }
     } finally {
       setBusy(false);
     }
@@ -773,8 +785,12 @@ export default function Search() {
       }}
     >
       <TopNavbar
+        collectionName={collectionName || "Smart Book"}
+        userName={userName}
+        busy={busy}
         onMenuOpen={handleMenuOpen}
-        title={collectionName || "Smart Book"}
+        onPull={onPull}
+        onPush={onPush}
       />
 
       {/* Menu for logout and DB info */}
@@ -851,21 +867,6 @@ export default function Search() {
                       />
                     ))}
                   </Tabs>
-
-                  {/* M / F / Total / Synced in single row */}
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                      flexShrink: 0,
-                      textAlign: "right",
-                      display: { xs: "none", sm: "block" },
-                    }}
-                  >
-                    M {male.toLocaleString()} · F {female.toLocaleString()} ·
-                    Total {total.toLocaleString()} · Synced{" "}
-                    {allRows.length.toLocaleString()}
-                  </Typography>
                 </Stack>
 
                 {/* Age band filter */}
@@ -914,26 +915,6 @@ export default function Search() {
                     ),
                   }}
                 />
-
-                {/* Pull / Push buttons */}
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={onPull}
-                    disabled={busy}
-                  >
-                    Pull
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={onPush}
-                    disabled={busy}
-                  >
-                    Push
-                  </Button>
-                </Stack>
               </Stack>
             </CardContent>
           </Card>
@@ -958,7 +939,6 @@ export default function Search() {
               const serialDisplay = !Number.isNaN(serialNum)
                 ? serialNum
                 : serialTxt || "—";
-              const part = getPart(r) || "—";
 
               return (
                 <Paper
@@ -970,7 +950,7 @@ export default function Search() {
                     gap: 0.5,
                   }}
                 >
-                  {/* Row 1: Serial · Part · Age · Sex + + button */}
+                  {/* Row 1: Serial · Age · Sex + + button (Part removed) */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -985,7 +965,7 @@ export default function Search() {
                       flexWrap="wrap"
                     >
                       <Typography variant="caption" color="text.secondary">
-                        Serial {serialDisplay} · Part {part}
+                        Serial {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"}
@@ -1012,15 +992,6 @@ export default function Search() {
                     onClick={() => setDetail(r)}
                   >
                     {name}
-                  </Typography>
-
-                  {/* NEW line: caste / interest / volunteer */}
-                  <Typography variant="caption" color="text.secondary">
-                    Caste: {getCaste(r) || "OPEN"} · Interest:{" "}
-                    {getPoliticalInterest(r) || "—"}
-                    {getVolunteer(r)
-                      ? ` · Volunteer: ${getVolunteer(r)}`
-                      : ""}
                   </Typography>
 
                   {/* Row 3: Actions - Call, Share, Edit icon in one row */}
