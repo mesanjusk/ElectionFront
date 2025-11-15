@@ -829,13 +829,18 @@ export default function Search() {
           pb: 10,
         }}
       >
-        <Stack spacing={1.5}>
+        <Stack spacing={1.0}>
           {/* Stats + filters */}
-          <Box
-            sx={{
-              borderRadius: 0,
-            }}
-          >
+         <Box
+    sx={{
+      borderRadius: 0,
+      position: "sticky",
+      top: 40, // if navbar height is ~56px, use top: 56 instead
+      zIndex: 10,
+      bgcolor: "background.paper",
+      pb: 1,
+    }}
+  >
 
             <Stack spacing={1}>
 
