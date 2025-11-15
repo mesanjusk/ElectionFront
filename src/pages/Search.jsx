@@ -66,9 +66,10 @@ const getName = (r) =>
   pick(r?.__raw, ["Name", "नाम", "पूर्ण नाव"]) ||
   "";
 
+// ✅ UPDATED: include "Voter ID" + variants
 const getEPIC = (r) =>
-  pick(r, ["EPIC", "Voter id", "VoterID", "VoterId"]) ||
-  pick(r?.__raw, ["EPIC", "Epic", "voter_id", "कार्ड नं"]) ||
+  pick(r, ["EPIC", "Voter ID", "Voter Id", "Voter id", "VoterID", "VoterId"]) ||
+  pick(r?.__raw, ["EPIC", "Epic", "Voter ID", "Voter Id", "voter_id", "कार्ड नं"]) ||
   "";
 
 const getPart = (r) =>
@@ -944,7 +945,7 @@ export default function Search() {
           </Box>
 
           {/* Voter list */}
-          <Stack spacing={0.5}>
+          <Stack spacing={0.4}>
             {visible.map((r, i) => {
               const name = getName(r);
               const epic = getEPIC(r);
@@ -967,105 +968,105 @@ export default function Search() {
 
               return (
                 <Paper
-  key={r._id || `${i}-${serialTxt}`}
-  sx={{
-    p: 0.75,
-    display: "flex",
-    flexDirection: "column",
-    gap: 0.2,
-    borderRadius: 1,
-  }}
->
-  {/* Row 1: Serial · Age · Sex · EPIC + + button */}
-  <Stack
-    direction="row"
-    spacing={1}
-    alignItems="center"
-    justifyContent="space-between"
-    flexWrap="wrap"
-  >
-    <Stack
-      direction="row"
-      spacing={1}
-      alignItems="center"
-      flexWrap="wrap"
-    >
-      <Typography variant="caption" color="text.secondary">
-        Serial {serialDisplay}
-      </Typography>
-      <Typography variant="caption" color="text.secondary">
-        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
-      </Typography>
-    </Stack>
+                  key={r._id || `${i}-${serialTxt}`}
+                  sx={{
+                    p: 0.5,               // 🔻 narrower padding
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 0.15,           // 🔻 smaller vertical gap
+                    borderRadius: 0.5,   // 🔻 smaller radius
+                  }}
+                >
+                  {/* Row 1: Serial · Age · Sex · EPIC + + button */}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    justifyContent="space-between"
+                    flexWrap="wrap"
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      flexWrap="wrap"
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Serial {serialDisplay}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        · Age {age || "—"} · {gender || "—"} · EPIC{" "}
+                        {epic || "—"}
+                      </Typography>
+                    </Stack>
 
-    <IconButton
-      size="small"
-      onClick={() => setTagsVoter(r)}
-      sx={{ ml: 1 }}
-    >
-      <AddRoundedIcon fontSize="small" />
-    </IconButton>
-  </Stack>
+                    <IconButton
+                      size="small"
+                      onClick={() => setTagsVoter(r)}
+                      sx={{ ml: 1 }}
+                    >
+                      <AddRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
 
-  {/* Row 2: Name + Call + WhatsApp + Edit */}
-  <Stack
-    direction="row"
-    alignItems="center"
-    justifyContent="space-between"
-    sx={{ width: "100%", mt: 0.25 }}
-  >
-    {/* Name */}
-    <Typography
-      variant="subtitle1"
-      fontWeight={700}
-      sx={{
-        cursor: "pointer",
-        textDecoration: "none",
-        "&:hover": { textDecoration: "underline" },
-        flex: 1,
-        pr: 1,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        color: "primary.main",
-      }}
-      onClick={() => setDetail(r)}
-    >
-      {name}
-    </Typography>
+                  {/* Row 2: Name + Call + WhatsApp + Edit */}
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ width: "100%", mt: 0.15 }}
+                  >
+                    {/* Name */}
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={700}
+                      sx={{
+                        cursor: "pointer",
+                        textDecoration: "none",
+                        "&:hover": { textDecoration: "underline" },
+                        flex: 1,
+                        pr: 1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        color: "primary.main",
+                      }}
+                      onClick={() => setDetail(r)}
+                    >
+                      {name}
+                    </Typography>
 
-    {/* Actions */}
-    <Stack direction="row" spacing={0.5} alignItems="center">
-      <IconButton
-        size="small"
-        disabled={!mob}
-        component={mob ? "a" : "button"}
-        href={mob ? `tel:${mob}` : undefined}
-      >
-        <CallRoundedIcon fontSize="small" />
-      </IconButton>
+                    {/* Actions */}
+                    <Stack direction="row" spacing={0.25} alignItems="center">
+                      <IconButton
+                        size="small"
+                        disabled={!mob}
+                        component={mob ? "a" : "button"}
+                        href={mob ? `tel:${mob}` : undefined}
+                      >
+                        <CallRoundedIcon fontSize="small" />
+                      </IconButton>
 
-      <IconButton
-        size="small"
-        component="a"
-        href={waHref}
-        target="_blank"
-        rel="noreferrer"
-      >
-        <WhatsAppIcon fontSize="small" />
-      </IconButton>
+                      <IconButton
+                        size="small"
+                        component="a"
+                        href={waHref}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <WhatsAppIcon fontSize="small" />
+                      </IconButton>
 
-      <IconButton
-        size="small"
-        color="primary"
-        onClick={() => setSelected(r)}
-      >
-        <EditRoundedIcon fontSize="small" />
-      </IconButton>
-    </Stack>
-  </Stack>
-</Paper>
-
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => setSelected(r)}
+                      >
+                        <EditRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  </Stack>
+                </Paper>
               );
             })}
             <Box ref={sentinelRef} sx={{ height: 32 }} />
