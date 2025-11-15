@@ -193,7 +193,7 @@ export default function Home() {
     <Box sx={{ minHeight: "100vh", pb: 4 }}>
       {/* Top navbar */}
       <TopNavbar
-        collectionName={collectionName}
+        
         userName={userName}
         userAvatar={avatarUrl}
         busy={syncing}

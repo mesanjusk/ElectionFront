@@ -781,7 +781,7 @@ export default function Search() {
       }}
     >
       <TopNavbar
-        collectionName={collectionName}
+        
         userName={userName}
         busy={busy}
         onMenuOpen={handleMenuOpen}
