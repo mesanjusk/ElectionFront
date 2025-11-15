@@ -368,11 +368,10 @@ export default function Login() {
             <Stack spacing={3}>
               <Stack spacing={0.5} alignItems="center">
                 <Typography variant="h5" fontWeight={700}>
-                  Smart Book
+                  Digital Voter Book
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  This device is already activated. Tap login to continue or
-                  reset this device.
+                  
                 </Typography>
               </Stack>
 
