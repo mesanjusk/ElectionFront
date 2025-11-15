@@ -1013,15 +1013,7 @@ export default function Search() {
                     {name}
                   </Typography>
 
-                  {/* Row 3: Actions - Call, Share, Edit icon in one row */}
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    flexWrap="wrap"
-                    sx={{ mt: 0.25 }}
-                    alignItems="center"
-                  >
-                    <Button
+                     <Button
                       variant="outlined"
                       size="small"
                       startIcon={<CallRoundedIcon />}
@@ -1029,7 +1021,7 @@ export default function Search() {
                       component={mob ? "a" : "button"}
                       href={mob ? `tel:${mob}` : undefined}
                     >
-                      Call
+                      
                     </Button>
                     <Button
                       variant="outlined"
@@ -1040,7 +1032,7 @@ export default function Search() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Share
+                      
                     </Button>
                     <IconButton
                       size="small"
@@ -1049,7 +1041,7 @@ export default function Search() {
                     >
                       <EditRoundedIcon />
                     </IconButton>
-                  </Stack>
+                  
                 </Paper>
               );
             })}
