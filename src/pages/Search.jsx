@@ -781,7 +781,7 @@ export default function Search() {
       }}
     >
       <TopNavbar
-        
+
         userName={userName}
         busy={busy}
         onMenuOpen={handleMenuOpen}
@@ -831,21 +831,33 @@ export default function Search() {
       >
         <Stack spacing={1.0}>
           {/* Stats + filters */}
-         <Box
-    sx={{
-      borderRadius: 0,
-      position: "sticky",
-      top: 40, // if navbar height is ~56px, use top: 56 instead
-      zIndex: 10,
-      bgcolor: "background.paper",
-      pb: 1,
-    }}
-  >
-
-            <Stack spacing={1}>
-
-
-              {/* Filters row */}
+          <Box
+            sx={{
+              borderRadius: 0,
+              position: "sticky",
+              top: 40,                 // adjust based on navbar height
+              zIndex: 20,
+              bgcolor: "#2E2E2E",      // dark grey background
+              color: "white",          // text turns white for contrast
+              pb: 1,
+              pt: 1,
+              px: 1.5,
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",   // center horizontally
+              alignItems: "center",       // center vertically
+              boxShadow: "0 2px 4px rgba(0,0,0,0.2)", // soft shadow
+            }}
+          >
+            <Stack
+              spacing={1}
+              sx={{
+                width: "100%",          // makes inner content full width
+                maxWidth: 600,          // centers nicely like mobile apps
+                mx: "auto",             // auto-center stack
+              }}
+            >
+              {/* Search box */}
               <TextField
                 id="searchBoxHindi"
                 fullWidth
@@ -856,7 +868,7 @@ export default function Search() {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" />
+                      <SearchRoundedIcon fontSize="small" htmlColor="white" />
                     </InputAdornment>
                   ),
                   endAdornment: (
@@ -869,45 +881,61 @@ export default function Search() {
                     </InputAdornment>
                   ),
                 }}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    backgroundColor: "#444",      // input darker
+                    color: "white",
+                  },
+                  "& .MuiInputBase-input::placeholder": {
+                    color: "#ccc",
+                  },
+                }}
               />
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1}
-              >
 
-                <Tabs
-                  value={tab}
-                  onChange={(_, value) => setTab(value)}
-                  variant="scrollable"
-                  allowScrollButtonsMobile
-                  sx={{
+              {/* Tabs */}
+              <Tabs
+                value={tab}
+                onChange={(_, value) => setTab(value)}
+                variant="scrollable"
+                allowScrollButtonsMobile
+                sx={{
+                  minHeight: 32,
+                  "& .MuiTab-root": {
                     minHeight: 32,
-                    "& .MuiTab-root": {
-                      minHeight: 32,
-                      paddingY: 0,
-                      fontSize: 13,
-                    },
-                  }}
-                >
-                  {filterTabs.map((filter) => (
-                    <Tab
-                      key={filter.key}
-                      label={filter.label}
-                      value={filter.key}
-                    />
-                  ))}
-                </Tabs>
-              </Stack>
+                    paddingY: 0,
+                    fontSize: 13,
+                    color: "#ddd",
+                  },
+                  "& .Mui-selected": {
+                    color: "white !important",
+                  },
+                  "& .MuiTabs-indicator": {
+                    backgroundColor: "white",
+                  },
+                }}
+              >
+                {filterTabs.map((filter) => (
+                  <Tab key={filter.key} label={filter.label} value={filter.key} />
+                ))}
+              </Tabs>
 
-              {/* Age band filter */}
+              {/* Age Filter */}
               <ToggleButtonGroup
                 value={ageBand}
                 exclusive
                 onChange={(_, val) => val && setAgeBand(val)}
                 size="small"
-                sx={{ flexWrap: "wrap" }}
+                sx={{
+                  flexWrap: "wrap",
+                  "& .MuiToggleButton-root": {
+                    color: "white",
+                    borderColor: "#777",
+                  },
+                  "& .Mui-selected": {
+                    backgroundColor: "#555 !important",
+                    color: "white !important",
+                  },
+                }}
               >
                 <ToggleButton value="all">All</ToggleButton>
                 <ToggleButton value="18-25">18–25</ToggleButton>
@@ -915,24 +943,24 @@ export default function Search() {
                 <ToggleButton value="36-50">36–50</ToggleButton>
                 <ToggleButton value="51+">51+</ToggleButton>
               </ToggleButtonGroup>
+
+              {/* Stats */}
               {visible.length === 0 ? (
-                <Typography color="text.secondary" variant="caption">
+                <Typography color="#ddd" variant="caption" textAlign="center">
                   No voters match your filters yet.
                 </Typography>
               ) : (
                 <Typography
                   variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 500 }}
+                  sx={{ fontWeight: 500, color: "#ddd", textAlign: "center" }}
                 >
-                  M {male.toLocaleString()} · F {female.toLocaleString()} ·
-                  Total {total.toLocaleString()} · Synced{" "}
-                  {allRows.length.toLocaleString()}
+                  M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
+                  {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
                 </Typography>
               )}
             </Stack>
-
           </Box>
+
 
           {/* Search box */}
 
