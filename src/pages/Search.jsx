@@ -295,8 +295,7 @@ const buildShareText = (r, collectionName) => {
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
-    `Part: ${part || "—"}  Serial: ${!Number.isNaN(serial) ? serial : "—"
-    }`,
+    `Part: ${part || "—"}  Serial: ${!Number.isNaN(serial) ? serial : "—"}`,
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
     house ? `House: ${house}` : null,
@@ -346,8 +345,7 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
       const dbId = getActiveDatabase && getActiveDatabase();
       if (dbId) {
         const res = await pushOutbox({ databaseId: dbId });
-        const pushed =
-          res?.pushed ?? res?.count ?? res?.synced ?? null;
+        const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
         if (pushed != null) {
           msg = `Saved & pushed ${pushed} change(s) to server.`;
         } else {
@@ -640,7 +638,7 @@ export default function Search() {
   }, []);
 
   useEffect(() => {
-    loadAll().catch(() => { });
+    loadAll().catch(() => {});
   }, [loadAll]);
 
   // infinite scroll
@@ -763,7 +761,6 @@ export default function Search() {
     }
   };
 
-
   const filterTabs = [
     { key: "all", label: "All" },
     { key: "male", label: "Male" },
@@ -781,7 +778,6 @@ export default function Search() {
       }}
     >
       <TopNavbar
-
         userName={userName}
         busy={busy}
         onMenuOpen={handleMenuOpen}
@@ -830,14 +826,14 @@ export default function Search() {
         }}
       >
         <Stack spacing={0.5}>
-          {/* Stats + filters */}
+          {/* Stats + filters (header) */}
           <Box
             sx={{
               borderRadius: 0,
               position: "sticky",
-              top: 30,
+              top: 56, // just below navbar; tweak if needed
               zIndex: 20,
-              bgcolor: "#898888ff",     // light grey background
+              bgcolor: "#f3f4f6", // light grey
               pb: 1,
               pt: 1,
               px: 1.5,
@@ -845,7 +841,7 @@ export default function Search() {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
             }}
           >
             <Stack
@@ -920,7 +916,11 @@ export default function Search() {
                 }}
               >
                 {filterTabs.map((filter) => (
-                  <Tab key={filter.key} label={filter.label} value={filter.key} />
+                  <Tab
+                    key={filter.key}
+                    label={filter.label}
+                    value={filter.key}
+                  />
                 ))}
               </Tabs>
 
@@ -940,39 +940,14 @@ export default function Search() {
                 <ToggleButton value="36-50">36–50</ToggleButton>
                 <ToggleButton value="51+">51+</ToggleButton>
               </ToggleButtonGroup>
-
-              {/* Stats */}
-              {visible.length === 0 ? (
-                <Typography color="text.secondary" variant="caption" textAlign="center">
-                  No voters match your filters yet.
-                </Typography>
-              ) : (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  textAlign="center"
-                  sx={{ fontWeight: 500 }}
-                >
-                  M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
-                  {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
-                </Typography>
-              )}
             </Stack>
           </Box>
 
-
-
-          {/* Search box */}
-
-          <Stack spacing={1}>
-
-          </Stack>
-
-
           {/* Voter list */}
-          <Stack spacing={0.75}>
+          <Stack spacing={0.5}>
             {visible.map((r, i) => {
               const name = getName(r);
+              const epic = getEPIC(r);
               const serialTxt = getSerialText(r);
               const serialNum = getSerialNum(r);
               const age = getAge(r);
@@ -982,8 +957,8 @@ export default function Search() {
               const shareText = buildShareText(r, collectionName);
               const waHref = mob
                 ? `https://wa.me/91${mob}?text=${encodeURIComponent(
-                  shareText
-                )}`
+                    shareText
+                  )}`
                 : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
               const serialDisplay = !Number.isNaN(serialNum)
@@ -994,7 +969,7 @@ export default function Search() {
                 <Paper
                   key={r._id || `${i}-${serialTxt}`}
                   sx={{
-                    p: 1,
+                    p: 0.75,
                     display: "flex",
                     flexDirection: "column",
                     gap: 0.2,
@@ -1032,17 +1007,26 @@ export default function Search() {
                     </IconButton>
                   </Stack>
 
-                  {/* Row 2: Name + Call + WhatsApp + Edit (Merged Row 3 inside Row 2) */}
+                  {/* Row 1.5: EPIC */}
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.25 }}
+                  >
+                    EPIC: {epic || "—"}
+                  </Typography>
+
+                  {/* Row 2: Name + Call + WhatsApp + Edit */}
                   <Stack
                     direction="row"
                     alignItems="center"
                     justifyContent="space-between"
-                    sx={{ width: "100%" }}
+                    sx={{ width: "100%", mt: 0.25 }}
                   >
                     {/* Name */}
                     <Typography
-                      variant="subtitle2"
-                      fontWeight={600}
+                      variant="subtitle1"
+                      fontWeight={700}
                       sx={{
                         cursor: "pointer",
                         textDecoration: "none",
@@ -1052,6 +1036,7 @@ export default function Search() {
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
+                        color: "primary.main",
                       }}
                       onClick={() => setDetail(r)}
                     >
@@ -1059,39 +1044,36 @@ export default function Search() {
                     </Typography>
 
                     {/* Actions */}
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Button
-                        variant="outlined"
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <IconButton
                         size="small"
-                        startIcon={<CallRoundedIcon />}
                         disabled={!mob}
                         component={mob ? "a" : "button"}
                         href={mob ? `tel:${mob}` : undefined}
-                        sx={{ minWidth: "24px", px: 1 }}
-                      />
+                      >
+                        <CallRoundedIcon fontSize="small" />
+                      </IconButton>
 
-                      <Button
-                        variant="outlined"
+                      <IconButton
                         size="small"
-                        startIcon={<WhatsAppIcon />}
                         component="a"
                         href={waHref}
                         target="_blank"
                         rel="noreferrer"
-                        sx={{ minWidth: "24px", px: 1 }}
-                      />
+                      >
+                        <WhatsAppIcon fontSize="small" />
+                      </IconButton>
 
                       <IconButton
                         size="small"
                         color="primary"
                         onClick={() => setSelected(r)}
                       >
-                        <EditRoundedIcon />
+                        <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Stack>
                   </Stack>
                 </Paper>
-
               );
             })}
             <Box ref={sentinelRef} sx={{ height: 32 }} />
@@ -1122,6 +1104,41 @@ export default function Search() {
         onClose={() => setDetail(null)}
         collectionName={collectionName}
       />
+
+      {/* Fixed footer with stats */}
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          bgcolor: "#e5e7eb",
+          borderTop: "1px solid #d1d5db",
+          py: 0.5,
+          px: 2,
+          zIndex: 30,
+        }}
+      >
+        {visible.length === 0 ? (
+          <Typography
+            color="text.secondary"
+            variant="caption"
+            textAlign="center"
+          >
+            No voters match your filters yet.
+          </Typography>
+        ) : (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            textAlign="center"
+            sx={{ fontWeight: 500 }}
+          >
+            M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
+            {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
+          </Typography>
+        )}
+      </Box>
 
       {/* Sync + info messages */}
       <Snackbar
