@@ -964,7 +964,7 @@ export default function Search() {
                     p: 1,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 0.4,
+                    gap: 0.2,
                     borderRadius: 1,
                   }}
                 >
@@ -1034,7 +1034,7 @@ export default function Search() {
                         disabled={!mob}
                         component={mob ? "a" : "button"}
                         href={mob ? `tel:${mob}` : undefined}
-                        sx={{ minWidth: "32px", px: 1 }}
+                        sx={{ minWidth: "24px", px: 1 }}
                       />
 
                       <Button
@@ -1045,7 +1045,7 @@ export default function Search() {
                         href={waHref}
                         target="_blank"
                         rel="noreferrer"
-                        sx={{ minWidth: "32px", px: 1 }}
+                        sx={{ minWidth: "24px", px: 1 }}
                       />
 
                       <IconButton
