@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -21,6 +22,7 @@ import {
   Menu,
   MenuItem,
   Paper,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
@@ -113,8 +115,7 @@ const getRPS = (r) =>
     "R/P/S",
     "Roll-Part-Serial",
     "Roll_Part_Serial",
-  ]) ||
-  "";
+  ]) || "";
 
 /** Serial as number (for sorting) */
 const getSerialNum = (r) => {
@@ -275,7 +276,7 @@ const devToLatin = (s) => {
 /* Share text for WhatsApp – includes photo, caste, interest, volunteer, DB */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
-  const epic = getEPIC(r);
+  const epic = getEPIC(r); // EPIC = Voter ID
   const part = getPart(r);
   const serial = getSerialNum(r);
   const rps = getRPS(r);
@@ -310,10 +311,23 @@ const buildShareText = (r, collectionName) => {
   return lines.join("\n");
 };
 
-/* ---------------- Small mobile edit modal (local only) ---------------- */
-function MobileEditModal({ open, voter, onClose }) {
+/* ---------------- Small mobile edit modal (local + push) --------------- */
+
+const CASTE_OPTIONS = ["OPEN", "OBC", "SC", "ST", "NT", "VJ", "SBC"];
+
+const INTEREST_OPTIONS = [
+  "Pro ruling party",
+  "Pro opposition",
+  "Neutral",
+  "Non voter",
+];
+
+function MobileEditModal({ open, voter, onClose, onSynced }) {
   const [mobile, setMobile] = useState(getMobile(voter));
-  useEffect(() => setMobile(getMobile(voter)), [voter]);
+
+  useEffect(() => {
+    setMobile(getMobile(voter));
+  }, [voter]);
 
   if (!open || !voter) return null;
 
@@ -323,15 +337,37 @@ function MobileEditModal({ open, voter, onClose }) {
       alert("Enter a valid 10-digit mobile.");
       return;
     }
+
+    // 1) Save locally
     await updateVoterLocal(voter._id, { mobile: n });
+
+    // 2) Immediately push to server for active DB
+    let msg = "Mobile saved locally.";
+    try {
+      const dbId = getActiveDatabase && getActiveDatabase();
+      if (dbId) {
+        const res = await pushOutbox({ databaseId: dbId });
+        const pushed =
+          res?.pushed ?? res?.count ?? res?.synced ?? null;
+        if (pushed != null) {
+          msg = `Saved & pushed ${pushed} change(s) to server.`;
+        } else {
+          msg = "Saved & sync triggered.";
+        }
+      } else {
+        msg = "Saved locally. No active database assigned.";
+      }
+    } catch (e) {
+      msg = "Saved locally. Sync failed, will retry from Push.";
+    }
+
+    if (onSynced) onSynced(msg);
     onClose(true);
   };
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>
-        {getMobile(voter) ? "Edit mobile" : "Add mobile"}
-      </DialogTitle>
+      <DialogTitle>Mobile number</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           <Typography variant="subtitle1" fontWeight={600}>
@@ -345,14 +381,16 @@ function MobileEditModal({ open, voter, onClose }) {
             <Typography variant="caption" color="text.secondary">
               EPIC
             </Typography>
-            <Typography fontFamily="monospace">{getEPIC(voter)}</Typography>
+            <Typography fontFamily="monospace">
+              {getEPIC(voter)}
+            </Typography>
           </Stack>
           <TextField
             label="Mobile number"
             value={mobile || ""}
             onChange={(e) => setMobile(e.target.value)}
             placeholder="10-digit mobile"
-            inputProps={{ inputMode: "numeric" }}
+            inputProps={{ inputMode: "numeric", maxLength: 10 }}
             fullWidth
           />
         </Stack>
@@ -360,7 +398,7 @@ function MobileEditModal({ open, voter, onClose }) {
       <DialogActions>
         <Button onClick={() => onClose(false)}>Cancel</Button>
         <Button onClick={handleSave} variant="contained">
-          Save (local)
+          Save & Sync
         </Button>
       </DialogActions>
     </Dialog>
@@ -368,15 +406,6 @@ function MobileEditModal({ open, voter, onClose }) {
 }
 
 /* ---------------- Voter tags (caste / interest / volunteer) ----------- */
-
-const CASTE_OPTIONS = ["OPEN", "OBC", "SC", "ST", "NT", "VJ", "SBC"];
-
-const INTEREST_OPTIONS = [
-  "Pro ruling party",
-  "Pro opposition",
-  "Neutral",
-  "Non voter",
-];
 
 function VoterTagsModal({ open, voter, onClose }) {
   const [caste, setCaste] = useState(getCaste(voter) || "OPEN");
@@ -465,22 +494,8 @@ function RecordModal({ open, voter, onClose, collectionName }) {
     ["Name", getName(voter)],
     ["EPIC", getEPIC(voter)],
     ["R/P/S", getRPS(voter) || "—"],
-    ["Part", getPart(voter) || "—"],
-    [
-      "Serial",
-      !Number.isNaN(getSerialNum(voter))
-        ? getSerialNum(voter)
-        : getSerialText(voter) || "—",
-    ],
     ["Age", getAge(voter) || "—"],
     ["Sex", getGender(voter) || "—"],
-    ["House", getHouseNo(voter) || "—"],
-    ["C/O", getCareOf(voter) || "—"],
-    ["Mobile", getMobile(voter) || "—"],
-    ["Photo", getPhotoUrl(voter) || "—"],
-    ["Caste", getCaste(voter) || "OPEN"],
-    ["Interest", getPoliticalInterest(voter) || "—"],
-    ["Volunteer", getVolunteer(voter) || "—"],
   ];
   const shareText = buildShareText(voter, collectionName);
 
@@ -559,6 +574,7 @@ export default function Search() {
   const [activeDb, setActiveDbState] = useState(
     () => getActiveDatabase() || ""
   );
+
   useEffect(() => {
     const id = getActiveDatabase() || "";
     if (id && id !== activeDb) {
@@ -594,6 +610,15 @@ export default function Search() {
   const [tagsVoter, setTagsVoter] = useState(null);
   const [detail, setDetail] = useState(null);
   const sentinelRef = useRef(null);
+
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+  });
+
+  const showSnack = (message) => {
+    setSnackbar({ open: true, message });
+  };
 
   const handleMenuOpen = (event) => setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
@@ -692,11 +717,19 @@ export default function Search() {
     try {
       const id = getActiveDatabase();
       if (!id) {
-        alert("No voter database is assigned to this device.");
+        showSnack("No voter database is assigned to this device.");
       } else {
-        await pullAll({ databaseId: id });
+        const res = await pullAll({ databaseId: id });
         await loadAll();
+        const pulled = res?.pulled ?? res?.count ?? res?.synced ?? null;
+        if (pulled != null) {
+          showSnack(`Pulled ${pulled.toLocaleString()} records from server.`);
+        } else {
+          showSnack("Pull completed.");
+        }
       }
+    } catch (e) {
+      showSnack("Pull failed. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -707,11 +740,19 @@ export default function Search() {
     try {
       const id = getActiveDatabase();
       if (!id) {
-        alert("No voter database is assigned to this device.");
+        showSnack("No voter database is assigned to this device.");
       } else {
-        await pushOutbox({ databaseId: id });
+        const res = await pushOutbox({ databaseId: id });
+        const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
+        if (pushed != null) {
+          showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
+        } else {
+          showSnack("Push completed.");
+        }
         await loadAll();
       }
+    } catch (e) {
+      showSnack("Push failed. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -729,10 +770,8 @@ export default function Search() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: (theme) =>
-          theme.palette.mode === "dark"
-            ? "linear-gradient(to bottom, #020617, #0f172a)"
-            : "linear-gradient(to bottom, #f9fafb, #e5e7eb)",
+        bgcolor: (theme) =>
+          theme.palette.mode === "dark" ? "#020617" : "#f3f4f6",
       }}
     >
       <TopNavbar
@@ -751,9 +790,16 @@ export default function Search() {
         onClose={handleMenuClose}
         keepMounted
       >
-        <Box sx={{ px: 2, py: 1.5, width: 280 }}>
-          <Typography variant="subtitle2">{userName}</Typography>
-          <Typography variant="caption" color="text.secondary">
+        <Box sx={{ px: 2, py: 1.5, width: 260 }}>
+          <Typography variant="subtitle2" noWrap>
+            {userName}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block" }}
+            noWrap
+          >
             Database: {collectionName || "Unassigned"}
           </Typography>
           <Button
@@ -762,6 +808,7 @@ export default function Search() {
             sx={{ mt: 1.5 }}
             onClick={logout}
             fullWidth
+            size="small"
           >
             Logout
           </Button>
@@ -769,13 +816,24 @@ export default function Search() {
       </Menu>
 
       {/* Results */}
-      <Container maxWidth="lg" sx={{ py: 3 }}>
-        <Stack spacing={3}>
-          <Card>
-            <CardContent>
-              <Stack spacing={1.25}>
+      <Container
+        maxWidth="lg"
+        sx={{
+          pt: 1.5,
+          pb: 10,
+        }}
+      >
+        <Stack spacing={1.5}>
+          {/* Stats + filters */}
+          <Card
+            sx={{
+              borderRadius: 2,
+            }}
+          >
+            <CardContent sx={{ py: 1.5 }}>
+              <Stack spacing={1}>
                 {visible.length === 0 ? (
-                  <Typography color="text.secondary">
+                  <Typography color="text.secondary" variant="caption">
                     No voters match your filters yet.
                   </Typography>
                 ) : (
@@ -793,7 +851,7 @@ export default function Search() {
                 {/* Filters row */}
                 <Stack
                   direction="row"
-                  alignItems="flex-end"
+                  alignItems="center"
                   justifyContent="space-between"
                   spacing={1}
                 >
@@ -807,6 +865,7 @@ export default function Search() {
                       "& .MuiTab-root": {
                         minHeight: 32,
                         paddingY: 0,
+                        fontSize: 13,
                       },
                     }}
                   >
@@ -828,7 +887,7 @@ export default function Search() {
                   size="small"
                   sx={{ flexWrap: "wrap" }}
                 >
-                  <ToggleButton value="all">All ages</ToggleButton>
+                  <ToggleButton value="all">All</ToggleButton>
                   <ToggleButton value="18-25">18–25</ToggleButton>
                   <ToggleButton value="26-35">26–35</ToggleButton>
                   <ToggleButton value="36-50">36–50</ToggleButton>
@@ -839,9 +898,13 @@ export default function Search() {
           </Card>
 
           {/* Search box */}
-          <Card>
-            <CardContent>
-              <Stack spacing={1.5}>
+          <Card
+            sx={{
+              borderRadius: 2,
+            }}
+          >
+            <CardContent sx={{ py: 1.25 }}>
+              <Stack spacing={1}>
                 <TextField
                   id="searchBoxHindi"
                   fullWidth
@@ -871,7 +934,7 @@ export default function Search() {
           </Card>
 
           {/* Voter list */}
-          <Stack spacing={1}>
+          <Stack spacing={0.75}>
             {visible.map((r, i) => {
               const name = getName(r);
               const serialTxt = getSerialText(r);
@@ -895,10 +958,11 @@ export default function Search() {
                 <Paper
                   key={r._id || `${i}-${serialTxt}`}
                   sx={{
-                    p: 1.25,
+                    p: 1,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 0.5,
+                    gap: 0.4,
+                    borderRadius: 2,
                   }}
                 >
                   {/* Row 1: Serial · Age · Sex + + button (Part removed) */}
@@ -933,7 +997,7 @@ export default function Search() {
 
                   {/* Row 2: Name (clickable -> details) */}
                   <Typography
-                    variant="subtitle1"
+                    variant="subtitle2"
                     fontWeight={600}
                     sx={{
                       cursor: "pointer",
@@ -997,6 +1061,7 @@ export default function Search() {
           setSelected(null);
           if (ok) await loadAll();
         }}
+        onSynced={showSnack}
       />
       <VoterTagsModal
         open={!!tagsVoter}
@@ -1012,6 +1077,30 @@ export default function Search() {
         onClose={() => setDetail(null)}
         collectionName={collectionName}
       />
+
+      {/* Sync + info messages */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={(_, reason) => {
+          if (reason === "clickaway") return;
+          setSnackbar((s) => ({ ...s, open: false }));
+        }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() =>
+            setSnackbar((s) => ({
+              ...s,
+              open: false,
+            }))
+          }
+          severity="info"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
       <PWAInstallPrompt bottom={120} />
     </Box>
