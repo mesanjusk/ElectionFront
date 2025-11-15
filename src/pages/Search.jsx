@@ -835,29 +835,28 @@ export default function Search() {
             sx={{
               borderRadius: 0,
               position: "sticky",
-              top: 40,                 // adjust based on navbar height
-              zIndex: 20,
-              bgcolor: "#2E2E2E",      // dark grey background
-              color: "white",          // text turns white for contrast
+              top: 30,
+              zIndex: 10,
+              bgcolor: "#F2F2F2",     // light grey background
               pb: 1,
               pt: 1,
               px: 1.5,
               width: "100%",
               display: "flex",
-              justifyContent: "center",   // center horizontally
-              alignItems: "center",       // center vertically
-              boxShadow: "0 2px 4px rgba(0,0,0,0.2)", // soft shadow
+              justifyContent: "center",
+              alignItems: "center",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
             }}
           >
             <Stack
               spacing={1}
               sx={{
-                width: "100%",          // makes inner content full width
-                maxWidth: 600,          // centers nicely like mobile apps
-                mx: "auto",             // auto-center stack
+                width: "100%",
+                maxWidth: 600,
+                mx: "auto",
               }}
             >
-              {/* Search box */}
+              {/* SEARCH BOX with X button */}
               <TextField
                 id="searchBoxHindi"
                 fullWidth
@@ -868,26 +867,36 @@ export default function Search() {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" htmlColor="white" />
+                      <SearchRoundedIcon fontSize="small" />
                     </InputAdornment>
                   ),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <VoiceSearchButton
-                        onResult={(text) => setQ(text)}
-                        lang={voiceLang}
-                        disabled={busy}
-                      />
+                      <>
+                        {/* CLEAR (X) BUTTON */}
+                        {q?.length > 0 && (
+                          <IconButton
+                            size="small"
+                            onClick={() => setQ("")}
+                            sx={{ mr: 0.5 }}
+                          >
+                            ✕
+                          </IconButton>
+                        )}
+
+                        {/* Voice Search */}
+                        <VoiceSearchButton
+                          onResult={(text) => setQ(text)}
+                          lang={voiceLang}
+                          disabled={busy}
+                        />
+                      </>
                     </InputAdornment>
                   ),
                 }}
                 sx={{
                   "& .MuiInputBase-root": {
-                    backgroundColor: "#444",      // input darker
-                    color: "white",
-                  },
-                  "& .MuiInputBase-input::placeholder": {
-                    color: "#ccc",
+                    backgroundColor: "white",
                   },
                 }}
               />
@@ -904,13 +913,9 @@ export default function Search() {
                     minHeight: 32,
                     paddingY: 0,
                     fontSize: 13,
-                    color: "#ddd",
-                  },
-                  "& .Mui-selected": {
-                    color: "white !important",
                   },
                   "& .MuiTabs-indicator": {
-                    backgroundColor: "white",
+                    backgroundColor: "black",
                   },
                 }}
               >
@@ -927,14 +932,6 @@ export default function Search() {
                 size="small"
                 sx={{
                   flexWrap: "wrap",
-                  "& .MuiToggleButton-root": {
-                    color: "white",
-                    borderColor: "#777",
-                  },
-                  "& .Mui-selected": {
-                    backgroundColor: "#555 !important",
-                    color: "white !important",
-                  },
                 }}
               >
                 <ToggleButton value="all">All</ToggleButton>
@@ -946,13 +943,15 @@ export default function Search() {
 
               {/* Stats */}
               {visible.length === 0 ? (
-                <Typography color="#ddd" variant="caption" textAlign="center">
+                <Typography color="text.secondary" variant="caption" textAlign="center">
                   No voters match your filters yet.
                 </Typography>
               ) : (
                 <Typography
                   variant="caption"
-                  sx={{ fontWeight: 500, color: "#ddd", textAlign: "center" }}
+                  color="text.secondary"
+                  textAlign="center"
+                  sx={{ fontWeight: 500 }}
                 >
                   M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
                   {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
@@ -960,6 +959,7 @@ export default function Search() {
               )}
             </Stack>
           </Box>
+
 
 
           {/* Search box */}
