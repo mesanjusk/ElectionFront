@@ -832,12 +832,12 @@ export default function Search() {
       >
         <Stack spacing={1.5}>
           {/* Stats + filters */}
-          <Card
+          <Box
             sx={{
-              borderRadius: 1,
+              borderRadius: 0,
             }}
           >
-            <CardContent sx={{ py: 1.5 }}>
+            
               <Stack spacing={1}>
                 
 
@@ -927,8 +927,8 @@ export default function Search() {
                   </Typography>
                 )}
               </Stack>
-            </CardContent>
-          </Card>
+            
+          </Box>
 
           {/* Search box */}
           
