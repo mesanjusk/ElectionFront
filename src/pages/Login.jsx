@@ -27,7 +27,7 @@ import {
   isSessionUnlocked,
   lockSession,
   clearToken,
-  getUser, // 👈 added so we can reuse existing user on PIN login
+  getUser, // 👈 reuse existing user on PIN login
 } from "../auth";
 import {
   clearActivationState,
@@ -99,50 +99,23 @@ export default function Login() {
   const [username, setUsername] = useState(() => activation?.username || "");
   const [password, setPassword] = useState("");
 
-  // PIN entry for unlock (2-digit)
+  // PIN entry (we now always use DEFAULT_PIN = "11" in code)
   const [pinInput, setPinInput] = useState("");
 
-  // UX state
+  // Basic UI state
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
 
-  // Keep document lang in sync (even though it’s fixed)
-  useEffect(() => {
-    if (typeof document !== "undefined")
-      document.documentElement.lang = language;
-    if (typeof window !== "undefined")
-      window.localStorage.setItem("appLanguage", language);
-  }, [language]);
-
-  // Handle revocation message
-  useEffect(() => {
-    if (activation?.revoked) {
-      setMode("activate");
-      setInfoMessage(
-        activation?.revokedMessage ||
-          "This device was signed out because your account was activated elsewhere. Reactivate to continue."
-      );
-    } else if (infoMessage) {
-      setInfoMessage("");
-    }
-  }, [activation, infoMessage]);
-
-  // Fast-path: if token exists and session is unlocked, go home
-  useEffect(() => {
-    if (getToken() && isSessionUnlocked()) {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
-
+  // ---------------------------------------------------------------------------
   // Helper: where to go after login
+  // ---------------------------------------------------------------------------
   const goAfterLogin = (user, fallbackUserType) => {
     const userType = user?.userType || fallbackUserType;
     if (user?.role === "admin") return navigate("/admin", { replace: true });
-    if (userType === "candidate")
-      return navigate("/search", { replace: true });
+    if (userType === "candidate") return navigate("/search", { replace: true });
     return navigate("/", { replace: true });
   };
 
@@ -172,158 +145,118 @@ export default function Login() {
       }
     }
 
-    setSession({ token, user, databases: available });
-    setAuthToken(token);
+    const effectiveDbId = chooseEffectiveDatabase({ activeDatabaseId, user });
 
-    // store userName for greeting
-    try {
-      if (user) {
-        const name = user.username || user.name || "";
-        if (name) {
-          window.localStorage.setItem("userName", name);
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    // Decide an effective DB, persist it, and use it for sync.
-    let effectiveDatabase = chooseEffectiveDatabase({ activeDatabaseId, user });
-    if (effectiveDatabase) setActiveDatabase(effectiveDatabase);
-
-    let pushResult = null;
-    let pushError = null;
-    let pullError = null;
-    let total = 0;
-
-    const shouldSync = !skipSync && effectiveDatabase;
-
-    // 🔁 Full push + pull only when NOT skipping (i.e., on activation login)
-    if (shouldSync) {
-      setProgress(0);
-      setProgressLabel("Uploading offline updates…");
-      try {
-        pushResult = await pushOutbox({ databaseId: effectiveDatabase });
-      } catch (err) {
-        pushError = err;
-      }
-
-      // For first-time activation, reset cursors for a clean pull
-      if (!pushError && effectiveDatabase) {
-        await resetSyncState(effectiveDatabase);
-      }
-
-      setProgress(0);
-      setProgressLabel("Downloading latest records…");
-      try {
-        await pullAll({
-          databaseId: effectiveDatabase,
-          onProgress: ({ total: t }) => {
-            total = t;
-            setProgress(t);
-            setProgressLabel(`Downloading ${t.toLocaleString()} records…`);
-          },
-        });
-      } catch (err) {
-        pullError = err;
-      }
-
-      if (pushError || pullError) {
-        const messages = [];
-        if (pushError)
-          messages.push(`push failed: ${pushError?.message || pushError}`);
-        if (pullError)
-          messages.push(`pull failed: ${pullError?.message || pullError}`);
-        alert(
-          `Login completed with limited sync — ${messages.join(" and ")}.`
-        );
-      } else {
-        const pushed = pushResult?.pushed || 0;
-        alert(
-          effectiveDatabase
-            ? `Sync complete. Uploaded ${pushed} changes and downloaded ${total} records.`
-            : `Login complete. No database assigned yet — ask admin to assign one.`
-        );
-      }
-    }
-
-    const updatedActivation = setActivationState({
-      language: DEFAULT_LANGUAGE,
-      revoked: false,
+    // Persist session + DB choice
+    setSession({
+      token,
+      user,
+      databases: available,
+      activeDatabaseId: effectiveDbId,
     });
-    setActivation(updatedActivation);
-    unlockSession();
+    if (effectiveDbId) {
+      setActiveDatabase(effectiveDbId);
+    }
 
-    const fallbackType = activation?.userType;
-    goAfterLogin(updatedActivation?.user || user, fallbackType);
+    // Mark this device as activated with a fixed PIN '11'
+    const deviceId = getDeviceId();
+    const activationPayload = {
+      deviceId,
+      username: user?.username || username,
+      userId: user?._id,
+      language,
+      pinHash: null, // backend may store hash; frontend still uses verifyPin(DEFAULT_PIN)
+      userType: user?.userType,
+      activeDatabaseId: effectiveDbId,
+      revoked: false,
+    };
+    const stored = storeActivation(activationPayload);
+    setActivation(stored);
+    clearRevocationFlag();
 
-    setLoading(false);
-    setProgress(0);
-    setProgressLabel("");
+    if (!skipSync) {
+      setProgress(10);
+      setProgressLabel("Pushing offline changes…");
+      await pushOutbox({ databaseId: effectiveDbId });
+
+      setProgress(60);
+      setProgressLabel("Pulling latest data…");
+      await pullAll({ databaseId: effectiveDbId });
+
+      setProgress(100);
+      setProgressLabel("Done.");
+    }
+
+    goAfterLogin(user, user?.userType || stored?.userType);
   };
 
-  // Activation submit (username + password + default PIN)
-  const handleActivationSubmit = async (event) => {
+  /**
+   * Username/password login (activation only)
+   */
+  const handleActivateSubmit = async (event) => {
     event.preventDefault();
     setError("");
     setInfoMessage("");
     setLoading(true);
     setProgress(0);
-    setProgressLabel("Activating device…");
+    setProgressLabel("Contacting server…");
 
     try {
-      const deviceId = await getDeviceId();
-      const pin = DEFAULT_PIN; // fixed 2-digit pin "11"
-
-      const res = await apiLogin({
+      const resp = await apiLogin({
         username,
         password,
-        deviceId,
-        pin,
+        userType: activation?.userType,
+        deviceId: getDeviceId(),
       });
 
-      // 🔐 Store richer activation info so future PIN unlock can reuse it
-      await storeActivation({
-        username,
-        pin,
-        deviceId,
-        userType: res?.user?.userType,
-        user: res?.user,
-        databases: res?.databases,
-        activeDatabaseId: res?.activeDatabaseId,
-      });
+      const { token, user, databases, activeDatabaseId } = resp.data;
 
-      // For full login (activation) => do sync
-      await completeLogin(res);
+      setAuthToken(token);
+      await completeLogin({
+        token,
+        user,
+        databases,
+        activeDatabaseId,
+        skipSync: false,
+      });
     } catch (err) {
-      setError(err?.message || "Activation failed.");
+      setError(err?.response?.data?.message || err?.message || "Login failed.");
+    } finally {
       setLoading(false);
       setProgress(0);
       setProgressLabel("");
-      clearRevocationFlag();
-      return;
     }
   };
 
-  // PIN unlock submit (NO sync, NO session reset)
+  /**
+   * PIN login (unlock)
+   * Now:
+   *  - uses fixed DEFAULT_PIN = "11"
+   *  - always runs PUSH then PULL on login
+   */
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError("");
     setLoading(true);
     setProgress(0);
-    setProgressLabel("Verifying PIN…");
+    setProgressLabel("Logging you in…");
 
     try {
-      const ok = await verifyPin(pinInput);
+      // Always use fixed PIN '11' as per requirement
+      const ok = await verifyPin(DEFAULT_PIN);
       if (!ok) {
-        setError("Invalid PIN. Try again.");
+        setError(
+          "This device is not activated. Please login with username & password once."
+        );
         setLoading(false);
         return;
       }
 
       const token = getToken();
       if (!token) {
-        setError("Session expired. Reactivate this device.");
+        setError(
+          "Session expired. Reactivate this device with username & password."
+        );
         setLoading(false);
         return;
       }
@@ -331,7 +264,7 @@ export default function Login() {
       // Restore axios auth header using existing token
       setAuthToken(token);
 
-      // Clear revoked flag and keep language
+      // Clear revoked flag and keep language (always English)
       const updatedActivation = setActivationState({
         language: DEFAULT_LANGUAGE,
         revoked: false,
@@ -349,15 +282,48 @@ export default function Login() {
         // ignore
       }
 
+      // Decide which DB to use and persist as active
+      const effectiveDbId = chooseEffectiveDatabase({
+        activeDatabaseId: updatedActivation?.activeDatabaseId,
+        user,
+      });
+
+      if (effectiveDbId) {
+        setActiveDatabase(effectiveDbId);
+      }
+
+      // 🔄 On every login run PUSH then PULL so Search/Home get fresh data
+      try {
+        if (effectiveDbId) {
+          await pushOutbox({ databaseId: effectiveDbId });
+        } else {
+          await pushOutbox();
+        }
+      } catch (err) {
+        console.error("Push on login failed:", err);
+      }
+
+      try {
+        if (effectiveDbId) {
+          await pullAll({ databaseId: effectiveDbId });
+        } else {
+          await pullAll();
+        }
+      } catch (err) {
+        console.error("Pull on login failed:", err);
+      }
+
       const fallbackType =
-        activation?.userType || updatedActivation?.userType;
+        updatedActivation?.userType ||
+        user?.userType ||
+        activation?.userType;
       goAfterLogin(user || updatedActivation?.user, fallbackType);
 
       setLoading(false);
       setProgress(0);
       setProgressLabel("");
     } catch (err) {
-      setError(err?.message || "PIN verification failed.");
+      setError(err?.message || "PIN login failed.");
       setLoading(false);
       setProgress(0);
       setProgressLabel("");
@@ -365,16 +331,18 @@ export default function Login() {
   };
 
   const startReactivation = () => {
+    // Full local reset: logout + clear activation + clear local sync state
     lockSession();
     clearToken();
     clearActivationState();
+    resetSyncState();
     setActivation(null);
     setMode("activate");
     setPinInput("");
     setPassword("");
     setError("");
     setInfoMessage(
-      "Reactivate this device with your username and password."
+      "Device reset. Please login again with your username and password."
     );
   };
 
@@ -391,25 +359,20 @@ export default function Login() {
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
-        py: { xs: 4, md: 8 },
+        bgcolor: "background.default",
       }}
     >
       <Container maxWidth="sm">
-        <Card elevation={8}>
+        <Card>
           <CardContent>
             <Stack spacing={3}>
-              <Stack spacing={0.5} textAlign="center">
-                <Typography
-                  variant="overline"
-                  color="text.secondary"
-                  sx={{ letterSpacing: 3 }}
-                >
-                  Smart Book access
+              <Stack spacing={0.5} alignItems="center">
+                <Typography variant="h5" fontWeight={700}>
+                  Smart Book
                 </Typography>
-                <Typography variant="h4">Secure login</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Activate this device once and unlock daily with your quick
-                  PIN.
+                  This device is already activated. Tap login to continue or
+                  reset this device.
                 </Typography>
               </Stack>
 
@@ -439,7 +402,7 @@ export default function Login() {
                 <Stack
                   component="form"
                   spacing={2}
-                  onSubmit={handleActivationSubmit}
+                  onSubmit={handleActivateSubmit}
                 >
                   <TextField
                     label="Username"
@@ -473,36 +436,33 @@ export default function Login() {
                   spacing={2}
                   onSubmit={handlePinSubmit}
                 >
-                  <TextField
-                    label="2 digit PIN"
-                    value={pinInput}
-                    onChange={(e) => handlePinInputChange(e.target.value)}
-                    inputProps={{
-                      inputMode: "numeric",
-                      maxLength: 2,
-                      pattern: "[0-9]{2}",
-                    }}
-                    required
-                  />
                   <Button type="submit" variant="contained" size="large">
                     Login
                   </Button>
-                  <Button variant="outlined" onClick={startReactivation}>
-                    Reactivate this device
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={startReactivation}
+                  >
+                    Reset this device
                   </Button>
                 </Stack>
               )}
 
               {loading && (
-                <Stack spacing={1} role="status" aria-live="polite">
-                  <LinearProgress color="secondary" />
+                <Stack spacing={1}>
+                  <LinearProgress
+                    variant={
+                      progress > 0 && progress < 100 ? "determinate" : "indeterminate"
+                    }
+                    value={progress || undefined}
+                  />
                   <Typography
                     variant="body2"
                     color="text.secondary"
                     textAlign="center"
                   >
-                    {progressLabel ||
-                      "Preparing your offline workspace…"}
+                    {progressLabel || "Preparing your offline workspace…"}
                   </Typography>
                 </Stack>
               )}
