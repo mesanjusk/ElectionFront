@@ -27,8 +27,8 @@ import {
   setActiveDatabase,
   lockSession,
   clearToken,
-} from "../auth";
-import { pullAll, resetSyncState, pushOutbox } from "../services/sync";
+} from "../auth.js";
+import { pullAll, resetSyncState, pushOutbox } from "../services/sync.js";
 import TopNavbar from "../components/TopNavbar.jsx";
 
 export default function Home() {
@@ -256,9 +256,243 @@ export default function Home() {
           </Box>
 
           {/* Trends Election 2025 card with multi-bar chart */}
-          
+          <Card
+            sx={{
+              borderRadius: 3,
+              boxShadow: 3,
+            }}
+          >
+            <CardContent sx={{ pb: 2 }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 600, mb: 1 }}
+              >
+                Trends Election - 2025
+              </Typography>
 
-          
+              <Box
+                sx={{
+                  mt: 1,
+                  borderRadius: 3,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(0,0,0,0.04)",
+                  px: 1.5,
+                  pt: 1,
+                  pb: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    height: 260,
+                  }}
+                >
+                  {/* Y-axis labels */}
+                  <Box
+                    sx={{
+                      width: 40,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      alignItems: "flex-end",
+                      pr: 0.5,
+                      pb: 24 / 8,
+                    }}
+                  >
+                    {yTicks
+                      .slice()
+                      .reverse()
+                      .map((tick) => (
+                        <Typography
+                          key={tick}
+                          variant="caption"
+                          sx={{ color: "text.secondary" }}
+                        >
+                          {tick}
+                        </Typography>
+                      ))}
+                  </Box>
+
+                  {/* Bars + grid */}
+                  <Box
+                    sx={{
+                      position: "relative",
+                      flex: 1,
+                      pb: 3,
+                    }}
+                  >
+                    {/* Horizontal dashed grid lines */}
+                    {yTicks.map((tick, idx) => (
+                      <Box
+                        key={tick}
+                        sx={{
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: `${(tick / yTicks[yTicks.length - 1]) * 100}%`,
+                          borderTop:
+                            idx === 0
+                              ? "1px solid rgba(0,0,0,0.3)"
+                              : "1px dashed rgba(0,0,0,0.2)",
+                        }}
+                      />
+                    ))}
+
+                    {/* Bars */}
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "flex-end",
+                        justifyContent: "space-around",
+                        px: 0.5,
+                        pb: 3.5,
+                      }}
+                    >
+                      {chartData.map((d) => {
+                        const height = Math.max(
+                          8,
+                          (d.value / maxVal) * 170
+                        );
+                        return (
+                          <Stack
+                            key={d.label}
+                            spacing={0.5}
+                            alignItems="center"
+                          >
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "text.secondary",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {d.value}
+                            </Typography>
+                            <Box
+                              sx={{
+                                width: 22,
+                                height: height,
+                                borderRadius: 1.5,
+                                backgroundColor: "#1976d2",
+                              }}
+                            />
+                            <Typography
+                              variant="caption"
+                              sx={{ mt: 0.5 }}
+                            >
+                              {d.label}
+                            </Typography>
+                          </Stack>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Legend like “value” */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    mt: 1,
+                    gap: 1,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 16,
+                      height: 10,
+                      borderRadius: 0.5,
+                      backgroundColor: "#1976d2",
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    value
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Sync info under chart */}
+              <Stack
+                direction="row"
+                spacing={1.5}
+                alignItems="center"
+                sx={{ mt: 2 }}
+              >
+                <Button
+                  variant="contained"
+                  startIcon={<SyncRoundedIcon />}
+                  onClick={syncAssigned}
+                  disabled={syncing || !assignedDb}
+                  size="small"
+                >
+                  {syncing ? "Syncing…" : "Sync voters"}
+                </Button>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Total synced voters: {totalCount.toLocaleString()}
+                </Typography>
+              </Stack>
+              {syncMessage && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 0.5 }}
+                >
+                  {syncMessage}
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* User info small card */}
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar
+                  src={avatarUrl || undefined}
+                  alt={userName}
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    bgcolor: "#1976d2",
+                    fontSize: 22,
+                  }}
+                >
+                  {!avatarUrl && userName?.[0]?.toUpperCase?.()}
+                </Avatar>
+                <Stack spacing={0.5}>
+                  <Typography variant="subtitle1">
+                    {userName}
+                  </Typography>
+                  {userRole && (
+                    <Chip
+                      label={userRole}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                  )}
+                  {assignedName && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                    >
+                      Assigned DB: {assignedName}
+                    </Typography>
+                  )}
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
 
           {/* Bottom three pastel blocks like screenshot */}
           <Grid container spacing={2}>
