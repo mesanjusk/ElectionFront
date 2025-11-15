@@ -11,7 +11,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   Container,
   Dialog,
   DialogActions,
@@ -20,7 +19,6 @@ import {
   IconButton,
   InputAdornment,
   Menu,
-  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -28,7 +26,6 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
@@ -41,144 +38,268 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { setAuthToken } from "../services/api";
 import {
   lockSession,
-  clearToken,
+  getActiveDatabase,
   getUser,
   getAvailableDatabases,
-  getActiveDatabase,
   setActiveDatabase,
 } from "../auth";
-import { pullAll, pushOutbox } from "../services/sync";
-import { loadLocalData, updateVoterLocal } from "../services/localDb";
-import PWAInstallPrompt from "../components/PWAInstallPrompt";
-import VoiceSearchButton from "../components/VoiceSearchButton";
-import TopNavbar from "../components/TopNavbar";
+import { db } from "../db/indexedDb";
+import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
+import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
+import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
+import TopNavbar from "../components/TopNavbar.jsx";
 
-/* ---------------- Helper pick ---------------- */
-function pick(obj, keys, fallback = "") {
-  if (!obj) return fallback;
+/* ---------------- helpers (EN + MR + __raw fallbacks) ---------------- */
+const pick = (obj, keys) => {
+  if (!obj) return "";
   for (const k of keys) {
-    if (obj[k] != null && obj[k] !== "") return obj[k];
+    const v = obj[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
   }
-  return fallback;
-}
-
-/* ---------------- Field getters ---------------- */
-const getName = (r) =>
-  pick(r, ["name", "Name"]) ||
-  pick(r?.__raw, ["name", "Name"]) ||
-  "—";
-
-const getEPIC = (r) =>
-  pick(r, ["epic", "EPIC", "epic_no", "epicNo", "Epic"]) ||
-  pick(r?.__raw, ["epic", "EPIC", "epic_no", "epicNo", "Epic"]) ||
-  "—";
-
-const getMobile = (r) =>
-  pick(r, ["mobile", "Mobile", "phone", "Phone"]) ||
-  pick(r?.__raw, ["mobile", "Mobile", "phone", "Phone"]) ||
-  "";
-
-const getAge = (r) =>
-  pick(r, ["age", "Age"]) || pick(r?.__raw, ["age", "Age"]) || "";
-
-const getAgeNum = (r) => {
-  const a = getAge(r);
-  const n = Number(a);
-  return Number.isNaN(n) ? null : n;
+  return "";
 };
 
-const getGender = (r) =>
-  pick(r, ["gender", "Gender", "sex", "Sex"]) ||
-  pick(r?.__raw, ["gender", "Gender", "sex", "Sex"]) ||
+const getName = (r) =>
+  pick(r, ["name", "Name"]) ||
+  pick(r?.__raw, ["Name", "नाव", "नाव + मोबा/ ईमेल नं."]) ||
+  "—";
+
+/** EPIC == Voter ID in your DB */
+const getEPIC = (r) =>
+  pick(r, [
+    "voter_id",
+    "VoterID",
+    "VoterId",
+    "Voter ID",
+    "Voter Id",
+    "voter id",
+    "EPIC",
+  ]) ||
+  pick(r?.__raw, [
+    "EPIC",
+    "voter_id",
+    "VoterID",
+    "VoterId",
+    "Voter ID",
+    "Voter Id",
+    "voter id",
+    "कार्ड नं",
+  ]) ||
+  "—";
+
+/** Roll / Part / Serial mapping */
+const getRPS = (r) =>
+  pick(r, [
+    "RPS",
+    "RollPartSerial",
+    "Roll/Part/Serial",
+    "Roll / Part / Serial",
+    "Roll-Part-Serial",
+    "Roll_Part_Serial",
+    "RollPartSr",
+  ]) ||
+  pick(r?.__raw, [
+    "RPS",
+    "RollPartSerial",
+    "Roll/Part/Serial",
+    "Roll / Part / Serial",
+    "R/P/S",
+    "Roll-Part-Serial",
+    "Roll_Part_Serial",
+  ]) ||
   "";
 
 const getPart = (r) =>
-  pick(r, ["part", "Part", "part_no", "partNo"]) ||
-  pick(r?.__raw, ["part", "Part", "part_no", "partNo"]) ||
+  pick(r, ["Part", "part", "Booth", "booth"]) ||
+  pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
   "";
 
-const getSerialText = (r) =>
-  pick(r, ["serial", "Serial", "serial_no", "serialNo"]) ||
-  pick(r?.__raw, ["serial", "Serial", "serial_no", "serialNo"]) ||
-  "";
+/* Serial helpers */
+const getSerialText = (r) => {
+  const v =
+    pick(r, ["Serial No", "serial", "Serial", "Sr No", "SrNo"]) ||
+    pick(r?.__raw, [
+      "Serial No",
+      "Serial",
+      "Sr No",
+      "SrNo",
+      "अनु. नं.",
+      "अनुक्रमांक",
+      "अनुक्रमांक नं.",
+    ]) ||
+    "";
+  return v == null ? "" : String(v);
+};
+
+const parseLastNumber = (s) => {
+  const m = String(s || "").match(/\d+/g);
+  if (!m) return NaN;
+  const n = parseInt(m[m.length - 1], 10);
+  return Number.isNaN(n) ? NaN : n;
+};
 
 const getSerialNum = (r) => {
-  const s = getSerialText(r);
-  const n = Number(s);
+  const t = getSerialText(r);
+  if (t) return parseLastNumber(t);
+  const rps = getRPS(r);
+  if (rps && /\d+\/\d+\/\d+/.test(rps)) {
+    const last = rps.split("/").pop();
+    return parseLastNumber(last);
+  }
+  return NaN;
+};
+
+const getHouseNo = (r) =>
+  pick(r, ["House No", "House", "HouseNumber"]) ||
+  pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
+  "";
+
+const getAge = (r) =>
+  pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
+
+const getAgeNum = (r) => {
+  const raw = getAge(r);
+  const m = String(raw || "").match(/\d+/);
+  if (!m) return null;
+  const n = parseInt(m[0], 10);
   return Number.isNaN(n) ? null : n;
 };
 
-const getRPS = (r) =>
-  pick(r, ["rps", "RPS"]) || pick(r?.__raw, ["rps", "RPS"]) || "";
-
-const getHouseNo = (r) =>
-  pick(r, ["house", "House", "houseNo", "house_no"]) ||
-  pick(r?.__raw, ["house", "House", "houseNo", "house_no"]) ||
-  "";
+const getGender = (r) => {
+  const g =
+    pick(r, ["gender", "Gender"]) ||
+    pick(r?.__raw, ["Gender", "gender", "लिंग"]) ||
+    "";
+  const s = String(g).toLowerCase();
+  if (!s) return "";
+  if (s.startsWith("m") || s.includes("पुरुष")) return "M";
+  if (s.startsWith("f") || s.includes("स्त्री")) return "F";
+  return s.toUpperCase();
+};
 
 const getCareOf = (r) =>
-  pick(r, ["careOf", "CareOf", "c/o", "co"]) ||
-  pick(r?.__raw, ["careOf", "CareOf", "c/o", "co"]) ||
+  pick(r, [
+    "Father Name",
+    "Husband Name",
+    "Guardian Name",
+    "CareOf",
+    "C_O",
+    "C/O",
+  ]) ||
+  pick(r?.__raw, [
+    "वडिलांचे नाव",
+    "वडिलांचे नांव",
+    "पतीचे नाव",
+    "पतीचे नांव",
+    "Guardians Name",
+    "Guardian Name",
+    "Father Name",
+    "Father's Name",
+    "Husband Name",
+    "Husband's Name",
+  ]) ||
   "";
 
-// cloudinary config
-const CLOUDINARY_CLOUD_NAME =
-  import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "";
-const CLOUDINARY_UPLOAD_PRESET =
-  import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "";
-const CLOUDINARY_BASE_URL = CLOUDINARY_CLOUD_NAME
-  ? `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/`
-  : "";
+/* Phone (DB fields only) */
+const getMobile = (r) =>
+  pick(r, ["mobile", "Mobile", "phone", "Phone", "contact", "Contact"]) || "";
 
-const getPhotoUrl = (r) => {
-  const raw = r?.photo || r?.photoUrl || r?.photo_url || r?.image;
+/* Image URL – used in WhatsApp share text */
+const getPhotoUrl = (r) =>
+  pick(r, [
+    "photoUrl",
+    "photo",
+    "Photo",
+    "image",
+    "Image",
+    "img",
+    "Img",
+    "avatar",
+    "Avatar",
+  ]) ||
+  pick(r?.__raw, ["photoUrl", "photo", "Photo", "image", "Image", "img"]) ||
+  "";
+
+/* Normalize phone for tel:/WhatsApp */
+const normalizePhone = (raw) => {
   if (!raw) return "";
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-  if (CLOUDINARY_BASE_URL) return CLOUDINARY_BASE_URL + raw;
-  return raw;
+  let d = String(raw).replace(/[^\d]/g, "");
+  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return d.length === 10 ? d : "";
 };
 
-const getCaste = (r) =>
-  pick(r, ["caste", "Caste"]) ||
-  pick(r?.__raw, ["caste", "Caste"]) ||
-  "";
-
-const getPoliticalInterest = (r) =>
-  pick(r, ["politicalInterest", "PoliticalInterest", "interest"]) ||
-  pick(r?.__raw, ["politicalInterest", "PoliticalInterest", "interest"]) ||
-  "";
-
-const getVolunteer = (r) =>
-  pick(r, ["volunteer", "Volunteer", "assignedVolunteer"]) ||
-  pick(r?.__raw, ["volunteer", "Volunteer", "assignedVolunteer"]) ||
-  "";
-
-const CASTE_OPTIONS = [
-  { value: "OPEN", label: "Open" },
-  { value: "SC", label: "SC" },
-  { value: "ST", label: "ST" },
-  { value: "OBC", label: "OBC" },
-  { value: "NT", label: "NT / VJNT" },
-  { value: "OTHER", label: "Other" },
-];
-
-const INTEREST_OPTIONS = [
-  { value: "OUR", label: "Our supporter" },
-  { value: "OPPOSITION", label: "Opposition" },
-  { value: "SWING", label: "Swing / Neutral" },
-];
-
-/* Normalize mobile */
-const normalizePhone = (mob) => {
-  if (!mob) return "";
-  const digits = String(mob).replace(/\D/g, "");
-  if (digits.length === 10) return digits;
-  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
-  if (digits.length > 10) return digits.slice(-10);
-  return digits;
+/* Simple transliteration: Devanagari to Latin (approx) – for text search */
+const DEV_TO_LATIN = {
+  अ: "a",
+  आ: "aa",
+  इ: "i",
+  ई: "ii",
+  उ: "u",
+  ऊ: "uu",
+  ए: "e",
+  ऐ: "ai",
+  ओ: "o",
+  औ: "au",
+  क: "k",
+  ख: "kh",
+  ग: "g",
+  घ: "gh",
+  च: "ch",
+  छ: "chh",
+  ज: "j",
+  झ: "jh",
+  ट: "t",
+  ठ: "th",
+  ड: "d",
+  ढ: "dh",
+  त: "t",
+  थ: "th",
+  द: "d",
+  ध: "dh",
+  न: "n",
+  प: "p",
+  फ: "ph",
+  ब: "b",
+  भ: "bh",
+  म: "m",
+  य: "y",
+  र: "r",
+  ल: "l",
+  व: "v",
+  स: "s",
+  श: "sh",
+  ष: "sh",
+  ह: "h",
+  ङ: "n",
+  ञ: "n",
+  ऱ: "r",
+  "्": "",
+  "ा": "a",
+  "ि": "i",
+  "ी": "i",
+  "ु": "u",
+  "ू": "u",
+  "े": "e",
+  "ै": "ai",
+  "ो": "o",
+  "ौ": "au",
+  "ं": "n",
+  "ँ": "n",
 };
 
-const buildShareText = (r, collectionName) => {
+const transliterate = (text) => {
+  const s = String(text || "");
+  let out = "";
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    out += DEV_TO_LATIN[ch] || ch.toLowerCase();
+  }
+  return out;
+};
+
+/* Share text for WhatsApp – now includes Photo URL if available */
+const buildShareText = (r) => {
   const name = getName(r);
   const epic = getEPIC(r);
   const part = getPart(r);
@@ -189,11 +310,6 @@ const buildShareText = (r, collectionName) => {
   const house = getHouseNo(r);
   const co = getCareOf(r);
   const photo = getPhotoUrl(r);
-
-  const caste = getCaste(r) || "OPEN";
-  const interest = getPoliticalInterest(r) || "—";
-  const volunteer = getVolunteer(r) || "";
-  const dbName = collectionName || "";
 
   const lines = [
     "Voter Details",
@@ -206,150 +322,54 @@ const buildShareText = (r, collectionName) => {
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
     house ? `House: ${house}` : null,
     co ? `C/O: ${co}` : null,
-    `Caste: ${caste}`,
-    `Political interest: ${interest}`,
-    volunteer ? `Volunteer: ${volunteer}` : null,
-    dbName ? `Database: ${dbName}` : null,
     photo ? `Photo: ${photo}` : null, // 👈 image URL included for WhatsApp
   ].filter(Boolean);
   return lines.join("\n");
 };
 
-/* ---------------- Caste / interest / volunteer modal ---------------- */
-function VoterTagsModal({ open, voter, onClose }) {
-  const [caste, setCaste] = useState("");
-  const [interest, setInterest] = useState("");
-  const [volunteer, setVolunteer] = useState("");
-
-  useEffect(() => {
-    if (!voter) return;
-    setCaste(getCaste(voter) || "OPEN");
-    setInterest(getPoliticalInterest(voter) || "");
-    setVolunteer(getVolunteer(voter) || "");
-  }, [voter]);
+/* ---------------- Small mobile edit modal (local only) ---------------- */
+function MobileEditModal({ open, voter, onClose }) {
+  const [mobile, setMobile] = useState(getMobile(voter));
+  useEffect(() => setMobile(getMobile(voter)), [voter]);
 
   if (!open || !voter) return null;
 
   const handleSave = async () => {
-    const payload = {
-      caste: caste || "OPEN",
-      politicalInterest: interest || "",
-      volunteer: volunteer || "",
-    };
-    await updateVoterLocal(voter._id, payload);
+    const n = normalizePhone(mobile);
+    if (!n) {
+      alert("Enter a valid 10-digit mobile.");
+      return;
+    }
+    await updateVoterLocal(voter._id, { mobile: n });
     onClose(true);
   };
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Assign caste / interest / volunteer</DialogTitle>
+      <DialogTitle>
+        {getMobile(voter) ? "Edit mobile" : "Add mobile"}
+      </DialogTitle>
       <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
+        <Stack spacing={2}>
           <Typography variant="subtitle1" fontWeight={600}>
             {getName(voter)}
           </Typography>
-
-          <TextField
-            select
-            label="Caste"
-            value={caste}
-            onChange={(e) => setCaste(e.target.value)}
-            fullWidth
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
           >
-            {CASTE_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-
+            <Typography variant="caption" color="text.secondary">
+              EPIC
+            </Typography>
+            <Typography fontFamily="monospace">{getEPIC(voter)}</Typography>
+          </Stack>
           <TextField
-            select
-            label="Political interest"
-            value={interest}
-            onChange={(e) => setInterest(e.target.value)}
-            fullWidth
-          >
-            <MenuItem value="">Not set</MenuItem>
-            {INTEREST_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            label="Volunteer (name or code)"
-            value={volunteer}
-            onChange={(e) => setVolunteer(e.target.value)}
-            fullWidth
-            placeholder="e.g. Rahul 01"
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => onClose(false)}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">
-          Save
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-/* ---------------- Small mobile edit modal (local only) ---------------- */
-function MobileEditModal({ open, voter, onClose }) {
-  const [form, setForm] = useState(() => ({
-    name: "",
-    mobile: "",
-    house: "",
-  }));
-
-  useEffect(() => {
-    if (!voter) return;
-    setForm({
-      name: getName(voter),
-      mobile: getMobile(voter),
-      house: getHouseNo(voter),
-    });
-  }, [voter]);
-
-  if (!open || !voter) return null;
-
-  const handleChange = (field, value) => {
-    setForm((old) => ({ ...old, [field]: value }));
-  };
-
-  const handleSave = async () => {
-    await updateVoterLocal(voter._id, {
-      name: form.name,
-      mobile: form.mobile,
-      house: form.house,
-    });
-    onClose(true);
-  };
-
-  return (
-    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="sm">
-      <DialogTitle>Edit voter</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            label="Name"
-            value={form.name}
-            onChange={(e) => handleChange("name", e.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Mobile"
-            value={form.mobile}
-            onChange={(e) => handleChange("mobile", e.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="House"
-            value={form.house}
-            onChange={(e) => handleChange("house", e.target.value)}
+            label="Mobile number"
+            value={mobile || ""}
+            onChange={(e) => setMobile(e.target.value)}
+            placeholder="10-digit mobile"
+            inputProps={{ inputMode: "numeric" }}
             fullWidth
           />
         </Stack>
@@ -357,15 +377,15 @@ function MobileEditModal({ open, voter, onClose }) {
       <DialogActions>
         <Button onClick={() => onClose(false)}>Cancel</Button>
         <Button onClick={handleSave} variant="contained">
-          Save
+          Save (local)
         </Button>
       </DialogActions>
     </Dialog>
   );
 }
 
-/* ---------------- Record modal with share ---------------- */
-function RecordModal({ open, voter, onClose, collectionName }) {
+/* ---------------- Full Record Details modal ---------------- */
+function RecordModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
   const fields = [
     ["Name", getName(voter)],
@@ -378,17 +398,14 @@ function RecordModal({ open, voter, onClose, collectionName }) {
         ? getSerialNum(voter)
         : getSerialText(voter) || "—",
     ],
-    ["Age / Sex", `${getAge(voter) || "—"} / ${getGender(voter) || "—"}`],
+    ["Age", getAge(voter) || "—"],
+    ["Sex", getGender(voter) || "—"],
     ["House", getHouseNo(voter) || "—"],
     ["C/O", getCareOf(voter) || "—"],
     ["Mobile", getMobile(voter) || "—"],
-    ["Caste", getCaste(voter) || "OPEN"],
-    ["Political interest", getPoliticalInterest(voter) || "—"],
-    ["Volunteer", getVolunteer(voter) || "—"],
-    ["Database", collectionName || "—"],
     ["Photo", getPhotoUrl(voter) || "—"],
   ];
-  const shareText = buildShareText(voter, collectionName);
+  const shareText = buildShareText(voter);
 
   const mob = getMobile(voter);
   const waUrl = mob
@@ -405,19 +422,22 @@ function RecordModal({ open, voter, onClose, collectionName }) {
               key={k}
               direction="row"
               justifyContent="space-between"
-              spacing={2}
+              alignItems="center"
             >
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="caption" color="text.secondary">
                 {k}
               </Typography>
-              <Typography
-                variant="body2"
-                sx={{ textAlign: "right", wordBreak: "break-word" }}
-              >
-                {v}
-              </Typography>
+              <Typography fontWeight={600}>{String(v)}</Typography>
             </Stack>
           ))}
+          <TextField
+            label="Share text"
+            value={shareText}
+            multiline
+            minRows={3}
+            fullWidth
+            InputProps={{ readOnly: true }}
+          />
         </Stack>
       </DialogContent>
       <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
@@ -499,32 +519,30 @@ export default function Search() {
 
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [tagsVoter, setTagsVoter] = useState(null);
   const sentinelRef = useRef(null);
 
-  const handleMenuOpen = (event) => {
-    setMenuAnchorEl(event.currentTarget);
-  };
+  const handleMenuOpen = (event) => setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
 
   const logout = () => {
+    handleMenuClose();
     lockSession();
-    clearToken();
-    window.location.href = "/";
+    window.location.href = "/login";
   };
 
   const loadAll = useCallback(async () => {
-    setBusy(true);
-    try {
-      const rows = await loadLocalData();
-      setAllRows(rows || []);
-      setVisibleCount(200);
-    } catch (e) {
-      console.error(e);
-      setAllRows([]);
-    } finally {
-      setBusy(false);
-    }
+    const arr = await db.voters.toArray();
+    arr.sort((a, b) => {
+      const sa = getSerialNum(a);
+      const sb = getSerialNum(b);
+      const aNaN = Number.isNaN(sa);
+      const bNaN = Number.isNaN(sb);
+      if (aNaN && bNaN) return 0;
+      if (aNaN) return 1;
+      if (bNaN) return -1;
+      return sa - sb;
+    });
+    setAllRows(arr);
   }, []);
 
   useEffect(() => {
@@ -565,8 +583,12 @@ export default function Search() {
     }
     setBusy(true);
     try {
-      const c = await pushOutbox({ databaseId: id });
-      alert(`Pushed ${c} local changes to server.`);
+      const res = await pushOutbox({ databaseId: id });
+      alert(
+        `Pushed: ${res.pushed}${
+          res.failed?.length ? `, Failed: ${res.failed.length}` : ""
+        }`
+      );
     } catch (e) {
       alert("Push failed: " + (e?.message || e));
     } finally {
@@ -574,10 +596,47 @@ export default function Search() {
     }
   };
 
-  // transliteration for search if needed
-  const transliterate = (text) => text; // stub for now
+  // 🔽 Load Google Transliteration for the Hindi search input (single box)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  // Combined filter: text + tab + age band
+    function initGoogleTransliteration() {
+      window.google.load("elements", "1", {
+        packages: "transliteration",
+        callback: () => {
+          const langCode =
+            window.google.elements.transliteration.LanguageCode;
+          const options = {
+            sourceLanguage: langCode.ENGLISH,
+            destinationLanguage: [langCode.HINDI],
+            transliterationEnabled: true,
+          };
+          const control =
+            new window.google.elements.transliteration.TransliterationControl(
+              options
+            );
+          control.makeTransliteratable(["searchBoxHindi"]);
+        },
+      });
+    }
+
+    if (window.google && window.google.load) {
+      initGoogleTransliteration();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://www.google.com/jsapi";
+    script.async = true;
+    script.onload = () => {
+      if (window.google && window.google.load) {
+        initGoogleTransliteration();
+      }
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  // Combined filter: text + tab + age band with transliteration (for search)
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     const termTrans = transliterate(term);
@@ -593,45 +652,58 @@ export default function Search() {
       return true;
     };
 
-    const inGenderTab = (r) => {
-      const g = (getGender(r) || "").toUpperCase();
-      if (tab === "all") return true;
-      if (tab === "male") return g === "M";
-      if (tab === "female") return g === "F";
-      return true;
+    const passesTab = (r) => {
+      if (tab === "male") return getGender(r) === "M";
+      if (tab === "female") return getGender(r) === "F";
+      return true; // all
     };
 
-    if (!term) {
-      return allRows.filter((r) => inGenderTab(r) && inAgeBand(r));
-    }
+    const textMatch = (r) => {
+      if (!term) return true;
 
-    const matches = (r) => {
-      const name = getName(r).toLowerCase();
-      const epic = getEPIC(r).toLowerCase();
-      const mob = (getMobile(r) || "").toLowerCase();
-      const house = (getHouseNo(r) || "").toLowerCase();
+      const name = getName(r) || "";
+      const epic = getEPIC(r) || "";
+      const mob = getMobile(r) || "";
+      const rps = getRPS(r) || "";
+      const part = getPart(r) || "";
+      const serialTxt = String(getSerialText(r) ?? "");
+
+      const nameL = name.toLowerCase();
+      const epicL = epic.toLowerCase();
+      const mobL = mob.toLowerCase();
+      const rpsL = rps.toLowerCase();
+      const partL = part.toLowerCase();
+      const serialL = serialTxt.toLowerCase();
+
+      const nameT = transliterate(nameL);
+      const partT = transliterate(partL);
+
       return (
-        name.includes(term) ||
-        name.includes(termTrans) ||
-        epic.includes(term) ||
-        mob.includes(term) ||
-        house.includes(term)
+        nameL.includes(term) ||
+        epicL.includes(term) ||
+        mobL.includes(term) ||
+        rpsL.includes(term) ||
+        partL.includes(term) ||
+        serialL.includes(term) ||
+        nameT.includes(termTrans) ||
+        partT.includes(termTrans)
       );
     };
 
-    return allRows.filter(
-      (r) => matches(r) && inGenderTab(r) && inAgeBand(r)
-    );
+    return allRows.filter((r) => textMatch(r) && passesTab(r) && inAgeBand(r));
   }, [q, tab, ageBand, allRows]);
 
-  // infinite scroll
+  // Reset window on any filter change
+  useEffect(() => setVisibleCount(200), [q, tab, ageBand]);
+
   useEffect(() => {
     if (!sentinelRef.current) return;
     const el = sentinelRef.current;
     const io = new IntersectionObserver((entries) => {
-      const first = entries[0];
-      if (first && first.isIntersecting) {
-        setVisibleCount((prev) => prev + 200);
+      if (entries[0].isIntersecting) {
+        setVisibleCount((c) =>
+          Math.min(c + 300, filtered.length || c + 300)
+        );
       }
     });
     io.observe(el);
@@ -666,24 +738,11 @@ export default function Search() {
     { key: "60+", label: "60+" },
   ];
 
-  const [ageFilterKey, setAgeFilterKey] = useState("all");
-
-  useEffect(() => {
-    setAgeBand(ageFilterKey);
-  }, [ageFilterKey]);
-
-  
-
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: "background.default",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <Box sx={{ minHeight: "100vh", pb: 8 }}>
+      {/* Top navbar */}
       <TopNavbar
+        collectionName={collectionName}
         userName={userName}
         busy={busy}
         onMenuOpen={handleMenuOpen}
@@ -719,94 +778,90 @@ export default function Search() {
                   minHeight: 32,
                   "& .MuiTab-root": {
                     minHeight: 32,
-                    fontSize: 12,
-                    paddingX: 1.5,
+                    paddingY: 0,
                   },
                 }}
               >
-                {filterTabs.map((f) => (
-                  <Tab key={f.key} value={f.key} label={f.label} />
+                {filterTabs.map((filter) => (
+                  <Tab
+                    key={filter.key}
+                    label={filter.label}
+                    value={filter.key}
+                  />
                 ))}
               </Tabs>
 
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Chip
-                  size="small"
-                  label={`M: ${male}`}
-                  color="primary"
-                  variant="outlined"
-                />
-                <Chip
-                  size="small"
-                  label={`F: ${female}`}
-                  color="secondary"
-                  variant="outlined"
-                />
-                <Chip
-                  size="small"
-                  label={`Shown: ${visible.length}/${total} • Synced: ${syncedTotal}`}
-                  variant="filled"
-                />
-              </Stack>
+              {/* M / F / Total / Synced in single row */}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
+                {total.toLocaleString()} · Synced {syncedTotal.toLocaleString()}
+              </Typography>
             </Stack>
 
-            {/* Row 2: Age band chips + search bar + clear */}
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1}
-              alignItems={{ xs: "stretch", sm: "center" }}
+            {/* Row 2: age filter pill group */}
+            <ToggleButtonGroup
+              value={ageBand}
+              exclusive
+              onChange={(_, value) => value && setAgeBand(value)}
+              size="small"
+              sx={{
+                alignSelf: "flex-start",
+              }}
             >
-              <ToggleButtonGroup
-                value={ageFilterKey}
-                exclusive
-                onChange={(_, value) => {
-                  if (value) setAgeFilterKey(value);
-                }}
-                size="small"
-              >
-                {ageFilters.map((f) => (
-                  <ToggleButton key={f.key} value={f.key}>
-                    {f.label}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
+              {ageFilters.map((filter) => (
+                <ToggleButton key={filter.key} value={filter.key}>
+                  {filter.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
 
-              <Box sx={{ flex: 1, display: "flex", gap: 1 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search voters (Hindi)"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <VoiceSearchButton
-                          onResult={(text) => setQ(text)}
-                          lang={voiceLang}
-                          disabled={busy}
-                        />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    maxWidth: { xs: "100%", sm: 420 },
-                  }}
-                />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setQ("")}
-                  disabled={!q}
-                >
-                  Clear
-                </Button>
-              </Box>
+            {/* Row 3: single Hindi search + clear button */}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ width: "100%", pt: 0.25 }}
+            >
+              <TextField
+                id="searchBoxHindi" // Google transliteration attaches here
+                size="small"
+                fullWidth
+                label="Search voters (Hindi)"
+                placeholder="नाम / EPIC / मोबाइल"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <VoiceSearchButton
+                        onResult={(text) => setQ(text)}
+                        lang={voiceLang}
+                        disabled={busy}
+                      />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  maxWidth: { xs: "100%", sm: 420 },
+                }}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setQ("")}
+                disabled={!q}
+              >
+                Clear
+              </Button>
             </Stack>
           </Stack>
         </Container>
@@ -820,14 +875,10 @@ export default function Search() {
         keepMounted
       >
         <Box sx={{ px: 2, py: 1.5, width: 280 }}>
-          <Typography variant="subtitle2">{userName}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Database: {collectionName || "Unassigned"}
-          </Typography>
           <Button
             variant="outlined"
             startIcon={<LogoutRoundedIcon />}
-            sx={{ mt: 1.5 }}
+            sx={{ mt: 1 }}
             onClick={logout}
             fullWidth
           >
@@ -853,11 +904,9 @@ export default function Search() {
                     const serialNum = getSerialNum(r);
                     const age = getAge(r);
                     const gender = getGender(r);
-                    const house = getHouseNo(r);
-                    const rps = getRPS(r);
                     const mobRaw = getMobile(r);
                     const mob = normalizePhone(mobRaw);
-                    const shareText = buildShareText(r, collectionName);
+                    const shareText = buildShareText(r);
                     const waHref = mob
                       ? `https://wa.me/91${mob}?text=${encodeURIComponent(
                           shareText
@@ -869,42 +918,59 @@ export default function Search() {
                     const serialDisplay = !Number.isNaN(serialNum)
                       ? serialNum
                       : serialTxt || "—";
+                    const part = getPart(r) || "—";
 
                     return (
                       <Paper
-                        key={r._id || i}
-                        variant="outlined"
+                        key={r._id || `${i}-${serialTxt}`}
                         sx={{
-                          p: 1.5,
-                          borderRadius: 2,
+                          p: 1.25,
                           display: "flex",
                           flexDirection: "column",
                           gap: 0.5,
                         }}
                       >
+                        {/* Row 1: Serial · Part · Age · Sex + + button */}
                         <Stack
                           direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
                           spacing={1}
+                          alignItems="center"
+                          justifyContent="space-between"
+                          flexWrap="wrap"
                         >
-                          <Typography variant="body2" color="text.secondary">
-                            Part: {getPart(r) || "—"} • Serial: {serialDisplay}
-                          </Typography>
-                          {rps && (
-                            <Chip
-                              label={rps}
-                              size="small"
-                              color="default"
-                              variant="outlined"
-                            />
-                          )}
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            flexWrap="wrap"
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Serial {serialDisplay} · Part {part}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              · Age {age || "—"} · {gender || "—"}
+                            </Typography>
+                          </Stack>
+                          <IconButton
+                            size="small"
+                            onClick={() => setSelected(r)}
+                            sx={{ ml: 1 }}
+                          >
+                            <AddRoundedIcon fontSize="small" />
+                          </IconButton>
                         </Stack>
 
+                        {/* Row 2: Name (clickable -> details) */}
                         <Typography
                           variant="subtitle1"
+                          fontWeight={600}
                           sx={{
-                            fontWeight: 600,
                             cursor: "pointer",
                             textDecoration: "none",
                             "&:hover": { textDecoration: "underline" },
@@ -914,20 +980,7 @@ export default function Search() {
                           {name}
                         </Typography>
 
-                        {/* Caste / interest / volunteer */}
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ mt: 0.5 }}
-                        >
-                          Caste: {getCaste(r) || "OPEN"} • Interest:{" "}
-                          {getPoliticalInterest(r) || "—"}{" "}
-                          {getVolunteer(r)
-                            ? `• Volunteer: ${getVolunteer(r)}`
-                            : ""}
-                        </Typography>
-
-                        {/* Row 3: Actions - Call, Share, Tags + Edit in one row */}
+                        {/* Row 3: Actions - Call, Share, Edit icon in one row */}
                         <Stack
                           direction="row"
                           spacing={1}
@@ -960,13 +1013,6 @@ export default function Search() {
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => setTagsVoter(r)}
-                          >
-                            <AddRoundedIcon />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="primary"
                             onClick={() => setSelected(r)}
                           >
                             <EditRoundedIcon />
@@ -976,7 +1022,7 @@ export default function Search() {
                     );
                   })
                 )}
-                <Box ref={sentinelRef} sx={{ height: 1 }} />
+                <Box ref={sentinelRef} sx={{ height: 32 }} />
               </Stack>
             </CardContent>
           </Card>
@@ -991,20 +1037,9 @@ export default function Search() {
           if (ok) await loadAll();
         }}
       />
-
-      <VoterTagsModal
-        open={!!tagsVoter}
-        voter={tagsVoter}
-        onClose={async (ok) => {
-          setTagsVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
-
       <RecordModal
         open={!!detail}
         voter={detail}
-        collectionName={collectionName}
         onClose={() => setDetail(null)}
       />
 
