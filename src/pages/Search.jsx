@@ -829,15 +829,15 @@ export default function Search() {
           pb: 10,
         }}
       >
-        <Stack spacing={1.0}>
+        <Stack spacing={0.5}>
           {/* Stats + filters */}
           <Box
             sx={{
               borderRadius: 0,
               position: "sticky",
               top: 30,
-              zIndex: 10,
-              bgcolor: "#F2F2F2",     // light grey background
+              zIndex: 20,
+              bgcolor: "#898888ff",     // light grey background
               pb: 1,
               pt: 1,
               px: 1.5,
@@ -849,7 +849,7 @@ export default function Search() {
             }}
           >
             <Stack
-              spacing={1}
+              spacing={0.75}
               sx={{
                 width: "100%",
                 maxWidth: 600,
