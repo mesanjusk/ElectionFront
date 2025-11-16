@@ -289,7 +289,7 @@ export default function AdminUsers({ onCreated }) {
       await adminUpdateUserRole(id, roleEditing[id]);
       setStatus({ type: 'ok', text: 'Role updated' });
       cancelRoleEdit(id);
-      await.loadAll();
+      await loadAll();
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     }

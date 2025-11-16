@@ -157,6 +157,7 @@ export default function AdminHome() {
   const totalOperators = users.filter((u) => roleOf(u) === 'operator').length;
   const totalCandidates = users.filter((u) => roleOf(u) === 'candidate').length;
   const totalPlainUsers = users.filter((u) => roleOf(u) === 'user').length;
+  const totalVolunteers = users.filter((u) => roleOf(u) === 'volunteer').length;
   const totalDatabases = databases.length;
 
   const tabOptions = [
@@ -277,6 +278,14 @@ export default function AdminHome() {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <StatCard
+                    title="Volunteers"
+                    value={totalVolunteers}
+                    hint="Field volunteers"
+                    icon={<FolderSharedRoundedIcon color="disabled" />}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <StatCard
                     title="Databases"
                     value={totalDatabases}
                     hint="Available lists"
@@ -365,6 +374,7 @@ export default function AdminHome() {
                           <TableRow>
                             <TableCell>User</TableCell>
                             <TableCell>Role</TableCell>
+                            <TableCell>Party</TableCell>
                             <TableCell>Allowed databases</TableCell>
                             <TableCell align="right">Actions</TableCell>
                           </TableRow>
@@ -377,6 +387,9 @@ export default function AdminHome() {
                             );
                             const isAdmin =
                               (user?.role || '').toLowerCase() === 'admin';
+                            const partyName = user?.partyName || '';
+                            const partyId = user?.partyId || '';
+
                             return (
                               <TableRow key={userId || Math.random()}>
                                 <TableCell>
@@ -414,6 +427,11 @@ export default function AdminHome() {
                                       ]
                                     )}
                                   </TextField>
+                                </TableCell>
+                                <TableCell sx={{ minWidth: 160 }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {partyName || partyId || '—'}
+                                  </Typography>
                                 </TableCell>
                                 <TableCell>
                                   <Stack
@@ -533,8 +551,7 @@ export default function AdminHome() {
                       <CardContent>
                         <Typography fontWeight={600}>Theme</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Using a light, professional palette (blue / green
-                          accents).
+                          Using a light, professional palette (blue / green accents).
                         </Typography>
                       </CardContent>
                     </Card>
