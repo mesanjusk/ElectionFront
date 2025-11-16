@@ -40,7 +40,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 
-import api from "../api"; // ✅ to load Party collection
+import api from "../api";
 
 import { setAuthToken } from "../services/api";
 import {
@@ -70,7 +70,7 @@ const getName = (r) =>
   pick(r?.__raw, ["Name", "नाम", "पूर्ण नाव"]) ||
   "";
 
-// ✅ UPDATED: include "Voter ID" + variants
+// ✅ EPIC / Voter ID
 const getEPIC = (r) =>
   pick(r, ["EPIC", "Voter ID", "Voter Id", "Voter id", "VoterID", "VoterId"]) ||
   pick(r?.__raw, ["EPIC", "Epic", "Voter ID", "Voter Id", "voter_id", "कार्ड नं"]) ||
@@ -308,7 +308,7 @@ const buildShareText = (r, collectionName) => {
     `Political interest: ${interest}`,
     volunteer ? `Volunteer: ${volunteer}` : null,
     dbName ? `Database: ${dbName}` : null,
-    photo ? `Photo: ${photo}` : null,
+    photo ? `Photo: ${photo}` : null, // image URL
   ].filter(Boolean);
   return lines.join("\n");
 };
@@ -401,43 +401,35 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
 
 /**
  * CasteModal
- * - Options come from DB (casteOptions)
- * - Also supports "+ Add new caste" with free text
+ * - Options come from local voter records (casteOptions)
+ * - Also supports typing a brand-new caste
  */
-function CasteModal({ open, voter, options = [], onClose }) {
-  const [mode, setMode] = useState("select"); // "select" | "custom"
-  const [caste, setCaste] = useState("");
+function CasteModal({ open, voter, onClose, options = [] }) {
+  const [caste, setCaste] = useState(getCaste(voter) || "");
   const [customCaste, setCustomCaste] = useState("");
 
   useEffect(() => {
-    if (!voter) return;
-    const existing = getCaste(voter) || "";
-    const list = options || [];
-    if (existing && !list.includes(existing)) {
-      setMode("custom");
-      setCustomCaste(existing);
-      setCaste("");
-    } else {
-      setMode("select");
-      setCaste(existing || "");
+    if (voter) {
+      setCaste(getCaste(voter) || "");
       setCustomCaste("");
     }
-  }, [voter, options]);
+  }, [voter]);
 
   if (!open || !voter) return null;
 
   const handleSave = async () => {
-    const value =
-      mode === "custom" ? customCaste.trim() : (caste || "").trim();
-    if (!value) {
-      alert("कृपया जात चुनें या नई जात लिखें.");
-      return;
-    }
+    const finalCaste =
+      (customCaste && customCaste.trim()) ||
+      (caste && caste.trim()) ||
+      "OPEN";
+
     await updateVoterLocal(voter._id, {
-      caste: value,
+      caste: finalCaste,
     });
     onClose(true);
   };
+
+  const casteList = options && options.length ? options : [];
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
@@ -448,37 +440,32 @@ function CasteModal({ open, voter, options = [], onClose }) {
             {getName(voter)}
           </Typography>
 
+          {/* Existing caste dropdown from DB values */}
           <TextField
             select
-            label="Caste"
-            value={mode === "select" ? caste : "__custom"}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "__custom") {
-                setMode("custom");
-              } else {
-                setMode("select");
-                setCaste(val);
-              }
-            }}
+            label="Select caste"
+            value={caste}
+            onChange={(e) => setCaste(e.target.value)}
             fullWidth
           >
-            {options.map((c) => (
+            <MenuItem value="">
+              <em>(None)</em>
+            </MenuItem>
+            {casteList.map((c) => (
               <MenuItem key={c} value={c}>
                 {c}
               </MenuItem>
             ))}
-            <MenuItem value="__custom">+ Add new caste</MenuItem>
           </TextField>
 
-          {mode === "custom" && (
-            <TextField
-              label="New caste"
-              value={customCaste}
-              onChange={(e) => setCustomCaste(e.target.value)}
-              fullWidth
-            />
-          )}
+          {/* OR add a new caste */}
+          <TextField
+            label="Or type new caste"
+            value={customCaste}
+            onChange={(e) => setCustomCaste(e.target.value)}
+            placeholder="e.g. कश्यप, अत्रि..."
+            fullWidth
+          />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -493,43 +480,35 @@ function CasteModal({ open, voter, options = [], onClose }) {
 
 /**
  * InterestModal
- * - Options come from Party collection (`Party` model) via /admin/parties
- * - Also supports "+ Add new party / interest" with free text
+ * - Options come from Party collection via /admin/parties
+ * - Also supports typing a brand-new interest
  */
-function InterestModal({ open, voter, options = [], onClose }) {
-  const [mode, setMode] = useState("select"); // "select" | "custom"
-  const [interest, setInterest] = useState("");
+function InterestModal({ open, voter, onClose, options = [] }) {
+  const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
   const [customInterest, setCustomInterest] = useState("");
 
   useEffect(() => {
-    if (!voter) return;
-    const existing = getPoliticalInterest(voter) || "";
-    const list = options || [];
-    if (existing && !list.includes(existing)) {
-      setMode("custom");
-      setCustomInterest(existing);
-      setInterest("");
-    } else {
-      setMode("select");
-      setInterest(existing || "");
+    if (voter) {
+      setInterest(getPoliticalInterest(voter) || "");
       setCustomInterest("");
     }
-  }, [voter, options]);
+  }, [voter]);
 
   if (!open || !voter) return null;
 
   const handleSave = async () => {
-    const value =
-      mode === "custom" ? customInterest.trim() : (interest || "").trim();
-    if (!value) {
-      alert("कृपया पार्टी/इंटरेस्ट चुनें या नया इंटरेस्ट लिखें.");
-      return;
-    }
+    const finalInterest =
+      (customInterest && customInterest.trim()) ||
+      (interest && interest.trim()) ||
+      "";
+
     await updateVoterLocal(voter._id, {
-      politicalInterest: value,
+      politicalInterest: finalInterest,
     });
     onClose(true);
   };
+
+  const interestList = options && options.length ? options : [];
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
@@ -540,37 +519,32 @@ function InterestModal({ open, voter, options = [], onClose }) {
             {getName(voter)}
           </Typography>
 
+          {/* Party / interest dropdown from Party master + generic options */}
           <TextField
             select
-            label="Political interest / Party"
-            value={mode === "select" ? interest : "__custom"}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "__custom") {
-                setMode("custom");
-              } else {
-                setMode("select");
-                setInterest(val);
-              }
-            }}
+            label="Select party / interest"
+            value={interest}
+            onChange={(e) => setInterest(e.target.value)}
             fullWidth
           >
-            {options.map((opt) => (
+            <MenuItem value="">
+              <em>(None)</em>
+            </MenuItem>
+            {interestList.map((opt) => (
               <MenuItem key={opt} value={opt}>
                 {opt}
               </MenuItem>
             ))}
-            <MenuItem value="__custom">+ Add new party / interest</MenuItem>
           </TextField>
 
-          {mode === "custom" && (
-            <TextField
-              label="New party / interest"
-              value={customInterest}
-              onChange={(e) => setCustomInterest(e.target.value)}
-              fullWidth
-            />
-          )}
+          {/* OR add a new interest */}
+          <TextField
+            label="Or type custom interest"
+            value={customInterest}
+            onChange={(e) => setCustomInterest(e.target.value)}
+            placeholder="e.g. Pro local independent, issue-based..."
+            fullWidth
+          />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -754,8 +728,8 @@ export default function Search() {
   const [interestVoter, setInterestVoter] = useState(null);
   const [volunteerVoter, setVolunteerVoter] = useState(null);
 
-  const [casteOptions, setCasteOptions] = useState([]); // ✅ from DB
-  const [partyOptions, setPartyOptions] = useState([]); // ✅ from Party collection
+  const [casteOptions, setCasteOptions] = useState([]); // from local records
+  const [partyOptions, setPartyOptions] = useState([]); // from Party collection
 
   const sentinelRef = useRef(null);
 
@@ -792,7 +766,7 @@ export default function Search() {
     loadAll().catch(() => {});
   }, [loadAll]);
 
-  // ✅ Build caste options from local voter records
+  // Build caste options from local voter records
   useEffect(() => {
     const set = new Set();
     for (const r of allRows) {
@@ -804,7 +778,7 @@ export default function Search() {
     setCasteOptions(list);
   }, [allRows]);
 
-  // ✅ Load party options from Party collection
+  // Load party options from Party collection
   useEffect(() => {
     let cancelled = false;
 
@@ -838,6 +812,13 @@ export default function Search() {
       cancelled = true;
     };
   }, []);
+
+  const interestOptions = useMemo(() => {
+    const partyNames = (partyOptions || []).map((p) => String(p));
+    const base = ["Neutral", "Non voter"];
+    const all = [...partyNames, ...base];
+    return Array.from(new Set(all));
+  }, [partyOptions]);
 
   // infinite scroll
   useEffect(() => {
@@ -1030,7 +1011,7 @@ export default function Search() {
             sx={{
               borderRadius: 0,
               position: "sticky",
-              top: 56,
+              top: 56, // just below navbar; tweak if needed
               zIndex: 20,
               bgcolor: "#f3f4f6",
               pb: 1,
@@ -1068,6 +1049,7 @@ export default function Search() {
                   endAdornment: (
                     <InputAdornment position="end">
                       <>
+                        {/* CLEAR (X) BUTTON */}
                         {q?.length > 0 && (
                           <IconButton
                             size="small"
@@ -1078,6 +1060,7 @@ export default function Search() {
                           </IconButton>
                         )}
 
+                        {/* Voice Search */}
                         <VoiceSearchButton
                           onResult={(text) => setQ(text)}
                           lang={voiceLang}
@@ -1167,14 +1150,14 @@ export default function Search() {
                 <Paper
                   key={r._id || `${i}-${serialTxt}`}
                   sx={{
-                    p: 0.5,
+                    p: 0.5, // narrower padding
                     display: "flex",
                     flexDirection: "column",
                     gap: 0.15,
-                    borderRadius: 0.5,
+                    borderRadius: 0.5, // smaller radius
                   }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC + caste / interest / volunteer icons */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1198,6 +1181,7 @@ export default function Search() {
                     </Stack>
 
                     <Stack direction="row" spacing={0.25} alignItems="center">
+                      {/* 1) Caste (via + icon) */}
                       <IconButton
                         size="small"
                         onClick={() => setCasteVoter(r)}
@@ -1205,6 +1189,7 @@ export default function Search() {
                         <AddRoundedIcon fontSize="small" />
                       </IconButton>
 
+                      {/* 2) Political interest */}
                       <IconButton
                         size="small"
                         onClick={() => setInterestVoter(r)}
@@ -1212,6 +1197,7 @@ export default function Search() {
                         <FlagRoundedIcon fontSize="small" />
                       </IconButton>
 
+                      {/* 3) Volunteer assigned */}
                       <IconButton
                         size="small"
                         onClick={() => setVolunteerVoter(r)}
@@ -1228,6 +1214,7 @@ export default function Search() {
                     justifyContent="space-between"
                     sx={{ width: "100%", mt: 0.15 }}
                   >
+                    {/* Name */}
                     <Typography
                       variant="subtitle1"
                       fontWeight={700}
@@ -1247,6 +1234,7 @@ export default function Search() {
                       {name}
                     </Typography>
 
+                    {/* Actions */}
                     <Stack direction="row" spacing={0.25} alignItems="center">
                       <IconButton
                         size="small"
@@ -1307,7 +1295,7 @@ export default function Search() {
       <InterestModal
         open={!!interestVoter}
         voter={interestVoter}
-        options={partyOptions}
+        options={interestOptions}
         onClose={async (ok) => {
           setInterestVoter(null);
           if (ok) await loadAll();
