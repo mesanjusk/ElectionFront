@@ -27,17 +27,17 @@ import api, {
   adminUpdateUserPassword,
   adminUpdateUserDatabases,
   adminResetUserDevice,
-  adminToggleUserEnabled, // 👈 NEW
+  adminToggleUserEnabled,
 } from '../api';
 
-// 👉 includes "volunteer"
+// includes "volunteer"
 const ROLES = ['user', 'operator', 'candidate', 'volunteer', 'admin'];
 
 const getId = (u) => u?.id || u?._id;
 const getRole = (u) => (u?.role || '').toLowerCase();
 const fmt = (d) => (d ? new Date(d).toLocaleString() : '—');
 
-// 🔧 Cloudinary config – read from Vite env, with safe defaults
+// Cloudinary config – read from Vite env, with safe defaults
 const CLOUDINARY_CLOUD_NAME =
   import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dadcprflr';
 const CLOUDINARY_UPLOAD_PRESET =
@@ -73,6 +73,7 @@ async function uploadAvatarToCloudinary(file) {
 export default function AdminUsers({ onCreated }) {
   const [users, setUsers] = useState([]);
   const [dbs, setDbs] = useState([]);
+  const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', text: '' });
 
@@ -82,15 +83,21 @@ export default function AdminUsers({ onCreated }) {
   const [role, setRole] = useState('user');
   const [allowed, setAllowed] = useState([]);
 
-  // 👉 NEW: max volunteers allowed for this account
+  // political party selection
+  const [partyId, setPartyId] = useState('');
+
+  // how many volunteers to auto-create (v1, v2, v3…)
+  const [autoVolunteerCount, setAutoVolunteerCount] = useState('3');
+
+  // max volunteers allowed (limit)
   const [maxVolunteers, setMaxVolunteers] = useState('');
 
-  // 🖼 avatar states for create-user
+  // poster image for candidate/user (shared with volunteers)
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // 👉 NEW: per-user avatar + volunteer-limit editing
+  // per-user avatar + volunteer-limit editing
   const [updatingAvatarId, setUpdatingAvatarId] = useState(null);
   const [volLimitEditing, setVolLimitEditing] = useState({});
 
@@ -102,23 +109,25 @@ export default function AdminUsers({ onCreated }) {
   const [roleEditing, setRoleEditing] = useState({});
   const [dbEditing, setDbEditing] = useState({});
 
-  // 👉 NEW: volunteer creation dialog states
+  // volunteer creation dialog (manual)
   const [volDialogUser, setVolDialogUser] = useState(null);
   const [volUsername, setVolUsername] = useState('');
   const [volPassword, setVolPassword] = useState('');
-  const [volAvatarFile, setVolAvatarFile] = useState(null);
-  const [volAvatarPreview, setVolAvatarPreview] = useState('');
-  const [volUploadingAvatar, setVolUploadingAvatar] = useState(false);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [uRes, dRes] = await Promise.all([
+      const [uRes, dRes, pRes] = await Promise.all([
         adminListUsers(),
         adminListDatabases(),
+        api
+          .get('/api/admin/parties')
+          .then((r) => r.data)
+          .catch(() => []),
       ]);
       setUsers(uRes || []);
       setDbs(dRes || []);
+      setParties(Array.isArray(pRes) ? pRes : []);
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     } finally {
@@ -152,6 +161,8 @@ export default function AdminUsers({ onCreated }) {
     setAvatarPreview('');
     setUploadingAvatar(false);
     setMaxVolunteers('');
+    setPartyId('');
+    setAutoVolunteerCount('3');
   };
 
   const onCreate = async (e) => {
@@ -160,7 +171,8 @@ export default function AdminUsers({ onCreated }) {
 
     try {
       if (!username.trim()) throw new Error('Username required');
-      if (password.length < 4) throw new Error('Password must be at least 4 chars');
+      if (password.length < 4)
+        throw new Error('Password must be at least 4 chars');
 
       let avatarUrl = null;
 
@@ -169,31 +181,83 @@ export default function AdminUsers({ onCreated }) {
         avatarUrl = await uploadAvatarToCloudinary(avatarFile);
       }
 
-      // Parse maxVolunteers as number
+      // Parse maxVolunteers as number (limit)
       let maxVol = 0;
       if (maxVolunteers !== '') {
         const parsed = Number(maxVolunteers);
         if (Number.isNaN(parsed) || parsed < 0) {
           throw new Error('Max volunteers must be a positive number');
         }
-        maxVol = Math.min(parsed, 50); // hard cap
+        maxVol = Math.min(parsed, 50);
       }
 
-      await adminCreateUser({
-        username: username.trim(),
+      // Parse autoVolunteerCount
+      let autoCount = 0;
+      if (autoVolunteerCount !== '') {
+        const parsedAuto = Number(autoVolunteerCount);
+        if (Number.isNaN(parsedAuto) || parsedAuto < 0) {
+          throw new Error('Volunteers to auto-create must be >= 0');
+        }
+        autoCount = Math.min(parsedAuto, 50);
+      }
+
+      // Ensure limit is at least auto count
+      if (autoCount > 0 && maxVol > 0 && maxVol < autoCount) {
+        maxVol = autoCount;
+      } else if (autoCount > 0 && maxVol === 0) {
+        maxVol = autoCount;
+      }
+
+      const baseUsername = username.trim();
+
+      // 1) Create main user
+      const created = await adminCreateUser({
+        username: baseUsername,
         password,
         role,
         allowedDatabaseIds: allowed,
-        avatarUrl,
-        maxVolunteers: maxVol, // 👈 how many volunteer logins allowed
+        avatarUrl, // poster image
+        maxVolunteers: maxVol,
+        partyId: partyId || null,
       });
 
+      const createdId =
+        created?.id ||
+        created?._id ||
+        created?.user?.id ||
+        created?.user?._id;
+      const createdUsername =
+        created?.username || created?.user?.username || baseUsername;
+
+      // 2) Auto-create volunteers only for candidates
+      if (role === 'candidate' && autoCount > 0 && createdId) {
+        for (let i = 1; i <= autoCount; i += 1) {
+          const vUsername = `${createdUsername}v${i}`; // priyal -> priyalv1
+          await adminCreateUser({
+            username: vUsername,
+            password, // same password as candidate
+            role: 'volunteer',
+            allowedDatabaseIds: allowed,
+            avatarUrl, // same poster image as candidate
+            parentUserId: createdId,
+            parentUsername: createdUsername,
+            partyId: partyId || null,
+          });
+        }
+      }
+
       resetCreateForm();
-      setStatus({ type: 'ok', text: 'User created' });
+      setStatus({
+        type: 'ok',
+        text:
+          role === 'candidate' && autoCount > 0
+            ? `User created with ${autoCount} volunteers (e.g. ${baseUsername}v1, ${baseUsername}v2…)`
+            : 'User created',
+      });
       onCreated?.();
       await loadAll();
-    } catch (e) {
-      setStatus({ type: 'error', text: e?.message || String(e) });
+    } catch (err) {
+      setStatus({ type: 'error', text: err?.message || String(err) });
     } finally {
       setUploadingAvatar(false);
     }
@@ -225,7 +289,7 @@ export default function AdminUsers({ onCreated }) {
       await adminUpdateUserRole(id, roleEditing[id]);
       setStatus({ type: 'ok', text: 'Role updated' });
       cancelRoleEdit(id);
-      await loadAll();
+      await.loadAll();
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     }
@@ -299,30 +363,17 @@ export default function AdminUsers({ onCreated }) {
     }
   };
 
-  // 👉 volunteer dialog helpers
+  // volunteer dialog helpers (manual volunteers)
   const openVolunteerDialog = (user) => {
     setVolDialogUser(user);
     setVolUsername('');
     setVolPassword('');
-    setVolAvatarFile(null);
-    setVolAvatarPreview('');
-    setVolUploadingAvatar(false);
   };
 
   const closeVolunteerDialog = () => {
     setVolDialogUser(null);
     setVolUsername('');
     setVolPassword('');
-    setVolAvatarFile(null);
-    setVolAvatarPreview('');
-    setVolUploadingAvatar(false);
-  };
-
-  const handleVolAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setVolAvatarFile(file);
-    setVolAvatarPreview(URL.createObjectURL(file));
   };
 
   const onCreateVolunteer = async (e) => {
@@ -336,31 +387,30 @@ export default function AdminUsers({ onCreated }) {
       if (volPassword.length < 4)
         throw new Error('Password must be at least 4 chars');
 
-      // capacity check (frontend-side)
       const maxVol = volDialogUser?.maxVolunteers ?? 0;
       const usedVol = volDialogUser?.volunteerCount ?? 0;
       if (maxVol && usedVol >= maxVol) {
         throw new Error('Volunteer limit reached for this account');
       }
 
-      let avatarUrl = null;
-      if (volAvatarFile) {
-        setVolUploadingAvatar(true);
-        avatarUrl = await uploadAvatarToCloudinary(volAvatarFile);
-      }
-
       const parentId = getId(volDialogUser);
       const parentUsername = volDialogUser.username;
       const parentAllowed = volDialogUser?.allowedDatabaseIds || [];
+      const parentPartyId =
+        volDialogUser.partyId ||
+        volDialogUser.party ||
+        null;
+      const parentAvatarUrl = volDialogUser.avatarUrl || null;
 
       await adminCreateUser({
         username: volUsername.trim(),
         password: volPassword,
         role: 'volunteer',
-        avatarUrl,
+        avatarUrl: parentAvatarUrl, // same poster image
         parentUserId: parentId,
         parentUsername,
-        allowedDatabaseIds: parentAllowed, // inherit cloned DBs
+        allowedDatabaseIds: parentAllowed,
+        partyId: parentPartyId,
       });
 
       setStatus({
@@ -369,14 +419,12 @@ export default function AdminUsers({ onCreated }) {
       });
       closeVolunteerDialog();
       await loadAll();
-    } catch (e) {
-      setStatus({ type: 'error', text: e?.message || String(e) });
-    } finally {
-      setVolUploadingAvatar(false);
+    } catch (err) {
+      setStatus({ type: 'error', text: err?.message || String(err) });
     }
   };
 
-  // 👉 enable / disable user (and all volunteers)
+  // enable / disable user (and their volunteers)
   const onToggleEnabled = async (id, enable) => {
     try {
       await adminToggleUserEnabled(id, enable);
@@ -392,7 +440,7 @@ export default function AdminUsers({ onCreated }) {
     }
   };
 
-  // 👉 per-user avatar update (edit existing user image)
+  // per-user avatar update (edit existing user image)
   const handleUserAvatarChange = async (e, user) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -422,7 +470,7 @@ export default function AdminUsers({ onCreated }) {
     }
   };
 
-  // 👉 volunteer-limit editing helpers
+  // volunteer-limit editing helpers
   const beginVolLimitEdit = (id, current) => {
     setVolLimitEditing((prev) => ({
       ...prev,
@@ -474,6 +522,29 @@ export default function AdminUsers({ onCreated }) {
     }
   };
 
+  // resolve party display name from user object
+  const getUserPartyName = (u) => {
+    const pid = u.partyId || u.party;
+    if (pid && parties.length) {
+      const match = parties.find(
+        (p) =>
+          p.id === pid ||
+          p._id === pid ||
+          p.code === pid
+      );
+      if (match) {
+        return (
+          match.name ||
+          match.title ||
+          match.shortName ||
+          match.code ||
+          pid
+        );
+      }
+    }
+    return u.partyName || u.party || '—';
+  };
+
   return (
     <Stack spacing={3}>
       {status.text && (
@@ -523,6 +594,34 @@ export default function AdminUsers({ onCreated }) {
                 </TextField>
               </Grid>
 
+              {/* Political party */}
+              <Grid item xs={12} md={4}>
+                <TextField
+                  select
+                  label="Political party"
+                  value={partyId}
+                  onChange={(e) => setPartyId(e.target.value)}
+                  fullWidth
+                  helperText="Party from Party master DB"
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {parties.map((p) => {
+                    const value = p.id || p._id || p.code;
+                    const label =
+                      p.name ||
+                      p.title ||
+                      p.shortName ||
+                      p.code ||
+                      value;
+                    return (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    );
+                  })}
+                </TextField>
+              </Grid>
+
               {/* Max volunteers allowed */}
               <Grid item xs={12} md={4}>
                 <TextField
@@ -536,7 +635,20 @@ export default function AdminUsers({ onCreated }) {
                 />
               </Grid>
 
-              {/* Avatar upload */}
+              {/* Volunteers to auto-create */}
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Volunteers to auto-create"
+                  type="number"
+                  value={autoVolunteerCount}
+                  onChange={(e) => setAutoVolunteerCount(e.target.value)}
+                  fullWidth
+                  helperText="For candidates, creates usernamev1, usernamev2, …"
+                  inputProps={{ min: 0 }}
+                />
+              </Grid>
+
+              {/* Poster image upload */}
               <Grid item xs={12} md={4}>
                 <Button
                   variant="outlined"
@@ -544,7 +656,7 @@ export default function AdminUsers({ onCreated }) {
                   fullWidth
                   disabled={uploadingAvatar}
                 >
-                  {uploadingAvatar ? 'Uploading image…' : 'Upload user image'}
+                  {uploadingAvatar ? 'Uploading image…' : 'Upload poster image'}
                   <input
                     type="file"
                     accept="image/*"
@@ -570,7 +682,7 @@ export default function AdminUsers({ onCreated }) {
                       }}
                     />
                     <Typography variant="body2" color="text.secondary">
-                      Image selected
+                      Poster image selected (used for user + all volunteers)
                     </Typography>
                   </Stack>
                 )}
@@ -630,6 +742,7 @@ export default function AdminUsers({ onCreated }) {
                 const parentUserId = u?.parentUserId;
 
                 const volunteerLimitReached = maxVol && usedVol >= maxVol;
+                const partyName = getUserPartyName(u);
 
                 return (
                   <Card key={id} variant="outlined">
@@ -654,7 +767,6 @@ export default function AdminUsers({ onCreated }) {
                             </Avatar>
                             <Stack spacing={0.5}>
                               <Typography variant="h6">{u.username}</Typography>
-                              {/* volunteer tagging */}
                               {role === 'volunteer' && (
                                 <Typography
                                   variant="body2"
@@ -664,6 +776,12 @@ export default function AdminUsers({ onCreated }) {
                                   {parentUsername || parentUserId || '—'}
                                 </Typography>
                               )}
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Party: {partyName}
+                              </Typography>
                               <Typography
                                 variant="body2"
                                 color="text.secondary"
@@ -683,7 +801,6 @@ export default function AdminUsers({ onCreated }) {
                               color={isEnabled ? 'success' : 'default'}
                               variant={isEnabled ? 'filled' : 'outlined'}
                             />
-                            {/* Only show "Create volunteer" for non-volunteer accounts */}
                             {role !== 'volunteer' && (
                               <Button
                                 size="small"
@@ -697,7 +814,6 @@ export default function AdminUsers({ onCreated }) {
                               </Button>
                             )}
 
-                            {/* Change image for this user */}
                             <Button
                               size="small"
                               variant="outlined"
@@ -878,9 +994,7 @@ export default function AdminUsers({ onCreated }) {
                                   variant="body2"
                                   color="text.secondary"
                                 >
-                                  {dbList.length
-                                    ? dbList.join(', ')
-                                    : '—'}
+                                  {dbList.length ? dbList.join(', ') : '—'}
                                 </Typography>
                                 <Button
                                   variant="outlined"
@@ -1063,7 +1177,7 @@ export default function AdminUsers({ onCreated }) {
         </Box>
       </Dialog>
 
-      {/* 👉 CREATE VOLUNTEER MODAL */}
+      {/* CREATE VOLUNTEER MODAL (manual) */}
       <Dialog
         open={!!volDialogUser}
         onClose={closeVolunteerDialog}
@@ -1091,56 +1205,17 @@ export default function AdminUsers({ onCreated }) {
                 required
                 fullWidth
               />
-              <Button
-                variant="outlined"
-                component="label"
-                fullWidth
-                disabled={volUploadingAvatar}
-              >
-                {volUploadingAvatar ? 'Uploading image…' : 'Upload volunteer image'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={handleVolAvatarChange}
-                />
-              </Button>
-              {volAvatarPreview && (
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mt: 1 }}
-                >
-                  <img
-                    src={volAvatarPreview}
-                    alt="Preview"
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    Image selected
-                  </Typography>
-                </Stack>
-              )}
               <Typography variant="body2" color="text.secondary">
-                Volunteer will inherit cloned databases from this account and will
-                be device-locked after first activation.
+                Volunteer will inherit poster image, party and cloned databases
+                from this account and will be device-locked after first
+                activation.
               </Typography>
             </Stack>
           </DialogContent>
           <DialogActions>
             <Button onClick={closeVolunteerDialog}>Cancel</Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={volUploadingAvatar}
-            >
-              {volUploadingAvatar ? 'Creating…' : 'Create volunteer'}
+            <Button type="submit" variant="contained">
+              Create volunteer
             </Button>
           </DialogActions>
         </Box>
