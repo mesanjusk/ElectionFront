@@ -40,6 +40,8 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 
+import api from "../api"; // 🔥 NEW: to load parties from backend
+
 import { setAuthToken } from "../services/api";
 import {
   lockSession,
@@ -169,7 +171,6 @@ const getCareOf = (r) =>
     "C/O",
     "वडील",
     "पती",
-    "पुत्र",
     "पु...",
   ]) ||
   "";
@@ -203,24 +204,9 @@ const getCaste = (r) =>
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
   "";
 
-// 🔁 UPDATED: read Party Intrest / Party Interest variants
 const getPoliticalInterest = (r) =>
-  pick(r, [
-    "politicalInterest",
-    "PoliticalInterest",
-    "interest",
-    "PartyInterest",
-    "Party Interest",
-    "Party Intrest",
-  ]) ||
-  pick(r?.__raw, [
-    "politicalInterest",
-    "PoliticalInterest",
-    "interest",
-    "PartyInterest",
-    "Party Interest",
-    "Party Intrest",
-  ]) ||
+  pick(r, ["politicalInterest", "PoliticalInterest", "interest"]) ||
+  pick(r?.__raw, ["politicalInterest", "PoliticalInterest", "interest"]) ||
   "";
 
 const getVolunteer = (r) =>
@@ -329,15 +315,6 @@ const buildShareText = (r, collectionName) => {
 
 /* ---------------- Small mobile edit modal (local + push) --------------- */
 
-const CASTE_OPTIONS = ["OPEN", "OBC", "SC", "ST", "NT", "VJ", "SBC"];
-
-const INTEREST_OPTIONS = [
-  "Pro ruling party",
-  "Pro opposition",
-  "Neutral",
-  "Non voter",
-];
-
 function MobileEditModal({ open, voter, onClose, onSynced }) {
   const [mobile, setMobile] = useState(getMobile(voter));
 
@@ -354,8 +331,8 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
       return;
     }
 
-    // 1) Save locally – make sure both mobile + Mobile are updated
-    await updateVoterLocal(voter._id, { mobile: n, Mobile: n });
+    // 1) Save locally
+    await updateVoterLocal(voter._id, { mobile: n });
 
     // 2) Immediately push to server for active DB
     let msg = "Mobile saved locally.";
@@ -422,26 +399,39 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
 
 /* ---------------- Separate modals: Caste / Interest / Volunteer -------- */
 
-function CasteModal({ open, voter, onClose }) {
-  const [caste, setCaste] = useState(getCaste(voter) || "OPEN");
+// 🔥 Caste modal now uses dynamic options + "Add new caste"
+function CasteModal({ open, voter, options = [], onClose }) {
+  const [mode, setMode] = useState("select"); // "select" | "custom"
+  const [caste, setCaste] = useState("");
+  const [customCaste, setCustomCaste] = useState("");
 
   useEffect(() => {
-    if (voter) {
-      setCaste(getCaste(voter) || "OPEN");
+    if (!voter) return;
+    const existing = getCaste(voter) || "";
+    const list = options || [];
+    if (existing && !list.includes(existing)) {
+      setMode("custom");
+      setCustomCaste(existing);
+      setCaste("");
+    } else {
+      setMode("select");
+      setCaste(existing || "");
+      setCustomCaste("");
     }
-  }, [voter]);
+  }, [voter, options]);
 
   if (!open || !voter) return null;
 
   const handleSave = async () => {
-    const value = caste || "OPEN";
-
-    // Save locally in both variants: caste + Caste
+    const value =
+      mode === "custom" ? customCaste.trim() : (caste || "").trim();
+    if (!value) {
+      alert("Please choose or enter a caste.");
+      return;
+    }
     await updateVoterLocal(voter._id, {
       caste: value,
-      Caste: value,
     });
-
     onClose(true);
   };
 
@@ -456,16 +446,34 @@ function CasteModal({ open, voter, onClose }) {
           <TextField
             select
             label="Caste"
-            value={caste}
-            onChange={(e) => setCaste(e.target.value)}
+            value={mode === "select" ? caste : "__custom"}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "__custom") {
+                setMode("custom");
+              } else {
+                setMode("select");
+                setCaste(val);
+              }
+            }}
             fullWidth
           >
-            {CASTE_OPTIONS.map((c) => (
+            {options.map((c) => (
               <MenuItem key={c} value={c}>
                 {c}
               </MenuItem>
             ))}
+            <MenuItem value="__custom">+ Add new caste</MenuItem>
           </TextField>
+
+          {mode === "custom" && (
+            <TextField
+              label="New caste"
+              value={customCaste}
+              onChange={(e) => setCustomCaste(e.target.value)}
+              fullWidth
+            />
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -478,27 +486,39 @@ function CasteModal({ open, voter, onClose }) {
   );
 }
 
-function InterestModal({ open, voter, onClose }) {
-  const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
+// 🔥 Interest modal now uses Party collection + "Add new party/interest"
+function InterestModal({ open, voter, options = [], onClose }) {
+  const [mode, setMode] = useState("select"); // "select" | "custom"
+  const [interest, setInterest] = useState("");
+  const [customInterest, setCustomInterest] = useState("");
 
   useEffect(() => {
-    if (voter) {
-      setInterest(getPoliticalInterest(voter) || "");
+    if (!voter) return;
+    const existing = getPoliticalInterest(voter) || "";
+    const list = options || [];
+    if (existing && !list.includes(existing)) {
+      setMode("custom");
+      setCustomInterest(existing);
+      setInterest("");
+    } else {
+      setMode("select");
+      setInterest(existing || "");
+      setCustomInterest("");
     }
-  }, [voter]);
+  }, [voter, options]);
 
   if (!open || !voter) return null;
 
   const handleSave = async () => {
-    const value = interest || "";
-
-    // Save locally in all variants, including old "Party Intrest"
+    const value =
+      mode === "custom" ? customInterest.trim() : (interest || "").trim();
+    if (!value) {
+      alert("Please choose or enter party interest.");
+      return;
+    }
     await updateVoterLocal(voter._id, {
       politicalInterest: value,
-      PartyInterest: value,
-      "Party Intrest": value,
     });
-
     onClose(true);
   };
 
@@ -512,17 +532,35 @@ function InterestModal({ open, voter, onClose }) {
           </Typography>
           <TextField
             select
-            label="Political interest"
-            value={interest}
-            onChange={(e) => setInterest(e.target.value)}
+            label="Political interest / Party"
+            value={mode === "select" ? interest : "__custom"}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "__custom") {
+                setMode("custom");
+              } else {
+                setMode("select");
+                setInterest(val);
+              }
+            }}
             fullWidth
           >
-            {INTEREST_OPTIONS.map((opt) => (
+            {options.map((opt) => (
               <MenuItem key={opt} value={opt}>
                 {opt}
               </MenuItem>
             ))}
+            <MenuItem value="__custom">+ Add new party / interest</MenuItem>
           </TextField>
+
+          {mode === "custom" && (
+            <TextField
+              label="New party / interest"
+              value={customInterest}
+              onChange={(e) => setCustomInterest(e.target.value)}
+              fullWidth
+            />
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -547,14 +585,9 @@ function VolunteerModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
 
   const handleSave = async () => {
-    const value = volunteer || "";
-
-    // Save locally in both variants: volunteer + Volunteer
     await updateVoterLocal(voter._id, {
-      volunteer: value,
-      Volunteer: value,
+      volunteer: volunteer || "",
     });
-
     onClose(true);
   };
 
@@ -711,6 +744,10 @@ export default function Search() {
   const [interestVoter, setInterestVoter] = useState(null);
   const [volunteerVoter, setVolunteerVoter] = useState(null);
 
+  // 🔥 NEW: dynamic options
+  const [casteOptions, setCasteOptions] = useState([]);
+  const [partyOptions, setPartyOptions] = useState([]);
+
   const sentinelRef = useRef(null);
 
   const [snackbar, setSnackbar] = useState({
@@ -745,6 +782,53 @@ export default function Search() {
   useEffect(() => {
     loadAll().catch(() => {});
   }, [loadAll]);
+
+  // 🔥 Build caste options from local DB values
+  useEffect(() => {
+    const set = new Set();
+    for (const r of allRows) {
+      const c = getCaste(r);
+      if (c) set.add(String(c).trim());
+    }
+    const list = Array.from(set).filter(Boolean);
+    list.sort((a, b) => String(a).localeCompare(String(b), "en-IN"));
+    setCasteOptions(list);
+  }, [allRows]);
+
+  // 🔥 Load party options from backend Party collection
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchParties() {
+      try {
+        const res = await api.get("/admin/parties"); // /api + /admin/parties
+        const data = Array.isArray(res.data) ? res.data : [];
+        const names = Array.from(
+          new Set(
+            data
+              .map(
+                (p) =>
+                  p.name ||
+                  p.englishName ||
+                  p.shortName ||
+                  p.code ||
+                  p.abbr
+              )
+              .filter(Boolean)
+          )
+        );
+        names.sort((a, b) => String(a).localeCompare(String(b), "en-IN"));
+        if (!cancelled) setPartyOptions(names);
+      } catch (err) {
+        console.error("Failed to load parties:", err?.response?.data || err);
+      }
+    }
+
+    fetchParties();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // infinite scroll
   useEffect(() => {
@@ -892,6 +976,7 @@ export default function Search() {
       />
 
       {/* Menu for logout and DB info */}
+
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
