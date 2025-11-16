@@ -1157,7 +1157,7 @@ export default function Search() {
                       flexWrap="wrap"
                     >
                       <Typography variant="caption" color="text.secondary">
-                        Sn. {serialDisplay}
+                        {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
