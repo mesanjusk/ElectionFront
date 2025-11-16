@@ -2,10 +2,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Avatar,
   Box,
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Grid,
   Stack,
@@ -15,6 +17,7 @@ import {
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import QuizRoundedIcon from "@mui/icons-material/QuizRounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
+import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 import {
@@ -39,6 +42,7 @@ export default function Home() {
   const navigate = useNavigate();
   const user = useMemo(() => getUser(), []);
 
+  // Pick the single assigned per-user DB (no UI to change)
   const assignedDb = useMemo(() => {
     if (!databases || databases.length === 0) return null;
     if (databases.length === 1) return databases[0];
@@ -54,6 +58,7 @@ export default function Home() {
       `Database ${assignedId}`
     : null;
 
+  // Load DBs & restore last sync count on mount
   useEffect(() => {
     const dbs = getAvailableDatabases();
     setDatabases(dbs);
@@ -74,6 +79,7 @@ export default function Home() {
     }
   }, []);
 
+  // Keep count updated when assigned DB changes
   useEffect(() => {
     if (!assignedId) return;
     const cached = Number(
@@ -131,6 +137,7 @@ export default function Home() {
     }
   };
 
+  // --- Election trends bar chart data (like screenshot) ---
   const chartData = [
     { label: "BJP", value: 320 },
     { label: "INC", value: 260 },
@@ -143,7 +150,7 @@ export default function Home() {
   const maxVal = Math.max(...chartData.map((d) => d.value), 10);
   const yTicks = [0, 100, 200, 300, 400];
 
-  // 🔹 Update quick actions: 1) Voter Search 2) Family Search 3) Coming Soon
+  // 🔹 Updated quick actions: Voter / Family / Caste
   const quickActions = [
     {
       label: "Voter Search",
@@ -154,14 +161,14 @@ export default function Home() {
     {
       label: "Family Search",
       description: "",
-      icon: <SearchRoundedIcon color="primary" />,
+      icon: <QuizRoundedIcon color="primary" />,
       action: () => navigate("/family"),
     },
     {
-      label: "Coming Soon",
+      label: "Caste Search",
       description: "",
       icon: <MapRoundedIcon color="primary" />,
-      action: () => alert("Feature coming soon."),
+      action: () => navigate("/caste"),
     },
   ];
 
@@ -184,6 +191,7 @@ export default function Home() {
 
   return (
     <Box sx={{ minHeight: "100vh", pb: 4 }}>
+      {/* Top navbar */}
       <TopNavbar
         userName={userName}
         userAvatar={avatarUrl}
@@ -193,6 +201,7 @@ export default function Home() {
         onPush={pushAssigned}
       />
 
+      {/* Menu for logout */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -214,6 +223,7 @@ export default function Home() {
 
       <Container maxWidth="sm" sx={{ pt: 1, pb: 4 }}>
         <Stack spacing={3}>
+          {/* Banner */}
           <Box
             sx={{
               borderRadius: 3,
@@ -244,8 +254,9 @@ export default function Home() {
             )}
           </Box>
 
-          {/* (Chart etc. removed/kept as you had – left as-is) */}
+          {/* (chart + other content skipped – keep as you had or extend later) */}
 
+          {/* Bottom three pastel blocks */}
           <Grid container spacing={2}>
             {quickActions.map((action) => (
               <Grid item xs={4} key={action.label}>

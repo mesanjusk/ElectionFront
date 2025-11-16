@@ -7,6 +7,7 @@ import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
 import AdminHome from './pages/AdminHome.jsx';
 import Family from "./pages/Family.jsx";
+import Caste from "./pages/Caste.jsx";
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 export default function App() {
@@ -35,7 +36,7 @@ export default function App() {
         }
       />
 
-      {/* Voter search – ONLY Search page */}
+      {/* Voter search */}
       <Route
         path="/search"
         element={
@@ -45,12 +46,22 @@ export default function App() {
         }
       />
 
-      {/* Family search – ONLY Family page */}
+      {/* Family search */}
       <Route
         path="/family"
         element={
           <ProtectedRoute>
             <Family />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Caste search */}
+      <Route
+        path="/caste"
+        element={
+          <ProtectedRoute>
+            <Caste />
           </ProtectedRoute>
         }
       />
