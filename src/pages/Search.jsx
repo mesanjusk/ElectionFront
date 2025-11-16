@@ -813,12 +813,12 @@ export default function Search() {
     };
   }, []);
 
-  const interestOptions = useMemo(() => {
-    const partyNames = (partyOptions || []).map((p) => String(p));
-    const base = ["Neutral", "Non voter"];
-    const all = [...partyNames, ...base];
-    return Array.from(new Set(all));
-  }, [partyOptions]);
+ const interestOptions = useMemo(() => {
+  // Only party names coming from Party collection
+  return Array.from(
+    new Set((partyOptions || []).map((p) => String(p)))
+  );
+}, [partyOptions]);
 
   // infinite scroll
   useEffect(() => {
@@ -951,433 +951,413 @@ export default function Search() {
 
   return (
     <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "#020617" : "#f3f4f6",
-      }}
-    >
-      <TopNavbar
-        userName={userName}
-        busy={busy}
-        onMenuOpen={handleMenuOpen}
-        onPull={onPull}
-        onPush={onPush}
-      />
+  sx={{
+    minHeight: "100vh",
+    bgcolor: (theme) =>
+      theme.palette.mode === "dark" ? "#020617" : "#f3f4f6",
+  }}
+>
+  <TopNavbar
+    userName={userName}
+    busy={busy}
+    onMenuOpen={handleMenuOpen}
+    onPull={onPull}
+    onPush={onPush}
+  />
 
-      {/* Menu for logout and DB info */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-        keepMounted
+  {/* Menu for logout and DB info */}
+  <Menu
+    anchorEl={menuAnchorEl}
+    open={Boolean(menuAnchorEl)}
+    onClose={handleMenuClose}
+    keepMounted
+  >
+    <Box sx={{ px: 2, py: 1.5, width: 260 }}>
+      <Typography variant="subtitle2" noWrap>
+        {userName}
+      </Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block" }}
+        noWrap
       >
-        <Box sx={{ px: 2, py: 1.5, width: 260 }}>
-          <Typography variant="subtitle2" noWrap>
-            {userName}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block" }}
-            noWrap
-          >
-            Database: {collectionName || "Unassigned"}
-          </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<LogoutRoundedIcon />}
-            sx={{ mt: 1.5 }}
-            onClick={logout}
-            fullWidth
-            size="small"
-          >
-            Logout
-          </Button>
-        </Box>
-      </Menu>
+        Database: {collectionName || "Unassigned"}
+      </Typography>
+      <Button
+        variant="outlined"
+        startIcon={<LogoutRoundedIcon />}
+        sx={{ mt: 1.5 }}
+        onClick={logout}
+        fullWidth
+        size="small"
+      >
+        Logout
+      </Button>
+    </Box>
+  </Menu>
 
-      {/* Results */}
-      <Container
-        maxWidth="lg"
+  {/* 🔹 FULL-WIDTH sticky search + filters header (like navbar/footer) */}
+  <Box
+    sx={{
+      position: "sticky",
+      top: 56, // height of TopNavbar; adjust if needed
+      zIndex: 20,
+      bgcolor: "#f3f4f6",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+      px: 1,
+      py: 1,
+      width: "100%",
+    }}
+  >
+    <Container maxWidth="lg">
+      <Stack
+        spacing={0.75}
         sx={{
-          pt: 1.5,
-          pb: 10,
+          width: "100%",
         }}
       >
-        <Stack spacing={0.5}>
-          {/* Stats + filters (header) */}
-          <Box
-            sx={{
-              borderRadius: 0,
-              position: "sticky",
-              top: 56, // just below navbar; tweak if needed
-              zIndex: 20,
-              bgcolor: "#f3f4f6",
-              pb: 1,
-              pt: 1,
-              px: 1.5,
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            }}
-          >
-            <Stack
-              spacing={0.75}
+        {/* SEARCH BOX with X button */}
+        <TextField
+          id="searchBoxHindi"
+          fullWidth
+          size="medium"
+          placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchRoundedIcon fontSize="small" />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <>
+                  {/* CLEAR (X) BUTTON */}
+                  {q?.length > 0 && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setQ("")}
+                      sx={{ mr: 0.5 }}
+                    >
+                      ✕
+                    </IconButton>
+                  )}
+
+                  {/* Voice Search */}
+                  <VoiceSearchButton
+                    onResult={(text) => setQ(text)}
+                    lang={voiceLang}
+                    disabled={busy}
+                  />
+                </>
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            "& .MuiInputBase-root": {
+              backgroundColor: "white",
+            },
+          }}
+        />
+
+        {/* Tabs */}
+        <Tabs
+          value={tab}
+          onChange={(_, value) => setTab(value)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{
+            minHeight: 32,
+            "& .MuiTab-root": {
+              minHeight: 32,
+              paddingY: 0,
+              fontSize: 13,
+            },
+            "& .MuiTabs-indicator": {
+              backgroundColor: "black",
+            },
+          }}
+        >
+          {filterTabs.map((filter) => (
+            <Tab key={filter.key} label={filter.label} value={filter.key} />
+          ))}
+        </Tabs>
+
+        {/* Age Filter */}
+        <ToggleButtonGroup
+          value={ageBand}
+          exclusive
+          onChange={(_, val) => val && setAgeBand(val)}
+          size="small"
+          sx={{
+            flexWrap: "wrap",
+          }}
+        >
+          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="18-25">18–25</ToggleButton>
+          <ToggleButton value="26-35">26–35</ToggleButton>
+          <ToggleButton value="36-45">36–45</ToggleButton>
+          <ToggleButton value="46-60">46–60</ToggleButton>
+          <ToggleButton value="61+">61+</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+    </Container>
+  </Box>
+
+  {/* Results */}
+  <Container
+    maxWidth="lg"
+    sx={{
+      pt: 1.5,
+      pb: 10,
+    }}
+  >
+    <Stack spacing={0.5}>
+      {/* Voter list */}
+      <Stack spacing={0.4}>
+        {visible.map((r, i) => {
+          const name = getName(r);
+          const epic = getEPIC(r);
+          const serialTxt = getSerialText(r);
+          const serialNum = getSerialNum(r);
+          const age = getAge(r);
+          const gender = getGender(r);
+          const mobRaw = getMobile(r);
+          const mob = normalizePhone(mobRaw);
+          const shareText = buildShareText(r, collectionName);
+          const waHref = mob
+            ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+            : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+          const serialDisplay = !Number.isNaN(serialNum)
+            ? serialNum
+            : serialTxt || "—";
+
+          return (
+            <Paper
+              key={r._id || `${i}-${serialTxt}`}
               sx={{
-                width: "100%",
-                maxWidth: 600,
-                mx: "auto",
+                p: 0.5, // narrower padding
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.15,
+                borderRadius: 0.5, // smaller radius
               }}
             >
-              {/* SEARCH BOX with X button */}
-              <TextField
-                id="searchBoxHindi"
-                fullWidth
-                size="medium"
-                placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <>
-                        {/* CLEAR (X) BUTTON */}
-                        {q?.length > 0 && (
-                          <IconButton
-                            size="small"
-                            onClick={() => setQ("")}
-                            sx={{ mr: 0.5 }}
-                          >
-                            ✕
-                          </IconButton>
-                        )}
-
-                        {/* Voice Search */}
-                        <VoiceSearchButton
-                          onResult={(text) => setQ(text)}
-                          lang={voiceLang}
-                          disabled={busy}
-                        />
-                      </>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  "& .MuiInputBase-root": {
-                    backgroundColor: "white",
-                  },
-                }}
-              />
-
-              {/* Tabs */}
-              <Tabs
-                value={tab}
-                onChange={(_, value) => setTab(value)}
-                variant="scrollable"
-                allowScrollButtonsMobile
-                sx={{
-                  minHeight: 32,
-                  "& .MuiTab-root": {
-                    minHeight: 32,
-                    paddingY: 0,
-                    fontSize: 13,
-                  },
-                  "& .MuiTabs-indicator": {
-                    backgroundColor: "black",
-                  },
-                }}
+              {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="space-between"
+                flexWrap="wrap"
               >
-                {filterTabs.map((filter) => (
-                  <Tab
-                    key={filter.key}
-                    label={filter.label}
-                    value={filter.key}
-                  />
-                ))}
-              </Tabs>
-
-              {/* Age Filter */}
-              <ToggleButtonGroup
-                value={ageBand}
-                exclusive
-                onChange={(_, val) => val && setAgeBand(val)}
-                size="small"
-                sx={{
-                  flexWrap: "wrap",
-                }}
-              >
-                <ToggleButton value="all">All</ToggleButton>
-                <ToggleButton value="18-25">18–25</ToggleButton>
-                <ToggleButton value="26-35">26–35</ToggleButton>
-                <ToggleButton value="36-45">36–45</ToggleButton>
-                <ToggleButton value="46-60">46–60</ToggleButton>
-                <ToggleButton value="61+">61+</ToggleButton>
-              </ToggleButtonGroup>
-            </Stack>
-          </Box>
-
-          {/* Voter list */}
-          <Stack spacing={0.4}>
-            {visible.map((r, i) => {
-              const name = getName(r);
-              const epic = getEPIC(r);
-              const serialTxt = getSerialText(r);
-              const serialNum = getSerialNum(r);
-              const age = getAge(r);
-              const gender = getGender(r);
-              const mobRaw = getMobile(r);
-              const mob = normalizePhone(mobRaw);
-              const shareText = buildShareText(r, collectionName);
-              const waHref = mob
-                ? `https://wa.me/91${mob}?text=${encodeURIComponent(
-                    shareText
-                  )}`
-                : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
-
-              const serialDisplay = !Number.isNaN(serialNum)
-                ? serialNum
-                : serialTxt || "—";
-
-              return (
-                <Paper
-                  key={r._id || `${i}-${serialTxt}`}
-                  sx={{
-                    p: 0.5, // narrower padding
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 0.15,
-                    borderRadius: 0.5, // smaller radius
-                  }}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  flexWrap="wrap"
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    justifyContent="space-between"
-                    flexWrap="wrap"
+                  <Typography variant="caption" color="text.secondary">
+                    Sn. {serialDisplay}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
+                  </Typography>
+                </Stack>
+
+                <Stack direction="row" spacing={0.25} alignItems="center">
+                  {/* 1) Caste (via + icon) */}
+                  <IconButton size="small" onClick={() => setCasteVoter(r)}>
+                    <AddRoundedIcon fontSize="small" />
+                  </IconButton>
+
+                  {/* 2) Political interest */}
+                  <IconButton size="small" onClick={() => setInterestVoter(r)}>
+                    <FlagRoundedIcon fontSize="small" />
+                  </IconButton>
+
+                  {/* 3) Volunteer assigned */}
+                  <IconButton size="small" onClick={() => setVolunteerVoter(r)}>
+                    <GroupRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+
+              {/* Row 2: Name + Call + WhatsApp + Edit */}
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ width: "100%", mt: 0.15 }}
+              >
+                {/* Name */}
+                <Typography
+                  variant="subtitle1"
+                  fontWeight={700}
+                  sx={{
+                    cursor: "pointer",
+                    textDecoration: "none",
+                    "&:hover": { textDecoration: "underline" },
+                    flex: 1,
+                    pr: 1,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    color: "primary.main",
+                  }}
+                  onClick={() => setDetail(r)}
+                >
+                  {name}
+                </Typography>
+
+                {/* Actions */}
+                <Stack direction="row" spacing={0.25} alignItems="center">
+                  <IconButton
+                    size="small"
+                    disabled={!mob}
+                    component={mob ? "a" : "button"}
+                    href={mob ? `tel:${mob}` : undefined}
                   >
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      flexWrap="wrap"
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        Sn. {serialDisplay}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} · EPIC{" "}
-                        {epic || "—"}
-                      </Typography>
-                    </Stack>
+                    <CallRoundedIcon fontSize="small" />
+                  </IconButton>
 
-                    <Stack direction="row" spacing={0.25} alignItems="center">
-                      {/* 1) Caste (via + icon) */}
-                      <IconButton
-                        size="small"
-                        onClick={() => setCasteVoter(r)}
-                      >
-                        <AddRoundedIcon fontSize="small" />
-                      </IconButton>
-
-                      {/* 2) Political interest */}
-                      <IconButton
-                        size="small"
-                        onClick={() => setInterestVoter(r)}
-                      >
-                        <FlagRoundedIcon fontSize="small" />
-                      </IconButton>
-
-                      {/* 3) Volunteer assigned */}
-                      <IconButton
-                        size="small"
-                        onClick={() => setVolunteerVoter(r)}
-                      >
-                        <GroupRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  </Stack>
-
-                  {/* Row 2: Name + Call + WhatsApp + Edit */}
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    sx={{ width: "100%", mt: 0.15 }}
+                  <IconButton
+                    size="small"
+                    component="a"
+                    href={waHref}
+                    target="_blank"
+                    rel="noreferrer"
                   >
-                    {/* Name */}
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={700}
-                      sx={{
-                        cursor: "pointer",
-                        textDecoration: "none",
-                        "&:hover": { textDecoration: "underline" },
-                        flex: 1,
-                        pr: 1,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        color: "primary.main",
-                      }}
-                      onClick={() => setDetail(r)}
-                    >
-                      {name}
-                    </Typography>
+                    <WhatsAppIcon fontSize="small" />
+                  </IconButton>
 
-                    {/* Actions */}
-                    <Stack direction="row" spacing={0.25} alignItems="center">
-                      <IconButton
-                        size="small"
-                        disabled={!mob}
-                        component={mob ? "a" : "button"}
-                        href={mob ? `tel:${mob}` : undefined}
-                      >
-                        <CallRoundedIcon fontSize="small" />
-                      </IconButton>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() => setSelected(r)}
+                  >
+                    <EditRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            </Paper>
+          );
+        })}
+        <Box ref={sentinelRef} sx={{ height: 32 }} />
+      </Stack>
+    </Stack>
+  </Container>
 
-                      <IconButton
-                        size="small"
-                        component="a"
-                        href={waHref}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <WhatsAppIcon fontSize="small" />
-                      </IconButton>
+  <MobileEditModal
+    open={!!selected}
+    voter={selected}
+    onClose={async (ok) => {
+      setSelected(null);
+      if (ok) await loadAll();
+    }}
+    onSynced={showSnack}
+  />
 
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => setSelected(r)}
-                      >
-                        <EditRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  </Stack>
-                </Paper>
-              );
-            })}
-            <Box ref={sentinelRef} sx={{ height: 32 }} />
-          </Stack>
-        </Stack>
-      </Container>
+  <CasteModal
+    open={!!casteVoter}
+    voter={casteVoter}
+    options={casteOptions}
+    onClose={async (ok) => {
+      setCasteVoter(null);
+      if (ok) await loadAll();
+    }}
+  />
 
-      <MobileEditModal
-        open={!!selected}
-        voter={selected}
-        onClose={async (ok) => {
-          setSelected(null);
-          if (ok) await loadAll();
-        }}
-        onSynced={showSnack}
-      />
+  <InterestModal
+    open={!!interestVoter}
+    voter={interestVoter}
+    options={interestOptions}
+    onClose={async (ok) => {
+      setInterestVoter(null);
+      if (ok) await loadAll();
+    }}
+  />
 
-      <CasteModal
-        open={!!casteVoter}
-        voter={casteVoter}
-        options={casteOptions}
-        onClose={async (ok) => {
-          setCasteVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
+  <VolunteerModal
+    open={!!volunteerVoter}
+    voter={volunteerVoter}
+    onClose={async (ok) => {
+      setVolunteerVoter(null);
+      if (ok) await loadAll();
+    }}
+  />
 
-      <InterestModal
-        open={!!interestVoter}
-        voter={interestVoter}
-        options={interestOptions}
-        onClose={async (ok) => {
-          setInterestVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
+  <RecordModal
+    open={!!detail}
+    voter={detail}
+    onClose={() => setDetail(null)}
+    collectionName={collectionName}
+  />
 
-      <VolunteerModal
-        open={!!volunteerVoter}
-        voter={volunteerVoter}
-        onClose={async (ok) => {
-          setVolunteerVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
-
-      <RecordModal
-        open={!!detail}
-        voter={detail}
-        onClose={() => setDetail(null)}
-        collectionName={collectionName}
-      />
-
-      {/* Fixed footer with stats */}
-      <Box
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          bgcolor: "#e5e7eb",
-          borderTop: "1px solid #d1d5db",
-          py: 0.5,
-          px: 2,
-          zIndex: 30,
-        }}
+  {/* Fixed footer with stats */}
+  <Box
+    sx={{
+      position: "fixed",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      bgcolor: "#e5e7eb",
+      borderTop: "1px solid #d1d5db",
+      py: 0.5,
+      px: 2,
+      zIndex: 30,
+    }}
+  >
+    {visible.length === 0 ? (
+      <Typography
+        color="text.secondary"
+        variant="caption"
+        textAlign="center"
       >
-        {visible.length === 0 ? (
-          <Typography
-            color="text.secondary"
-            variant="caption"
-            textAlign="center"
-          >
-            No voters match your filters yet.
-          </Typography>
-        ) : (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            textAlign="center"
-            sx={{ fontWeight: 500 }}
-          >
-            M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
-            {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
-          </Typography>
-        )}
-      </Box>
-
-      {/* Sync + info messages */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={(_, reason) => {
-          if (reason === "clickaway") return;
-          setSnackbar((s) => ({ ...s, open: false }));
-        }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        No voters match your filters yet.
+      </Typography>
+    ) : (
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        textAlign="center"
+        sx={{ fontWeight: 500 }}
       >
-        <Alert
-          onClose={() =>
-            setSnackbar((s) => ({
-              ...s,
-              open: false,
-            }))
-          }
-          severity="info"
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+        M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
+        {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
+      </Typography>
+    )}
+  </Box>
 
-      <PWAInstallPrompt bottom={120} />
-    </Box>
+  {/* Sync + info messages */}
+  <Snackbar
+    open={snackbar.open}
+    autoHideDuration={3000}
+    onClose={(_, reason) => {
+      if (reason === "clickaway") return;
+      setSnackbar((s) => ({ ...s, open: false }));
+    }}
+    anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+  >
+    <Alert
+      onClose={() =>
+        setSnackbar((s) => ({
+          ...s,
+          open: false,
+        }))
+      }
+      severity="info"
+      sx={{ width: "100%" }}
+    >
+      {snackbar.message}
+    </Alert>
+  </Snackbar>
+
+  <PWAInstallPrompt bottom={120} />
+</Box>
+
   );
 }
