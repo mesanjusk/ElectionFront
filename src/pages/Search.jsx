@@ -10,8 +10,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Container,
   Dialog,
   DialogActions,
@@ -41,7 +39,6 @@ import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 
 import api from "../api";
-
 import { setAuthToken } from "../services/api";
 import {
   lockSession,
@@ -522,13 +519,14 @@ function InterestModal({ open, voter, onClose, options = [] }) {
           {/* Party / interest dropdown from Party master */}
           <TextField
             select
-            label="Select party / interest"
+            label="Political interest (party)"
             value={interest}
             onChange={(e) => setInterest(e.target.value)}
             fullWidth
+            helperText="Party from Party master DB"
           >
             <MenuItem value="">
-              <em>(None)</em>
+              <em>Choose party</em>
             </MenuItem>
             {interestList.map((opt) => (
               <MenuItem key={opt} value={opt}>
@@ -778,7 +776,7 @@ export default function Search() {
     setCasteOptions(list);
   }, [allRows]);
 
-  // Load party options from Party collection (same API as AdminUsers.jsx)
+  // Load party options from Party collection (same as AdminUsers)
   useEffect(() => {
     let cancelled = false;
 
@@ -786,7 +784,22 @@ export default function Search() {
       try {
         const res = await api.get("/api/admin/parties");
         const data = Array.isArray(res.data) ? res.data : [];
-        if (!cancelled) setPartyOptions(data);
+        const names = Array.from(
+          new Set(
+            data
+              .map(
+                (p) =>
+                  p.name ||
+                  p.englishName ||
+                  p.shortName ||
+                  p.code ||
+                  p.abbr
+              )
+              .filter(Boolean)
+          )
+        );
+        names.sort((a, b) => String(a).localeCompare(String(b), "en-IN"));
+        if (!cancelled) setPartyOptions(names);
       } catch (err) {
         console.error("Failed to load parties:", err?.response?.data || err);
       }
@@ -798,22 +811,15 @@ export default function Search() {
     };
   }, []);
 
-  // Convert Party records into display names (no Neutral / Non voter now)
+  // Only party names from Party collection
   const interestOptions = useMemo(() => {
-    const names = (partyOptions || [])
-      .map((p) => {
-        if (!p) return null;
-        return (
-          p.name ||
-          p.title ||
-          p.shortName ||
-          p.code ||
-          p.abbr ||
-          null
-        );
-      })
-      .filter(Boolean);
-    return Array.from(new Set(names));
+    return Array.from(
+      new Set(
+        (partyOptions || [])
+          .map((p) => String(p))
+          .filter(Boolean)
+      )
+    );
   }, [partyOptions]);
 
   // infinite scroll
@@ -894,7 +900,7 @@ export default function Search() {
       } else {
         const res = await pullAll({ databaseId: id });
         await loadAll();
-        const pulled = res?.pulled ?? res?.count ?? res?.synced ?? null;
+        const pulled = res?.pulled ?? res?.count ?? res ?? null;
         if (pulled != null) {
           showSnack(`Pulled ${pulled.toLocaleString()} records from server.`);
         } else {
@@ -997,7 +1003,7 @@ export default function Search() {
       <Box
         sx={{
           position: "sticky",
-          top: 56, // height of TopNavbar; adjust if needed
+          top: 56, // height of TopNavbar
           zIndex: 20,
           bgcolor: "#f3f4f6",
           boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
@@ -1124,7 +1130,9 @@ export default function Search() {
               const mob = normalizePhone(mobRaw);
               const shareText = buildShareText(r, collectionName);
               const waHref = mob
-                ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+                ? `https://wa.me/91${mob}?text=${encodeURIComponent(
+                    shareText
+                  )}`
                 : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
               const serialDisplay = !Number.isNaN(serialNum)
@@ -1157,10 +1165,10 @@ export default function Search() {
                       flexWrap="wrap"
                     >
                       <Typography variant="caption" color="text.secondary">
-                        {serialDisplay}
+                        Sn. {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} EPIC {epic || "—"}
+                        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
                       </Typography>
                     </Stack>
 
@@ -1329,7 +1337,8 @@ export default function Search() {
             sx={{ fontWeight: 500 }}
           >
             M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
-            {total.toLocaleString()} · Synced {allRows.length.toLocaleString()}
+            {total.toLocaleString()} · Synced{" "}
+            {allRows.length.toLocaleString()}
           </Typography>
         )}
       </Box>
