@@ -40,7 +40,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 
-import api from "../api"; // 🔥 NEW: to load parties from backend
+import api from "../api"; // ✅ to load Party collection
 
 import { setAuthToken } from "../services/api";
 import {
@@ -70,7 +70,7 @@ const getName = (r) =>
   pick(r?.__raw, ["Name", "नाम", "पूर्ण नाव"]) ||
   "";
 
-// ✅ EPIC / Voter ID
+// ✅ UPDATED: include "Voter ID" + variants
 const getEPIC = (r) =>
   pick(r, ["EPIC", "Voter ID", "Voter Id", "Voter id", "VoterID", "VoterId"]) ||
   pick(r?.__raw, ["EPIC", "Epic", "Voter ID", "Voter Id", "voter_id", "कार्ड नं"]) ||
@@ -198,7 +198,7 @@ const getPhotoUrl = (r) =>
   pick(r?.__raw, ["photoUrl", "photo", "Photo", "image", "Image", "img"]) ||
   "";
 
-// NEW: caste / political interest / volunteer getters
+// caste / political interest / volunteer getters
 const getCaste = (r) =>
   pick(r, ["caste", "Caste"]) ||
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
@@ -308,7 +308,7 @@ const buildShareText = (r, collectionName) => {
     `Political interest: ${interest}`,
     volunteer ? `Volunteer: ${volunteer}` : null,
     dbName ? `Database: ${dbName}` : null,
-    photo ? `Photo: ${photo}` : null, // image URL
+    photo ? `Photo: ${photo}` : null,
   ].filter(Boolean);
   return lines.join("\n");
 };
@@ -399,7 +399,11 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
 
 /* ---------------- Separate modals: Caste / Interest / Volunteer -------- */
 
-// 🔥 Caste modal now uses dynamic options + "Add new caste"
+/**
+ * CasteModal
+ * - Options come from DB (casteOptions)
+ * - Also supports "+ Add new caste" with free text
+ */
 function CasteModal({ open, voter, options = [], onClose }) {
   const [mode, setMode] = useState("select"); // "select" | "custom"
   const [caste, setCaste] = useState("");
@@ -426,7 +430,7 @@ function CasteModal({ open, voter, options = [], onClose }) {
     const value =
       mode === "custom" ? customCaste.trim() : (caste || "").trim();
     if (!value) {
-      alert("Please choose or enter a caste.");
+      alert("कृपया जात चुनें या नई जात लिखें.");
       return;
     }
     await updateVoterLocal(voter._id, {
@@ -443,6 +447,7 @@ function CasteModal({ open, voter, options = [], onClose }) {
           <Typography variant="subtitle1" fontWeight={600}>
             {getName(voter)}
           </Typography>
+
           <TextField
             select
             label="Caste"
@@ -486,7 +491,11 @@ function CasteModal({ open, voter, options = [], onClose }) {
   );
 }
 
-// 🔥 Interest modal now uses Party collection + "Add new party/interest"
+/**
+ * InterestModal
+ * - Options come from Party collection (`Party` model) via /admin/parties
+ * - Also supports "+ Add new party / interest" with free text
+ */
 function InterestModal({ open, voter, options = [], onClose }) {
   const [mode, setMode] = useState("select"); // "select" | "custom"
   const [interest, setInterest] = useState("");
@@ -513,7 +522,7 @@ function InterestModal({ open, voter, options = [], onClose }) {
     const value =
       mode === "custom" ? customInterest.trim() : (interest || "").trim();
     if (!value) {
-      alert("Please choose or enter party interest.");
+      alert("कृपया पार्टी/इंटरेस्ट चुनें या नया इंटरेस्ट लिखें.");
       return;
     }
     await updateVoterLocal(voter._id, {
@@ -530,6 +539,7 @@ function InterestModal({ open, voter, options = [], onClose }) {
           <Typography variant="subtitle1" fontWeight={600}>
             {getName(voter)}
           </Typography>
+
           <TextField
             select
             label="Political interest / Party"
@@ -744,9 +754,8 @@ export default function Search() {
   const [interestVoter, setInterestVoter] = useState(null);
   const [volunteerVoter, setVolunteerVoter] = useState(null);
 
-  // 🔥 NEW: dynamic options
-  const [casteOptions, setCasteOptions] = useState([]);
-  const [partyOptions, setPartyOptions] = useState([]);
+  const [casteOptions, setCasteOptions] = useState([]); // ✅ from DB
+  const [partyOptions, setPartyOptions] = useState([]); // ✅ from Party collection
 
   const sentinelRef = useRef(null);
 
@@ -783,7 +792,7 @@ export default function Search() {
     loadAll().catch(() => {});
   }, [loadAll]);
 
-  // 🔥 Build caste options from local DB values
+  // ✅ Build caste options from local voter records
   useEffect(() => {
     const set = new Set();
     for (const r of allRows) {
@@ -795,13 +804,13 @@ export default function Search() {
     setCasteOptions(list);
   }, [allRows]);
 
-  // 🔥 Load party options from backend Party collection
+  // ✅ Load party options from Party collection
   useEffect(() => {
     let cancelled = false;
 
     async function fetchParties() {
       try {
-        const res = await api.get("/admin/parties"); // /api + /admin/parties
+        const res = await api.get("/admin/parties");
         const data = Array.isArray(res.data) ? res.data : [];
         const names = Array.from(
           new Set(
@@ -976,7 +985,6 @@ export default function Search() {
       />
 
       {/* Menu for logout and DB info */}
-
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -1022,9 +1030,9 @@ export default function Search() {
             sx={{
               borderRadius: 0,
               position: "sticky",
-              top: 56, // just below navbar; tweak if needed
+              top: 56,
               zIndex: 20,
-              bgcolor: "#f3f4f6", // light grey
+              bgcolor: "#f3f4f6",
               pb: 1,
               pt: 1,
               px: 1.5,
@@ -1060,7 +1068,6 @@ export default function Search() {
                   endAdornment: (
                     <InputAdornment position="end">
                       <>
-                        {/* CLEAR (X) BUTTON */}
                         {q?.length > 0 && (
                           <IconButton
                             size="small"
@@ -1071,7 +1078,6 @@ export default function Search() {
                           </IconButton>
                         )}
 
-                        {/* Voice Search */}
                         <VoiceSearchButton
                           onResult={(text) => setQ(text)}
                           lang={voiceLang}
@@ -1161,14 +1167,14 @@ export default function Search() {
                 <Paper
                   key={r._id || `${i}-${serialTxt}`}
                   sx={{
-                    p: 0.5, // narrower padding
+                    p: 0.5,
                     display: "flex",
                     flexDirection: "column",
                     gap: 0.15,
-                    borderRadius: 0.5, // smaller radius
+                    borderRadius: 0.5,
                   }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + caste / interest / volunteer icons */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1192,7 +1198,6 @@ export default function Search() {
                     </Stack>
 
                     <Stack direction="row" spacing={0.25} alignItems="center">
-                      {/* 1) Caste (via + icon) */}
                       <IconButton
                         size="small"
                         onClick={() => setCasteVoter(r)}
@@ -1200,7 +1205,6 @@ export default function Search() {
                         <AddRoundedIcon fontSize="small" />
                       </IconButton>
 
-                      {/* 2) Political interest */}
                       <IconButton
                         size="small"
                         onClick={() => setInterestVoter(r)}
@@ -1208,7 +1212,6 @@ export default function Search() {
                         <FlagRoundedIcon fontSize="small" />
                       </IconButton>
 
-                      {/* 3) Volunteer assigned */}
                       <IconButton
                         size="small"
                         onClick={() => setVolunteerVoter(r)}
@@ -1225,7 +1228,6 @@ export default function Search() {
                     justifyContent="space-between"
                     sx={{ width: "100%", mt: 0.15 }}
                   >
-                    {/* Name */}
                     <Typography
                       variant="subtitle1"
                       fontWeight={700}
@@ -1245,7 +1247,6 @@ export default function Search() {
                       {name}
                     </Typography>
 
-                    {/* Actions */}
                     <Stack direction="row" spacing={0.25} alignItems="center">
                       <IconButton
                         size="small"
@@ -1296,6 +1297,7 @@ export default function Search() {
       <CasteModal
         open={!!casteVoter}
         voter={casteVoter}
+        options={casteOptions}
         onClose={async (ok) => {
           setCasteVoter(null);
           if (ok) await loadAll();
@@ -1305,6 +1307,7 @@ export default function Search() {
       <InterestModal
         open={!!interestVoter}
         voter={interestVoter}
+        options={partyOptions}
         onClose={async (ok) => {
           setInterestVoter(null);
           if (ok) await loadAll();
