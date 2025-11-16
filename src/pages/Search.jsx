@@ -1160,7 +1160,7 @@ export default function Search() {
                         {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
+                        · Age {age || "—"} · {gender || "—"} EPIC {epic || "—"}
                       </Typography>
                     </Stack>
 
