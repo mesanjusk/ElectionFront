@@ -68,7 +68,7 @@ const getName = (r) =>
   pick(r?.__raw, ["Name", "नाम", "पूर्ण नाव"]) ||
   "";
 
-// ✅ UPDATED: include "Voter ID" + variants
+// ✅ EPIC / Voter ID
 const getEPIC = (r) =>
   pick(r, ["EPIC", "Voter ID", "Voter Id", "Voter id", "VoterID", "VoterId"]) ||
   pick(r?.__raw, ["EPIC", "Epic", "Voter ID", "Voter Id", "voter_id", "कार्ड नं"]) ||
@@ -203,9 +203,24 @@ const getCaste = (r) =>
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
   "";
 
+// 🔁 UPDATED: read Party Intrest / Party Interest variants
 const getPoliticalInterest = (r) =>
-  pick(r, ["politicalInterest", "PoliticalInterest", "interest"]) ||
-  pick(r?.__raw, ["politicalInterest", "PoliticalInterest", "interest"]) ||
+  pick(r, [
+    "politicalInterest",
+    "PoliticalInterest",
+    "interest",
+    "PartyInterest",
+    "Party Interest",
+    "Party Intrest",
+  ]) ||
+  pick(r?.__raw, [
+    "politicalInterest",
+    "PoliticalInterest",
+    "interest",
+    "PartyInterest",
+    "Party Interest",
+    "Party Intrest",
+  ]) ||
   "";
 
 const getVolunteer = (r) =>
@@ -339,8 +354,8 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
       return;
     }
 
-    // 1) Save locally
-    await updateVoterLocal(voter._id, { mobile: n });
+    // 1) Save locally – make sure both mobile + Mobile are updated
+    await updateVoterLocal(voter._id, { mobile: n, Mobile: n });
 
     // 2) Immediately push to server for active DB
     let msg = "Mobile saved locally.";
@@ -419,9 +434,14 @@ function CasteModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
 
   const handleSave = async () => {
+    const value = caste || "OPEN";
+
+    // Save locally in both variants: caste + Caste
     await updateVoterLocal(voter._id, {
-      caste: caste || "OPEN",
+      caste: value,
+      Caste: value,
     });
+
     onClose(true);
   };
 
@@ -470,9 +490,15 @@ function InterestModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
 
   const handleSave = async () => {
+    const value = interest || "";
+
+    // Save locally in all variants, including old "Party Intrest"
     await updateVoterLocal(voter._id, {
-      politicalInterest: interest || "",
+      politicalInterest: value,
+      PartyInterest: value,
+      "Party Intrest": value,
     });
+
     onClose(true);
   };
 
@@ -521,9 +547,14 @@ function VolunteerModal({ open, voter, onClose }) {
   if (!open || !voter) return null;
 
   const handleSave = async () => {
+    const value = volunteer || "";
+
+    // Save locally in both variants: volunteer + Volunteer
     await updateVoterLocal(voter._id, {
-      volunteer: volunteer || "",
+      volunteer: value,
+      Volunteer: value,
     });
+
     onClose(true);
   };
 
