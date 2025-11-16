@@ -24,6 +24,7 @@ import {
   Stack,
   TextField,
   Typography,
+  Chip,
 } from "@mui/material";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -31,7 +32,12 @@ import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 
 import { setAuthToken } from "../services/api";
-import { lockSession, getActiveDatabase, getUser, getAvailableDatabases } from "../auth";
+import {
+  lockSession,
+  getActiveDatabase,
+  getUser,
+  getAvailableDatabases,
+} from "../auth";
 import { db } from "../db/indexedDb";
 import { pullAll, pushOutbox } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
@@ -103,7 +109,7 @@ const normalizePhone = (raw) => {
   return d.length === 10 ? d : "";
 };
 
-/* Simple transliteration: Devanagari to Latin (approx) – for surname search */
+/* Simple transliteration: Devanagari to Latin (approx) – for surname search / A–Z */
 const DEV_TO_LATIN = {
   अ: "a",
   आ: "aa",
@@ -181,21 +187,70 @@ const buildShareText = (r, collectionName) => {
   return lines.join("\n");
 };
 
-/* Extract surname from full name (last word) */
+/* Extract surname from full name – FIRST word considered as surname */
 const getSurname = (r) => {
   const name = getName(r);
   if (!name) return "";
   const clean = String(name).replace(/[.,]/g, " ").trim();
   if (!clean) return "";
   const parts = clean.split(/\s+/);
-  return parts[parts.length - 1];
+  return parts[0];
 };
 
-/* ---------------- Family detail modal (all voters for that surname) ---- */
+/* Caste color tag style */
+const getCasteChipSx = (caste) => {
+  const v = String(caste || "OPEN").toUpperCase();
+  const base = {
+    height: 20,
+    borderRadius: "999px",
+    fontSize: 11,
+    px: 1,
+  };
+
+  if (v.includes("SC")) {
+    return { ...base, bgcolor: "#fee2e2", color: "#b91c1c" };
+  }
+  if (v.includes("ST")) {
+    return { ...base, bgcolor: "#dcfce7", color: "#166534" };
+  }
+  if (v.includes("OBC")) {
+    return { ...base, bgcolor: "#ffedd5", color: "#9a3412" };
+  }
+  if (v.includes("OPEN")) {
+    return { ...base, bgcolor: "#e0f2fe", color: "#075985" };
+  }
+  return { ...base, bgcolor: "#e5e7eb", color: "#111827" };
+};
+
+/* ---------------- Family detail modal (grouped by House + C/O) -------- */
 
 function FamilyDetailModal({ open, family, onClose, collectionName }) {
   if (!open || !family) return null;
   const voters = family.voters || [];
+
+  // Grouping by House No + Father (C/O)
+  const groupsMap = new Map();
+  for (const r of voters) {
+    const house = getHouseNo(r) || "";
+    const co = getCareOf(r) || "";
+    const key = `${house}||${co}`;
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        house,
+        co,
+        voters: [],
+      });
+    }
+    groupsMap.get(key).voters.push(r);
+  }
+
+  const groups = Array.from(groupsMap.values());
+  // Sort by house (optional)
+  groups.sort((a, b) => {
+    const ha = (a.house || "").toString();
+    const hb = (b.house || "").toString();
+    return ha.localeCompare(hb, "en-IN");
+  });
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -203,80 +258,98 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
         {family.surname} परिवार ({family.count} मतदाता)
       </DialogTitle>
       <DialogContent dividers>
-        <Stack spacing={0.75}>
-          {voters.map((r) => {
-            const name = getName(r);
-            const epic = getEPIC(r);
-            const age = getAge(r);
-            const gender = getGender(r);
-            const house = getHouseNo(r);
-            const co = getCareOf(r);
-            const mobRaw = getMobile(r);
-            const mob = normalizePhone(mobRaw);
-            const shareText = buildShareText(r, collectionName);
-            const waHref = mob
-              ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
-              : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
-
-            return (
-              <Paper
-                key={r._id || `${family.surname}-${epic}`}
-                sx={{
-                  p: 0.6,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 0.25,
-                  borderRadius: 0.75,
-                }}
+        <Stack spacing={1}>
+          {groups.map((g, idx) => (
+            <Paper
+              key={`${g.house}-${g.co}-${idx}`}
+              sx={{
+                p: 0.7,
+                borderRadius: 1,
+                border: "1px solid #e5e7eb",
+              }}
+            >
+              {/* Group header: House + C/O */}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600 }}
               >
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                >
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {name}
-                  </Typography>
-                  <Stack direction="row" spacing={0.25}>
-                    <IconButton
-                      size="small"
-                      disabled={!mob}
-                      component={mob ? "a" : "button"}
-                      href={mob ? `tel:${mob}` : undefined}
+                {g.house ? `House: ${g.house}` : "House: —"}
+                {g.co ? ` · C/O: ${g.co}` : ""}
+              </Typography>
+
+              <Stack spacing={0.4} sx={{ mt: 0.4 }}>
+                {g.voters.map((r) => {
+                  const name = getName(r);
+                  const epic = getEPIC(r);
+                  const age = getAge(r);
+                  const gender = getGender(r);
+                  const mobRaw = getMobile(r);
+                  const mob = normalizePhone(mobRaw);
+                  const shareText = buildShareText(r, collectionName);
+                  const waHref = mob
+                    ? `https://wa.me/91${mob}?text=${encodeURIComponent(
+                        shareText
+                      )}`
+                    : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+                  return (
+                    <Paper
+                      key={r._id || `${family.surname}-${epic}`}
+                      sx={{
+                        p: 0.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.2,
+                        borderRadius: 0.75,
+                        bgcolor: "#f9fafb",
+                      }}
                     >
-                      <CallRoundedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      component="a"
-                      href={waHref}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <WhatsAppIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
-                </Stack>
-                <Typography variant="caption" color="text.secondary">
-                  EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"}
-                </Typography>
-                {(house || co) && (
-                  <Typography variant="caption" color="text.secondary">
-                    {house ? `House: ${house}` : ""}{" "}
-                    {co ? `· C/O: ${co}` : ""}
-                  </Typography>
-                )}
-              </Paper>
-            );
-          })}
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          sx={{
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {name}
+                        </Typography>
+                        <Stack direction="row" spacing={0.25}>
+                          <IconButton
+                            size="small"
+                            disabled={!mob}
+                            component={mob ? "a" : "button"}
+                            href={mob ? `tel:${mob}` : undefined}
+                          >
+                            <CallRoundedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            component="a"
+                            href={waHref}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <WhatsAppIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary">
+                        EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"}
+                      </Typography>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          ))}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -290,7 +363,7 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
 
 /* ================================== PAGE ================================== */
 export default function Family() {
-  // auth for server Pull/Push (same as Search page)
+  // auth for server Pull/Push
   useEffect(() => {
     const t = localStorage.getItem("token");
     if (t) setAuthToken(t);
@@ -345,6 +418,7 @@ export default function Family() {
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   const [q, setQ] = useState(""); // surname search
+  const [letterFilter, setLetterFilter] = useState("ALL"); // A–Z filter
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -416,45 +490,55 @@ export default function Family() {
         mainCaste = casteKeys[0];
       } else if (casteKeys.length > 1) {
         // pick most common caste for that surname
-        casteKeys.sort(
-          (a, b) => fam.casteCounts[b] - fam.casteCounts[a]
-        );
+        casteKeys.sort((a, b) => fam.casteCounts[b] - fam.casteCounts[a]);
         mainCaste = casteKeys[0];
       }
+
+      const latin = devToLatin(fam.surname || "");
+      const alphaSource = (latin || fam.surname || "").trim();
+      const alphaKey = alphaSource ? alphaSource[0].toUpperCase() : "";
+
       list.push({
         surname: fam.surname,
         count: fam.count,
         caste: mainCaste,
         voters: fam.voters,
+        alphaKey,
       });
     }
 
-    // Sort families: larger groups first, then alphabetically
-    list.sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.surname.localeCompare(b.surname, "en-IN");
-    });
+    // 🔹 Sort surname alphabetically
+    list.sort((a, b) => a.surname.localeCompare(b.surname, "en-IN"));
 
     return list;
   }, [allRows]);
 
-  // Search by surname only (supports Latin or Devanagari via devToLatin)
+  // Search by surname + A–Z filter
   const filteredFamilies = useMemo(() => {
     const term = q.trim();
-    if (!term) return families;
-
-    const lower = term.toLowerCase();
-    const latinTerm = devToLatin(term);
+    const letter = letterFilter;
 
     return families.filter((f) => {
-      const s = String(f.surname || "").toLowerCase();
-      const latinSurname = devToLatin(f.surname || "");
+      // A–Z filter
+      if (letter !== "ALL" && f.alphaKey && f.alphaKey !== letter) {
+        return false;
+      }
+
+      if (!term) return true;
+
+      const lower = term.toLowerCase();
+      const latinTerm = devToLatin(term);
+
+      const surnameStr = String(f.surname || "");
+      const s = surnameStr.toLowerCase();
+      const latinSurname = devToLatin(surnameStr);
+
       return (
         s.includes(lower) ||
-        latinSurname.includes(latinTerm.toLowerCase())
+        latinSurname.toLowerCase().includes(latinTerm.toLowerCase())
       );
     });
-  }, [families, q]);
+  }, [families, q, letterFilter]);
 
   const visible = filteredFamilies.slice(0, visibleCount);
 
@@ -525,6 +609,8 @@ export default function Family() {
     }
   };
 
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
   return (
     <Box
       sx={{
@@ -573,7 +659,7 @@ export default function Family() {
         </Box>
       </Menu>
 
-      {/* Sticky header: only surname search */}
+      {/* Sticky header: surname search + A–Z filter bar */}
       <Box
         sx={{
           position: "sticky",
@@ -588,6 +674,7 @@ export default function Family() {
       >
         <Container maxWidth="lg">
           <Stack spacing={0.75}>
+            {/* Search bar */}
             <TextField
               fullWidth
               size="medium"
@@ -628,6 +715,34 @@ export default function Family() {
               }}
             />
 
+            {/* A–Z filter bar */}
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{
+                overflowX: "auto",
+                pb: 0.25,
+              }}
+            >
+              <Chip
+                label="All"
+                size="small"
+                onClick={() => setLetterFilter("ALL")}
+                color={letterFilter === "ALL" ? "primary" : "default"}
+                sx={{ height: 22 }}
+              />
+              {LETTERS.map((L) => (
+                <Chip
+                  key={L}
+                  label={L}
+                  size="small"
+                  onClick={() => setLetterFilter(L)}
+                  color={letterFilter === L ? "primary" : "default"}
+                  sx={{ height: 22 }}
+                />
+              ))}
+            </Stack>
+
             <Typography
               variant="caption"
               color="text.secondary"
@@ -656,8 +771,6 @@ export default function Family() {
               sx={{
                 p: 0.7,
                 display: "flex",
-                flexDirection: "column",
-                gap: 0.15,
                 borderRadius: 0.75,
                 cursor: "pointer",
               }}
@@ -666,7 +779,9 @@ export default function Family() {
                 direction="row"
                 justifyContent="space-between"
                 alignItems="center"
+                sx={{ width: "100%" }}
               >
+                {/* LEFT: Surname */}
                 <Typography
                   variant="subtitle1"
                   fontWeight={700}
@@ -679,21 +794,28 @@ export default function Family() {
                 >
                   {fam.surname}
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 500 }}
+
+                {/* RIGHT: Count + caste color tag */}
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  alignItems="center"
+                  sx={{ whiteSpace: "nowrap" }}
                 >
-                  {fam.count.toLocaleString()} voters
-                </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    {fam.count.toLocaleString()}
+                  </Typography>
+                  <Chip
+                    label={fam.caste || "OPEN"}
+                    size="small"
+                    sx={getCasteChipSx(fam.caste)}
+                  />
+                </Stack>
               </Stack>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 0.2 }}
-              >
-                Caste: {fam.caste || "OPEN"}
-              </Typography>
             </Paper>
           ))}
           <Box ref={sentinelRef} sx={{ height: 32 }} />

@@ -1,3 +1,4 @@
+// client/src/App.jsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login.jsx';
@@ -11,35 +12,47 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 export default function App() {
   return (
     <Routes>
-      {/* Public route */}
+      {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/adminlogin" element={<AdminLogin />} />
 
       {/* Protected routes */}
       <Route
         path="/"
-        element={(
+        element={
           <ProtectedRoute>
             <Home />
           </ProtectedRoute>
-        )}
+        }
       />
+
       <Route
         path="/admin"
-        element={(
+        element={
           <ProtectedRoute requiredRole="admin">
             <AdminHome />
           </ProtectedRoute>
-        )}
+        }
       />
+
+      {/* Voter search – ONLY Search page */}
       <Route
         path="/search"
-        element={(
+        element={
           <ProtectedRoute>
-           <Family />
             <Search />
           </ProtectedRoute>
-        )}
+        }
+      />
+
+      {/* Family search – ONLY Family page */}
+      <Route
+        path="/family"
+        element={
+          <ProtectedRoute>
+            <Family />
+          </ProtectedRoute>
+        }
       />
 
       {/* Fallback */}
