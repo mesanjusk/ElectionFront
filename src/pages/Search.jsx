@@ -37,6 +37,8 @@ import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
+import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 
 import { setAuthToken } from "../services/api";
 import {
@@ -403,18 +405,14 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
   );
 }
 
-/* ---------------- Voter tags (caste / interest / volunteer) ----------- */
+/* ---------------- Separate modals: Caste / Interest / Volunteer -------- */
 
-function VoterTagsModal({ open, voter, onClose }) {
+function CasteModal({ open, voter, onClose }) {
   const [caste, setCaste] = useState(getCaste(voter) || "OPEN");
-  const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
-  const [volunteer, setVolunteer] = useState(getVolunteer(voter) || "");
 
   useEffect(() => {
     if (voter) {
       setCaste(getCaste(voter) || "OPEN");
-      setInterest(getPoliticalInterest(voter) || "");
-      setVolunteer(getVolunteer(voter) || "");
     }
   }, [voter]);
 
@@ -423,21 +421,18 @@ function VoterTagsModal({ open, voter, onClose }) {
   const handleSave = async () => {
     await updateVoterLocal(voter._id, {
       caste: caste || "OPEN",
-      politicalInterest: interest || "",
-      volunteer: volunteer || "",
     });
     onClose(true);
   };
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Voter tags</DialogTitle>
+      <DialogTitle>Update caste</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="subtitle1" fontWeight={600}>
             {getName(voter)}
           </Typography>
-
           <TextField
             select
             label="Caste"
@@ -451,7 +446,44 @@ function VoterTagsModal({ open, voter, onClose }) {
               </MenuItem>
             ))}
           </TextField>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onClose(false)}>Cancel</Button>
+        <Button onClick={handleSave} variant="contained">
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
+function InterestModal({ open, voter, onClose }) {
+  const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
+
+  useEffect(() => {
+    if (voter) {
+      setInterest(getPoliticalInterest(voter) || "");
+    }
+  }, [voter]);
+
+  if (!open || !voter) return null;
+
+  const handleSave = async () => {
+    await updateVoterLocal(voter._id, {
+      politicalInterest: interest || "",
+    });
+    onClose(true);
+  };
+
+  return (
+    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
+      <DialogTitle>Political interest</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {getName(voter)}
+          </Typography>
           <TextField
             select
             label="Political interest"
@@ -465,9 +497,46 @@ function VoterTagsModal({ open, voter, onClose }) {
               </MenuItem>
             ))}
           </TextField>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onClose(false)}>Cancel</Button>
+        <Button onClick={handleSave} variant="contained">
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
+function VolunteerModal({ open, voter, onClose }) {
+  const [volunteer, setVolunteer] = useState(getVolunteer(voter) || "");
+
+  useEffect(() => {
+    if (voter) {
+      setVolunteer(getVolunteer(voter) || "");
+    }
+  }, [voter]);
+
+  if (!open || !voter) return null;
+
+  const handleSave = async () => {
+    await updateVoterLocal(voter._id, {
+      volunteer: volunteer || "",
+    });
+    onClose(true);
+  };
+
+  return (
+    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
+      <DialogTitle>Assigned volunteer</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {getName(voter)}
+          </Typography>
           <TextField
-            label="Volunteer"
+            label="Volunteer name"
             value={volunteer}
             onChange={(e) => setVolunteer(e.target.value)}
             placeholder="Volunteer / party worker name"
@@ -478,7 +547,7 @@ function VoterTagsModal({ open, voter, onClose }) {
       <DialogActions>
         <Button onClick={() => onClose(false)}>Cancel</Button>
         <Button onClick={handleSave} variant="contained">
-          Save tags
+          Save
         </Button>
       </DialogActions>
     </Dialog>
@@ -604,9 +673,13 @@ export default function Search() {
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
 
-  const [selected, setSelected] = useState(null);
-  const [tagsVoter, setTagsVoter] = useState(null);
-  const [detail, setDetail] = useState(null);
+  const [selected, setSelected] = useState(null); // mobile edit
+  const [detail, setDetail] = useState(null); // full record
+
+  const [casteVoter, setCasteVoter] = useState(null);
+  const [interestVoter, setInterestVoter] = useState(null);
+  const [volunteerVoter, setVolunteerVoter] = useState(null);
+
   const sentinelRef = useRef(null);
 
   const [snackbar, setSnackbar] = useState({
@@ -972,14 +1045,14 @@ export default function Search() {
                 <Paper
                   key={r._id || `${i}-${serialTxt}`}
                   sx={{
-                    p: 0.5,               // 🔻 narrower padding
+                    p: 0.5, // narrower padding
                     display: "flex",
                     flexDirection: "column",
-                    gap: 0.15,           // 🔻 smaller vertical gap
-                    borderRadius: 0.5,   // 🔻 smaller radius
+                    gap: 0.15,
+                    borderRadius: 0.5, // smaller radius
                   }}
                 >
-                  {/* Row 1: Serial · Age · Sex · EPIC + + button */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1002,13 +1075,31 @@ export default function Search() {
                       </Typography>
                     </Stack>
 
-                    <IconButton
-                      size="small"
-                      onClick={() => setTagsVoter(r)}
-                      sx={{ ml: 1 }}
-                    >
-                      <AddRoundedIcon fontSize="small" />
-                    </IconButton>
+                    <Stack direction="row" spacing={0.25} alignItems="center">
+                      {/* 1) Caste (via + icon) */}
+                      <IconButton
+                        size="small"
+                        onClick={() => setCasteVoter(r)}
+                      >
+                        <AddRoundedIcon fontSize="small" />
+                      </IconButton>
+
+                      {/* 2) Political interest */}
+                      <IconButton
+                        size="small"
+                        onClick={() => setInterestVoter(r)}
+                      >
+                        <FlagRoundedIcon fontSize="small" />
+                      </IconButton>
+
+                      {/* 3) Volunteer assigned */}
+                      <IconButton
+                        size="small"
+                        onClick={() => setVolunteerVoter(r)}
+                      >
+                        <GroupRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   </Stack>
 
                   {/* Row 2: Name + Call + WhatsApp + Edit */}
@@ -1085,14 +1176,34 @@ export default function Search() {
         }}
         onSynced={showSnack}
       />
-      <VoterTagsModal
-        open={!!tagsVoter}
-        voter={tagsVoter}
+
+      <CasteModal
+        open={!!casteVoter}
+        voter={casteVoter}
         onClose={async (ok) => {
-          setTagsVoter(null);
+          setCasteVoter(null);
           if (ok) await loadAll();
         }}
       />
+
+      <InterestModal
+        open={!!interestVoter}
+        voter={interestVoter}
+        onClose={async (ok) => {
+          setInterestVoter(null);
+          if (ok) await loadAll();
+        }}
+      />
+
+      <VolunteerModal
+        open={!!volunteerVoter}
+        voter={volunteerVoter}
+        onClose={async (ok) => {
+          setVolunteerVoter(null);
+          if (ok) await loadAll();
+        }}
+      />
+
       <RecordModal
         open={!!detail}
         voter={detail}
