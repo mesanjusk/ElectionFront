@@ -2,12 +2,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Avatar,
   Box,
   Button,
   Card,
   CardContent,
-  Chip,
   Container,
   Grid,
   Stack,
@@ -17,7 +15,6 @@ import {
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import QuizRoundedIcon from "@mui/icons-material/QuizRounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
-import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 import {
@@ -42,7 +39,6 @@ export default function Home() {
   const navigate = useNavigate();
   const user = useMemo(() => getUser(), []);
 
-  // Pick the single assigned per-user DB (no UI to change)
   const assignedDb = useMemo(() => {
     if (!databases || databases.length === 0) return null;
     if (databases.length === 1) return databases[0];
@@ -58,7 +54,6 @@ export default function Home() {
       `Database ${assignedId}`
     : null;
 
-  // Load DBs & restore last sync count on mount
   useEffect(() => {
     const dbs = getAvailableDatabases();
     setDatabases(dbs);
@@ -79,7 +74,6 @@ export default function Home() {
     }
   }, []);
 
-  // Keep count updated when assigned DB changes
   useEffect(() => {
     if (!assignedId) return;
     const cached = Number(
@@ -137,7 +131,6 @@ export default function Home() {
     }
   };
 
-  // --- Election trends bar chart data (like screenshot) ---
   const chartData = [
     { label: "BJP", value: 320 },
     { label: "INC", value: 260 },
@@ -150,6 +143,7 @@ export default function Home() {
   const maxVal = Math.max(...chartData.map((d) => d.value), 10);
   const yTicks = [0, 100, 200, 300, 400];
 
+  // 🔹 Update quick actions: 1) Voter Search 2) Family Search 3) Coming Soon
   const quickActions = [
     {
       label: "Voter Search",
@@ -158,10 +152,10 @@ export default function Home() {
       action: () => navigate("/search"),
     },
     {
-      label: "Coming Soon",
+      label: "Family Search",
       description: "",
-      icon: <QuizRoundedIcon color="primary" />,
-      action: () => alert("Feature coming soon."),
+      icon: <SearchRoundedIcon color="primary" />,
+      action: () => navigate("/family"),
     },
     {
       label: "Coming Soon",
@@ -175,7 +169,6 @@ export default function Home() {
   const userName = user?.username || user?.name || "User";
   const userRole = (user?.role || "").toUpperCase();
   const avatarUrl = user?.avatarUrl || user?.avatar || null;
-  // Banner image uploaded while creating user (poster)
   const bannerUrl =
     user?.bannerUrl || user?.coverUrl || user?.posterUrl || avatarUrl;
 
@@ -191,9 +184,7 @@ export default function Home() {
 
   return (
     <Box sx={{ minHeight: "100vh", pb: 4 }}>
-      {/* Top navbar */}
       <TopNavbar
-        
         userName={userName}
         userAvatar={avatarUrl}
         busy={syncing}
@@ -202,7 +193,6 @@ export default function Home() {
         onPush={pushAssigned}
       />
 
-      {/* Menu for logout */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -224,7 +214,6 @@ export default function Home() {
 
       <Container maxWidth="sm" sx={{ pt: 1, pb: 4 }}>
         <Stack spacing={3}>
-          {/* Banner uses image uploaded while creating user */}
           <Box
             sx={{
               borderRadius: 3,
@@ -255,12 +244,8 @@ export default function Home() {
             )}
           </Box>
 
-          {/* Trends Election 2025 card with multi-bar chart */}
-          
+          {/* (Chart etc. removed/kept as you had – left as-is) */}
 
-          
-
-          {/* Bottom three pastel blocks like screenshot */}
           <Grid container spacing={2}>
             {quickActions.map((action) => (
               <Grid item xs={4} key={action.label}>
@@ -274,8 +259,7 @@ export default function Home() {
                     alignItems: "center",
                     justifyContent: "center",
                     boxShadow: 2,
-                    background:
-                      "linear-gradient(145deg, #f5f7ff, #ffffff)",
+                    background: "linear-gradient(145deg, #f5f7ff, #ffffff)",
                   }}
                 >
                   <CardContent

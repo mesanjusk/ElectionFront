@@ -5,6 +5,7 @@ import AdminLogin from './pages/AdminLogin.jsx';
 import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
 import AdminHome from './pages/AdminHome.jsx';
+import Family from "./pages/Family.jsx";
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         path="/search"
         element={(
           <ProtectedRoute>
+           <Family />
             <Search />
           </ProtectedRoute>
         )}
