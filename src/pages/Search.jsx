@@ -555,23 +555,54 @@ function InterestModal({ open, voter, onClose, options = [] }) {
   );
 }
 
-function VolunteerModal({ open, voter, onClose }) {
-  const [volunteer, setVolunteer] = useState(getVolunteer(voter) || "");
+/**
+ * VolunteerModal
+ * - Volunteers come from Users table (filtered as volunteers for this candidate)
+ * - You can pick from list OR type custom volunteer name
+ */
+function VolunteerModal({ open, voter, onClose, options = [] }) {
+  const [volunteerName, setVolunteerName] = useState(getVolunteer(voter) || "");
+  const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
 
   useEffect(() => {
     if (voter) {
-      setVolunteer(getVolunteer(voter) || "");
+      const vName = getVolunteer(voter) || "";
+      setVolunteerName(vName);
+
+      // try to auto-select matching volunteer from options
+      const matched = options.find(
+        (o) => o.name && o.name.toLowerCase() === vName.toLowerCase()
+      );
+      setSelectedVolunteerId(matched ? matched.id || matched._id || "" : "");
     }
-  }, [voter]);
+  }, [voter, options]);
 
   if (!open || !voter) return null;
 
   const handleSave = async () => {
+    const nameFromList =
+      options.find(
+        (o) =>
+          o.id === selectedVolunteerId ||
+          o._id === selectedVolunteerId ||
+          o.uuid === selectedVolunteerId
+      )?.name || "";
+
+    const finalName =
+      (nameFromList && nameFromList.trim()) ||
+      (volunteerName && volunteerName.trim()) ||
+      "";
+
     await updateVoterLocal(voter._id, {
-      volunteer: volunteer || "",
+      volunteer: finalName,
+      assignedVolunteer: finalName,
+      volunteerId: selectedVolunteerId || undefined,
     });
+
     onClose(true);
   };
+
+  const volunteers = options || [];
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
@@ -581,10 +612,45 @@ function VolunteerModal({ open, voter, onClose }) {
           <Typography variant="subtitle1" fontWeight={600}>
             {getName(voter)}
           </Typography>
+
+          {/* Volunteer dropdown from Users table */}
           <TextField
-            label="Volunteer name"
-            value={volunteer}
-            onChange={(e) => setVolunteer(e.target.value)}
+            select
+            label="Select volunteer"
+            value={selectedVolunteerId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedVolunteerId(id);
+              const found = volunteers.find(
+                (o) => o.id === id || o._id === id || o.uuid === id
+              );
+              if (found?.name) {
+                setVolunteerName(found.name);
+              }
+            }}
+            fullWidth
+            helperText="Volunteers assigned to this candidate"
+          >
+            <MenuItem value="">
+              <em>(None)</em>
+            </MenuItem>
+            {volunteers.map((v) => (
+              <MenuItem key={v.id || v._id || v.name} value={v.id || v._id || v.uuid || v.name}>
+                {v.name}
+                {v.phone ? ` (${v.phone})` : ""}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {/* OR type custom volunteer name */}
+          <TextField
+            label="Or type volunteer name"
+            value={volunteerName}
+            onChange={(e) => {
+              setVolunteerName(e.target.value);
+              // if typing manually, clear dropdown selection
+              if (selectedVolunteerId) setSelectedVolunteerId("");
+            }}
             placeholder="Volunteer / party worker name"
             fullWidth
           />
@@ -728,6 +794,7 @@ export default function Search() {
 
   const [casteOptions, setCasteOptions] = useState([]); // from local records
   const [partyOptions, setPartyOptions] = useState([]); // from Party collection
+  const [volunteerOptions, setVolunteerOptions] = useState([]); // from Users table
 
   const sentinelRef = useRef(null);
 
@@ -806,6 +873,48 @@ export default function Search() {
     }
 
     fetchParties();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load volunteers from Users table (only volunteer role, assigned to this candidate)
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchVolunteers() {
+      try {
+        const res = await api.get("/api/admin/users");
+        const raw =
+          Array.isArray(res.data) ? res.data : res.data?.users || [];
+
+        const list = raw
+          .filter((u) => {
+            const role = (u.role || u.type || "").toString().toLowerCase();
+            // treat 'volunteer' as volunteer role
+            return role.includes("volunteer");
+          })
+          .map((u) => ({
+            id: u._id || u.id || u.uuid,
+            name: u.name || u.fullName || u.username,
+            phone:
+              u.mobile ||
+              u.phone ||
+              u.contactNumber ||
+              u.whatsapp ||
+              u.whatsappNumber,
+          }))
+          .filter((v) => v.name);
+
+        if (!cancelled) {
+          setVolunteerOptions(list);
+        }
+      } catch (err) {
+        console.error("Failed to load volunteers:", err?.response?.data || err);
+      }
+    }
+
+    fetchVolunteers();
     return () => {
       cancelled = true;
     };
@@ -1294,6 +1403,7 @@ export default function Search() {
       <VolunteerModal
         open={!!volunteerVoter}
         voter={volunteerVoter}
+        options={volunteerOptions}
         onClose={async (ok) => {
           setVolunteerVoter(null);
           if (ok) await loadAll();
