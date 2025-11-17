@@ -604,6 +604,7 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
 
   const volunteers = options || [];
 
+
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
       <DialogTitle>Assigned volunteer</DialogTitle>
@@ -635,7 +636,10 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
               <em>(None)</em>
             </MenuItem>
             {volunteers.map((v) => (
-              <MenuItem key={v.id || v._id || v.name} value={v.id || v._id || v.uuid || v.name}>
+              <MenuItem
+                key={v.id || v._id || v.name}
+                value={v.id || v._id || v.uuid || v.name}
+              >
                 {v.name}
                 {v.phone ? ` (${v.phone})` : ""}
               </MenuItem>
@@ -888,14 +892,40 @@ export default function Search() {
         const raw =
           Array.isArray(res.data) ? res.data : res.data?.users || [];
 
+        // current logged-in user (candidate / parent)
+        let myId = null;
+        try {
+          const authUser = getUser && getUser();
+          myId =
+            authUser?.id ||
+            authUser?._id ||
+            authUser?.userId ||
+            authUser?.user?.id ||
+            null;
+        } catch {
+          // ignore
+        }
+
         const list = raw
           .filter((u) => {
-            const role = (u.role || u.type || "").toString().toLowerCase();
-            // treat 'volunteer' as volunteer role
-            return role.includes("volunteer");
+            const role = (u.role || u.type || "")
+              .toString()
+              .toLowerCase();
+
+            // only users with volunteer role
+            if (!role.includes("volunteer")) return false;
+
+            // if we know current user's id, show only volunteers linked to this parent
+            if (myId) {
+              const parent = u.parentUserId ? String(u.parentUserId) : "";
+              return parent === String(myId);
+            }
+
+            // fallback: admin view sees all volunteers
+            return true;
           })
           .map((u) => ({
-            id: u._id || u.id || u.uuid,
+            id: u.id || u._id || u.uuid,
             name: u.name || u.fullName || u.username,
             phone:
               u.mobile ||
