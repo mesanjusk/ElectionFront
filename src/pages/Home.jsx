@@ -165,10 +165,10 @@ export default function Home() {
       action: () => navigate("/family"),
     },
     {
-      label: "Coming Soon",
+      label: "Alphabatically",
       description: "",
       icon: <MapRoundedIcon color="primary" />,
-      action: () => navigate(""),
+      action: () => navigate("/alpha"),
     },
   ];
 

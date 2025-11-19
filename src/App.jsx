@@ -7,6 +7,7 @@ import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
 import AdminHome from './pages/AdminHome.jsx';
 import Family from "./pages/Family.jsx";
+import Alpha from "./pages/alphafamily.jsx";
 import Caste from "./pages/Caste.jsx";
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -52,6 +53,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Family />
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/family"
+        element={
+          <ProtectedRoute>
+            <Alpha />
           </ProtectedRoute>
         }
       />
