@@ -57,7 +57,7 @@ export default function App() {
         }
       />
        <Route
-        path="/family"
+        path="/alpha"
         element={
           <ProtectedRoute>
             <Alpha />
