@@ -1,4 +1,4 @@
-// client/src/pages/Search.jsx
+// client/src/pages/Family.jsx
 import React, {
   useEffect,
   useMemo,
@@ -11,10 +11,6 @@ import {
   Box,
   Button,
   Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   InputAdornment,
   Menu,
@@ -22,23 +18,15 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Tab,
-  Tabs,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
+  Chip,
 } from "@mui/material";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
-import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 
-import api from "../api";
 import { setAuthToken } from "../services/api";
 import {
   lockSession,
@@ -47,12 +35,12 @@ import {
   getAvailableDatabases,
 } from "../auth";
 import { db } from "../db/indexedDb";
-import { pullAll, pushOutbox, updateVoterLocal } from "../services/sync";
+import { pullAll, pushOutbox } from "../services/sync";
 import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
 import TopNavbar from "../components/TopNavbar.jsx";
 
-/* ---------------- helpers (EN + MR + __raw fallbacks) ---------------- */
+/* ---------------- helpers (same style as Search.jsx) ---------------- */
 const pick = (obj, keys) => {
   if (!obj) return "";
   for (const k of keys) {
@@ -67,85 +55,13 @@ const getName = (r) =>
   pick(r?.__raw, ["Name", "नाम", "पूर्ण नाव"]) ||
   "";
 
-// ✅ EPIC / Voter ID
 const getEPIC = (r) =>
   pick(r, ["EPIC", "Voter ID", "Voter Id", "Voter id", "VoterID", "VoterId"]) ||
   pick(r?.__raw, ["EPIC", "Epic", "Voter ID", "Voter Id", "voter_id", "कार्ड नं"]) ||
   "";
 
-const getPart = (r) =>
-  pick(r, ["Part", "part", "Booth", "booth"]) ||
-  pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
-  "";
-
-const getSerialText = (r) =>
-  pick(r, [
-    "Serial No",
-    "serial",
-    "Serial",
-    "Sr No",
-    "SrNo",
-    "अनुक्रमांक",
-    "अनु. क्र.",
-  ]) ||
-  pick(r?.__raw, [
-    "Serial No",
-    "Serial",
-    "SrNo",
-    "Sr No",
-    "अनु क्र",
-    "अनु. नं.",
-    "अनुक्रमांक",
-    "अनुक्रमांक नं.",
-  ]) ||
-  "";
-
-const parseLastNumber = (s) => {
-  const m = String(s || "").match(/\d+/g);
-  if (!m) return NaN;
-  const n = parseInt(m[m.length - 1], 10);
-  return Number.isNaN(n) ? NaN : n;
-};
-
-/** Roll / Part / Serial mapping */
-const getRPS = (r) =>
-  pick(r, [
-    "RPS",
-    "RollPartSerial",
-    "Roll/Part/Serial",
-    "Roll / Part / Serial",
-    "R/P/S",
-    "Roll-Part-Serial",
-    "Roll_Part_Serial",
-  ]) || "";
-
-/** Serial as number (for sorting) */
-const getSerialNum = (r) => {
-  const t = getSerialText(r);
-  if (t) return parseLastNumber(t);
-  const rps = getRPS(r);
-  if (rps && /\d+\/\d+\/\d+/.test(rps)) {
-    const last = rps.split("/").pop();
-    return parseLastNumber(last);
-  }
-  return NaN;
-};
-
-const getHouseNo = (r) =>
-  pick(r, ["House No", "House", "HouseNumber"]) ||
-  pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
-  "";
-
 const getAge = (r) =>
   pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
-
-const getAgeNum = (r) => {
-  const raw = getAge(r);
-  const m = String(raw || "").match(/\d+/);
-  if (!m) return null;
-  const n = parseInt(m[0], 10);
-  return Number.isNaN(n) ? null : n;
-};
 
 const getGender = (r) => {
   const g =
@@ -159,56 +75,25 @@ const getGender = (r) => {
   return s.toUpperCase();
 };
 
-const getCareOf = (r) =>
-  pick(r, ["CareOf", "careof", "C/O", "CO", "Father", "Husband"]) ||
-  pick(r?.__raw, [
-    "Father",
-    "Husband",
-    "Care Of",
-    "C/O",
-    "वडील",
-    "पती",
-    "पु...",
-  ]) ||
+const getHouseNo = (r) =>
+  pick(r, ["House No", "House", "HouseNumber"]) ||
+  pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
   "";
 
-/* Mobile – stored in our local DB */
+const getCareOf = (r) =>
+  pick(r, ["CareOf", "careof", "C/O", "CO", "Father", "Husband"]) ||
+  pick(r?.__raw, ["Father", "Husband", "Care Of", "C/O", "वडील", "पती"]) ||
+  "";
+
 const getMobile = (r) =>
   r?.mobile ||
   pick(r, ["Mobile", "mobile", "Phone"]) ||
   pick(r?.__raw, ["Mobile", "mobile", "Phone"]) ||
   "";
 
-/* Image URL – used in WhatsApp share text */
-const getPhotoUrl = (r) =>
-  pick(r, [
-    "photoUrl",
-    "photo",
-    "Photo",
-    "image",
-    "Image",
-    "img",
-    "Img",
-    "avatar",
-    "Avatar",
-  ]) ||
-  pick(r?.__raw, ["photoUrl", "photo", "Photo", "image", "Image", "img"]) ||
-  "";
-
-// caste / political interest / volunteer getters
 const getCaste = (r) =>
   pick(r, ["caste", "Caste"]) ||
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
-  "";
-
-const getPoliticalInterest = (r) =>
-  pick(r, ["politicalInterest", "PoliticalInterest", "interest"]) ||
-  pick(r?.__raw, ["politicalInterest", "PoliticalInterest", "interest"]) ||
-  "";
-
-const getVolunteer = (r) =>
-  pick(r, ["volunteer", "Volunteer", "assignedVolunteer"]) ||
-  pick(r?.__raw, ["volunteer", "Volunteer", "assignedVolunteer"]) ||
   "";
 
 /* Normalize phone for tel:/WhatsApp */
@@ -220,7 +105,7 @@ const normalizePhone = (raw) => {
   return d.length === 10 ? d : "";
 };
 
-/* Simple transliteration: Devanagari to Latin (approx) – for text search */
+/* Simple transliteration: Devanagari to Latin (approx) – for surname search / A–Z */
 const DEV_TO_LATIN = {
   अ: "a",
   आ: "aa",
@@ -274,461 +159,73 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp – includes photo, caste, interest, volunteer, DB */
+/* Share text for WhatsApp (simple version for per-voter row) */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
-  const epic = getEPIC(r); // EPIC = Voter ID
-  const part = getPart(r);
-  const serial = getSerialNum(r);
-  const rps = getRPS(r);
+  const epic = getEPIC(r);
   const age = getAge(r);
   const gender = getGender(r);
   const house = getHouseNo(r);
   const co = getCareOf(r);
-  const photo = getPhotoUrl(r);
-
   const caste = getCaste(r) || "OPEN";
-  const interest = getPoliticalInterest(r) || "—";
-  const volunteer = getVolunteer(r) || "";
   const dbName = collectionName || "";
 
   const lines = [
     "Voter Details",
     `Name: ${name}`,
-    `EPIC: ${epic}`,
-    
-    rps ? `R/P/S: ${rps}` : null,
+    `EPIC: ${epic || "—"}`,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
-    
-    photo ? `Photo: ${photo}` : null, // image URL
+    house ? `House: ${house}` : null,
+    co ? `C/O: ${co}` : null,
+    `Caste: ${caste}`,
+    dbName ? `Database: ${dbName}` : null,
   ].filter(Boolean);
   return lines.join("\n");
 };
 
-/* ---------------- Small mobile edit modal (local + push) --------------- */
+/* Extract surname from full name – FIRST word considered as surname */
+const getSurname = (r) => {
+  const name = getName(r);
+  if (!name) return "";
+  const clean = String(name).replace(/[.,]/g, " ").trim();
+  if (!clean) return "";
+  const parts = clean.split(/\s+/);
+  return parts[0];
+};
 
-function MobileEditModal({ open, voter, onClose, onSynced }) {
-  const [mobile, setMobile] = useState(getMobile(voter));
-
-  useEffect(() => {
-    setMobile(getMobile(voter));
-  }, [voter]);
-
-  if (!open || !voter) return null;
-
-  const handleSave = async () => {
-    const n = normalizePhone(mobile);
-    if (!n) {
-      alert("Enter a valid 10-digit mobile.");
-      return;
-    }
-
-    // 1) Save locally
-    await updateVoterLocal(voter._id, { mobile: n });
-
-    // 2) Immediately push to server for active DB
-    let msg = "Mobile saved locally.";
-    try {
-      const dbId = getActiveDatabase && getActiveDatabase();
-      if (dbId) {
-        const res = await pushOutbox({ databaseId: dbId });
-        const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
-        if (pushed != null) {
-          msg = `Saved & pushed ${pushed} change(s) to server.`;
-        } else {
-          msg = "Saved & sync triggered.";
-        }
-      } else {
-        msg = "Saved locally. No active database assigned.";
-      }
-    } catch (e) {
-      msg = "Saved locally. Sync failed, will retry from Push.";
-    }
-
-    if (onSynced) onSynced(msg);
-    onClose(true);
+/* Caste color tag style */
+const getCasteChipSx = (caste) => {
+  const v = String(caste || "OPEN").toUpperCase();
+  const base = {
+    height: 20,
+    borderRadius: "999px",
+    fontSize: 11,
+    px: 1,
   };
 
-  return (
-    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Mobile number</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            {getName(voter)}
-          </Typography>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <Typography variant="caption" color="text.secondary">
-              EPIC
-            </Typography>
-            <Typography fontFamily="monospace">
-              {getEPIC(voter)}
-            </Typography>
-          </Stack>
-          <TextField
-            label="Mobile number"
-            value={mobile || ""}
-            onChange={(e) => setMobile(e.target.value)}
-            placeholder="10-digit mobile"
-            inputProps={{ inputMode: "numeric", maxLength: 10 }}
-            fullWidth
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => onClose(false)}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">
-          Save & Sync
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-/* ---------------- Separate modals: Caste / Interest / Volunteer -------- */
-
-/**
- * CasteModal
- * - Options come from local voter records (casteOptions)
- * - Also supports typing a brand-new caste
- */
-function CasteModal({ open, voter, onClose, options = [] }) {
-  const [caste, setCaste] = useState(getCaste(voter) || "");
-  const [customCaste, setCustomCaste] = useState("");
-
-  useEffect(() => {
-    if (voter) {
-      setCaste(getCaste(voter) || "");
-      setCustomCaste("");
-    }
-  }, [voter]);
-
-  if (!open || !voter) return null;
-
-  const handleSave = async () => {
-    const finalCaste =
-      (customCaste && customCaste.trim()) ||
-      (caste && caste.trim()) ||
-      "OPEN";
-
-    await updateVoterLocal(voter._id, {
-      caste: finalCaste,
-    });
-    onClose(true);
-  };
-
-  const casteList = options && options.length ? options : [];
-
-  return (
-    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Update caste</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            {getName(voter)}
-          </Typography>
-
-          {/* Existing caste dropdown from DB values */}
-          <TextField
-            select
-            label="Select caste"
-            value={caste}
-            onChange={(e) => setCaste(e.target.value)}
-            fullWidth
-          >
-            <MenuItem value="">
-              <em>(None)</em>
-            </MenuItem>
-            {casteList.map((c) => (
-              <MenuItem key={c} value={c}>
-                {c}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* OR add a new caste */}
-          <TextField
-            label="Or type new caste"
-            value={customCaste}
-            onChange={(e) => setCustomCaste(e.target.value)}
-            placeholder="e.g. कश्यप, अत्रि..."
-            fullWidth
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => onClose(false)}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">
-          Save
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-/**
- * InterestModal
- * - Options come from Party collection via /api/admin/parties
- * - Also supports typing a brand-new interest
- */
-function InterestModal({ open, voter, onClose, options = [] }) {
-  const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
-  const [customInterest, setCustomInterest] = useState("");
-
-  useEffect(() => {
-    if (voter) {
-      setInterest(getPoliticalInterest(voter) || "");
-      setCustomInterest("");
-    }
-  }, [voter]);
-
-  if (!open || !voter) return null;
-
-  const handleSave = async () => {
-    const finalInterest =
-      (customInterest && customInterest.trim()) ||
-      (interest && interest.trim()) ||
-      "";
-
-    await updateVoterLocal(voter._id, {
-      politicalInterest: finalInterest,
-    });
-    onClose(true);
-  };
-
-  const interestList = options && options.length ? options : [];
-
-  return (
-    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Political interest</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            {getName(voter)}
-          </Typography>
-
-          {/* Party / interest dropdown from Party master */}
-          <TextField
-            select
-            label="Political interest (party)"
-            value={interest}
-            onChange={(e) => setInterest(e.target.value)}
-            fullWidth
-            helperText="Party from Party master DB"
-          >
-            <MenuItem value="">
-              <em>Choose party</em>
-            </MenuItem>
-            {interestList.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* OR add a new interest */}
-          <TextField
-            label="Or type custom interest"
-            value={customInterest}
-            onChange={(e) => setCustomInterest(e.target.value)}
-            placeholder="e.g. Pro local independent, issue-based..."
-            fullWidth
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => onClose(false)}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">
-          Save
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-/**
- * VolunteerModal
- * - Volunteers come from Users table (filtered as volunteers for this candidate)
- * - You can pick from list OR type custom volunteer name
- */
-function VolunteerModal({ open, voter, onClose, options = [] }) {
-  const [volunteerName, setVolunteerName] = useState(getVolunteer(voter) || "");
-  const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
-
-  useEffect(() => {
-    if (voter) {
-      const vName = getVolunteer(voter) || "";
-      setVolunteerName(vName);
-
-      // try to auto-select matching volunteer from options
-      const matched = options.find(
-        (o) => o.name && o.name.toLowerCase() === vName.toLowerCase()
-      );
-      setSelectedVolunteerId(matched ? matched.id || matched._id || "" : "");
-    }
-  }, [voter, options]);
-
-  if (!open || !voter) return null;
-
-  const handleSave = async () => {
-    const nameFromList =
-      options.find(
-        (o) =>
-          o.id === selectedVolunteerId ||
-          o._id === selectedVolunteerId ||
-          o.uuid === selectedVolunteerId
-      )?.name || "";
-
-    const finalName =
-      (nameFromList && nameFromList.trim()) ||
-      (volunteerName && volunteerName.trim()) ||
-      "";
-
-    await updateVoterLocal(voter._id, {
-      volunteer: finalName,
-      assignedVolunteer: finalName,
-      volunteerId: selectedVolunteerId || undefined,
-    });
-
-    onClose(true);
-  };
-
-  const volunteers = options || [];
-
-
-  return (
-    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Assigned volunteer</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            {getName(voter)}
-          </Typography>
-
-          {/* Volunteer dropdown from Users table */}
-          <TextField
-            select
-            label="Select volunteer"
-            value={selectedVolunteerId}
-            onChange={(e) => {
-              const id = e.target.value;
-              setSelectedVolunteerId(id);
-              const found = volunteers.find(
-                (o) => o.id === id || o._id === id || o.uuid === id
-              );
-              if (found?.name) {
-                setVolunteerName(found.name);
-              }
-            }}
-            fullWidth
-            helperText="Volunteers assigned to this candidate"
-          >
-            <MenuItem value="">
-              <em>(None)</em>
-            </MenuItem>
-            {volunteers.map((v) => (
-              <MenuItem
-                key={v.id || v._id || v.name}
-                value={v.id || v._id || v.uuid || v.name}
-              >
-                {v.name}
-                {v.phone ? ` (${v.phone})` : ""}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* OR type custom volunteer name */}
-          <TextField
-            label="Or type volunteer name"
-            value={volunteerName}
-            onChange={(e) => {
-              setVolunteerName(e.target.value);
-              // if typing manually, clear dropdown selection
-              if (selectedVolunteerId) setSelectedVolunteerId("");
-            }}
-            placeholder="Volunteer / party worker name"
-            fullWidth
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => onClose(false)}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">
-          Save
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-/* ---------------- Full Record Details modal ---------------- */
-function RecordModal({ open, voter, onClose, collectionName }) {
-  if (!open || !voter) return null;
-  const fields = [
-    ["Name", getName(voter)],
-    ["EPIC", getEPIC(voter)],
-    ["R/P/S", getRPS(voter) || "—"],
-    ["Age", getAge(voter) || "—"],
-    ["Sex", getGender(voter) || "—"],
-  ];
-  const shareText = buildShareText(voter, collectionName);
-
-  const mob = getMobile(voter);
-  const waUrl = mob
-    ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
-    : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
-
-  return (
-    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="sm">
-      <DialogTitle>Record details</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={1.5}>
-          {fields.map(([k, v]) => (
-            <Stack
-              key={k}
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="caption" color="text.secondary">
-                {k}
-              </Typography>
-              <Typography fontWeight={600}>{String(v)}</Typography>
-            </Stack>
-          ))}
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button
-          href={waUrl}
-          target="_blank"
-          rel="noreferrer"
-          variant="contained"
-          startIcon={<WhatsAppIcon />}
-        >
-          Share on WhatsApp
-        </Button>
-        <Button onClick={() => onClose(false)} variant="outlined">
-          Close
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
+  if (v.includes("SC")) {
+    return { ...base, bgcolor: "#fee2e2", color: "#b91c1c" };
+  }
+  if (v.includes("ST")) {
+    return { ...base, bgcolor: "#dcfce7", color: "#166534" };
+  }
+  if (v.includes("OBC")) {
+    return { ...base, bgcolor: "#ffedd5", color: "#9a3412" };
+  }
+  if (v.includes("OPEN")) {
+    return { ...base, bgcolor: "#e0f2fe", color: "#075985" };
+  }
+  return { ...base, bgcolor: "#e5e7eb", color: "#111827" };
+};
 
 /* ================================== PAGE ================================== */
-export default function Search() {
+export default function Family() {
   // auth for server Pull/Push
   useEffect(() => {
     const t = localStorage.getItem("token");
     if (t) setAuthToken(t);
   }, []);
 
-  // username and collection
   const [userName, setUserName] = useState("User");
   const [collectionName, setCollectionName] = useState("");
 
@@ -774,26 +271,14 @@ export default function Search() {
     }
   }, [activeDb]);
 
-  const voiceLang = "hi-IN"; // Hindi voice search (for button)
+  const voiceLang = "hi-IN";
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
-  const [q, setQ] = useState("");
-  const [tab, setTab] = useState("all"); // all | male | female
-  const [ageBand, setAgeBand] = useState("all");
+  const [q, setQ] = useState(""); // surname / name search
+  const [letterFilter, setLetterFilter] = useState("ALL"); // A–Z filter
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
-
-  const [selected, setSelected] = useState(null); // mobile edit
-  const [detail, setDetail] = useState(null); // full record
-
-  const [casteVoter, setCasteVoter] = useState(null);
-  const [interestVoter, setInterestVoter] = useState(null);
-  const [volunteerVoter, setVolunteerVoter] = useState(null);
-
-  const [casteOptions, setCasteOptions] = useState([]); // from local records
-  const [partyOptions, setPartyOptions] = useState([]); // from Party collection
-  const [volunteerOptions, setVolunteerOptions] = useState([]); // from Users table
 
   const sentinelRef = useRef(null);
 
@@ -815,174 +300,120 @@ export default function Search() {
     window.location.href = "/login";
   };
 
-   const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     const arr = await db.voters.toArray();
-
-    // Sort alphabetically by surname (A→Z), then by full name, then by serial
-    arr.sort((a, b) => {
-      const sa = getSurnameKey(a).toLowerCase();
-      const sb = getSurnameKey(b).toLowerCase();
-
-      // If both have surname, use that
-      if (sa && sb) {
-        const cmp = sa.localeCompare(sb, "en-IN");
-        if (cmp !== 0) return cmp;
-      } else if (sa && !sb) {
-        // records with surname come first
-        return -1;
-      } else if (!sa && sb) {
-        return 1;
-      }
-
-      // Fallback 1: full name
-      const na = (getName(a) || "").toString();
-      const nb = (getName(b) || "").toString();
-      if (na && nb) {
-        const cmpName = na.localeCompare(nb, "en-IN");
-        if (cmpName !== 0) return cmpName;
-      }
-
-      // Fallback 2: serial number (old logic)
-      const sNa = getSerialNum(a);
-      const sNb = getSerialNum(b);
-      if (!Number.isNaN(sNa) && !Number.isNaN(sNb)) return sNa - sNb;
-
-      return 0;
-    });
-
     setAllRows(arr);
   }, []);
-
 
   useEffect(() => {
     loadAll().catch(() => {});
   }, [loadAll]);
 
-  // Build caste options from local voter records
-  useEffect(() => {
-    const set = new Set();
+  // Build per-surname stats, then flatten to voter list sorted alphabetically
+  const votersList = useMemo(() => {
+    const surnameStats = new Map();
+
+    // 1) collect stats per surname
     for (const r of allRows) {
-      const c = getCaste(r);
-      if (c) set.add(String(c).trim());
+      const surname = getSurname(r) || "";
+      if (!surname) continue;
+
+      const caste = getCaste(r) || "OPEN";
+
+      let stat = surnameStats.get(surname);
+      if (!stat) {
+        stat = { count: 0, casteCounts: {} };
+        surnameStats.set(surname, stat);
+      }
+      stat.count += 1;
+      stat.casteCounts[caste] = (stat.casteCounts[caste] || 0) + 1;
     }
-    const list = Array.from(set).filter(Boolean);
-    list.sort((a, b) => String(a).localeCompare(String(b), "en-IN"));
-    setCasteOptions(list);
+
+    // 2) build per-voter list with surname + main caste + family count
+    const list = allRows.map((r) => {
+      const surname = getSurname(r) || "";
+      const name = getName(r) || "";
+      const epic = getEPIC(r) || "";
+      const stat = surnameStats.get(surname);
+
+      let mainCaste = getCaste(r) || "OPEN";
+      let familyCount = stat?.count || 1;
+
+      if (stat) {
+        const casteKeys = Object.keys(stat.casteCounts);
+        if (casteKeys.length === 1) {
+          mainCaste = casteKeys[0];
+        } else if (casteKeys.length > 1) {
+          casteKeys.sort((a, b) => stat.casteCounts[b] - stat.casteCounts[a]);
+          mainCaste = casteKeys[0];
+        }
+      }
+
+      const latin = devToLatin(surname);
+      const alphaSource = (latin || surname || "").trim();
+      const alphaKey = alphaSource ? alphaSource[0].toUpperCase() : "";
+
+      return {
+        record: r,
+        surname,
+        name,
+        epic,
+        caste: mainCaste,
+        familyCount,
+        alphaKey,
+      };
+    });
+
+    // 3) sort alphabetically: surname, then name
+    list.sort((a, b) => {
+      const sa = (a.surname || "").toString();
+      const sb = (b.surname || "").toString();
+      const cmpS = sa.localeCompare(sb, "en-IN");
+      if (cmpS !== 0) return cmpS;
+      const na = (a.name || "").toString();
+      const nb = (b.name || "").toString();
+      return na.localeCompare(nb, "en-IN");
+    });
+
+    return list;
   }, [allRows]);
 
-  // Load party options from Party collection (same as AdminUsers)
-  useEffect(() => {
-    let cancelled = false;
+  // Search + A–Z filter
+  const filteredVoters = useMemo(() => {
+    const term = q.trim();
+    const letter = letterFilter;
 
-    async function fetchParties() {
-      try {
-        const res = await api.get("/api/admin/parties");
-        const data = Array.isArray(res.data) ? res.data : [];
-        const names = Array.from(
-          new Set(
-            data
-              .map(
-                (p) =>
-                  p.name ||
-                  p.englishName ||
-                  p.shortName ||
-                  p.code ||
-                  p.abbr
-              )
-              .filter(Boolean)
-          )
-        );
-        names.sort((a, b) => String(a).localeCompare(String(b), "en-IN"));
-        if (!cancelled) setPartyOptions(names);
-      } catch (err) {
-        console.error("Failed to load parties:", err?.response?.data || err);
+    return votersList.filter((v) => {
+      // A–Z filter on surname
+      if (letter !== "ALL" && v.alphaKey && v.alphaKey !== letter) {
+        return false;
       }
-    }
 
-    fetchParties();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      if (!term) return true;
 
-  // Load volunteers from Users table (only volunteer role, assigned to this candidate)
-  useEffect(() => {
-    let cancelled = false;
+      const lower = term.toLowerCase();
+      const latinTerm = devToLatin(term).toLowerCase();
 
-    async function fetchVolunteers() {
-      try {
-        const res = await api.get("/api/admin/users");
-        const raw =
-          Array.isArray(res.data) ? res.data : res.data?.users || [];
+      const surnameStr = String(v.surname || "");
+      const nameStr = String(v.name || "");
+      const epicStr = String(v.epic || "");
 
-        // current logged-in user (candidate / parent)
-        let myId = null;
-        try {
-          const authUser = getUser && getUser();
-          myId =
-            authUser?.id ||
-            authUser?._id ||
-            authUser?.userId ||
-            authUser?.user?.id ||
-            null;
-        } catch {
-          // ignore
-        }
+      const s = surnameStr.toLowerCase();
+      const n = nameStr.toLowerCase();
+      const e = epicStr.toLowerCase();
 
-        const list = raw
-          .filter((u) => {
-            const role = (u.role || u.type || "")
-              .toString()
-              .toLowerCase();
+      const latinSurname = devToLatin(surnameStr).toLowerCase();
 
-            // only users with volunteer role
-            if (!role.includes("volunteer")) return false;
+      return (
+        s.includes(lower) ||
+        n.includes(lower) ||
+        e.includes(lower) ||
+        latinSurname.includes(latinTerm)
+      );
+    });
+  }, [votersList, q, letterFilter]);
 
-            // if we know current user's id, show only volunteers linked to this parent
-            if (myId) {
-              const parent = u.parentUserId ? String(u.parentUserId) : "";
-              return parent === String(myId);
-            }
-
-            // fallback: admin view sees all volunteers
-            return true;
-          })
-          .map((u) => ({
-            id: u.id || u._id || u.uuid,
-            name: u.name || u.fullName || u.username,
-            phone:
-              u.mobile ||
-              u.phone ||
-              u.contactNumber ||
-              u.whatsapp ||
-              u.whatsappNumber,
-          }))
-          .filter((v) => v.name);
-
-        if (!cancelled) {
-          setVolunteerOptions(list);
-        }
-      } catch (err) {
-        console.error("Failed to load volunteers:", err?.response?.data || err);
-      }
-    }
-
-    fetchVolunteers();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Only party names from Party collection
-  const interestOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        (partyOptions || [])
-          .map((p) => String(p))
-          .filter(Boolean)
-      )
-    );
-  }, [partyOptions]);
+  const visible = filteredVoters.slice(0, visibleCount);
 
   // infinite scroll
   useEffect(() => {
@@ -997,61 +428,7 @@ export default function Search() {
     });
     io.observe(el);
     return () => io.disconnect();
-  }, [allRows.length]);
-
-  // filters + search
-  const filtered = useMemo(() => {
-    const term = q.trim();
-    const lt = term ? devToLatin(term) : "";
-
-    return allRows.filter((r) => {
-      // gender filter
-      const g = getGender(r);
-      if (tab === "male" && g !== "M") return false;
-      if (tab === "female" && g !== "F") return false;
-
-      // age band filter
-      const ageNum = getAgeNum(r);
-      if (ageBand === "18-25" && !(ageNum >= 18 && ageNum <= 25)) return false;
-      if (ageBand === "26-35" && !(ageNum >= 26 && ageNum <= 35)) return false;
-      if (ageBand === "36-45" && !(ageNum >= 36 && ageNum <= 45)) return false;
-      if (ageBand === "46-60" && !(ageNum >= 46 && ageNum <= 60)) return false;
-      if (ageBand === "61+" && !(ageNum >= 61)) return false;
-
-      if (!term) return true;
-
-      const fields = [
-        getName(r),
-        getEPIC(r),
-        getPart(r),
-        getSerialText(r),
-        getHouseNo(r),
-        getCareOf(r),
-        getMobile(r),
-      ];
-
-      const hay = fields
-        .filter(Boolean)
-        .map((x) => String(x).toLowerCase())
-        .join(" ");
-
-      if (hay.includes(term.toLowerCase())) return true;
-
-      const devHay = devToLatin(hay);
-      return devHay.includes(lt);
-    });
-  }, [allRows, q, tab, ageBand]);
-
-  const { male, female, total } = useMemo(() => {
-    let maleCount = 0;
-    let femaleCount = 0;
-    for (const row of filtered) {
-      const g = getGender(row);
-      if (g === "M") maleCount += 1;
-      if (g === "F") femaleCount += 1;
-    }
-    return { male: maleCount, female: femaleCount, total: filtered.length };
-  }, [filtered]);
+  }, [filteredVoters.length]);
 
   const onPull = async () => {
     setBusy(true);
@@ -1105,13 +482,7 @@ export default function Search() {
     }
   };
 
-  const filterTabs = [
-    { key: "all", label: "All" },
-    { key: "male", label: "Male" },
-    { key: "female", label: "Female" },
-  ];
-
-  const visible = filtered.slice(0, visibleCount);
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   return (
     <Box
@@ -1129,7 +500,7 @@ export default function Search() {
         onPush={onPush}
       />
 
-      {/* Menu for logout and DB info */}
+      {/* Menu for logout + DB info */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -1161,11 +532,11 @@ export default function Search() {
         </Box>
       </Menu>
 
-      {/* 🔹 FULL-WIDTH sticky search + filters header */}
+      {/* Sticky header: search + A–Z filter bar */}
       <Box
         sx={{
           position: "sticky",
-          top: 56, // height of TopNavbar
+          top: 56,
           zIndex: 20,
           bgcolor: "#f3f4f6",
           boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
@@ -1175,20 +546,17 @@ export default function Search() {
         }}
       >
         <Container maxWidth="lg">
-          <Stack
-            spacing={0.75}
-            sx={{
-              width: "100%",
-            }}
-          >
-            {/* SEARCH BOX with X button */}
+          <Stack spacing={0.75}>
+            {/* Search bar */}
             <TextField
-              id="searchBoxHindi"
               fullWidth
               size="medium"
-              placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
+              placeholder="उपनाम / Surname / Name / EPIC से मतदाता खोजें..."
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setVisibleCount(200);
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -1198,20 +566,23 @@ export default function Search() {
                 endAdornment: (
                   <InputAdornment position="end">
                     <>
-                      {/* CLEAR (X) BUTTON */}
                       {q?.length > 0 && (
                         <IconButton
                           size="small"
-                          onClick={() => setQ("")}
+                          onClick={() => {
+                            setQ("");
+                            setVisibleCount(200);
+                          }}
                           sx={{ mr: 0.5 }}
                         >
                           ✕
                         </IconButton>
                       )}
-
-                      {/* Voice Search */}
                       <VoiceSearchButton
-                        onResult={(text) => setQ(text)}
+                        onResult={(text) => {
+                          setQ(text);
+                          setVisibleCount(200);
+                        }}
                         lang={voiceLang}
                         disabled={busy}
                       />
@@ -1226,51 +597,54 @@ export default function Search() {
               }}
             />
 
-            {/* Tabs */}
-            <Tabs
-              value={tab}
-              onChange={(_, value) => setTab(value)}
-              variant="scrollable"
-              allowScrollButtonsMobile
+            {/* A–Z filter bar */}
+            <Stack
+              direction="row"
+              spacing={0.5}
               sx={{
-                minHeight: 32,
-                "& .MuiTab-root": {
-                  minHeight: 32,
-                  paddingY: 0,
-                  fontSize: 13,
-                },
-                "& .MuiTabs-indicator": {
-                  backgroundColor: "black",
-                },
+                overflowX: "auto",
+                pb: 0.25,
               }}
             >
-              {filterTabs.map((filter) => (
-                <Tab key={filter.key} label={filter.label} value={filter.key} />
+              <Chip
+                label="All"
+                size="small"
+                onClick={() => {
+                  setLetterFilter("ALL");
+                  setVisibleCount(200);
+                }}
+                color={letterFilter === "ALL" ? "primary" : "default"}
+                sx={{ height: 22 }}
+              />
+              {LETTERS.map((L) => (
+                <Chip
+                  key={L}
+                  label={L}
+                  size="small"
+                  onClick={() => {
+                    setLetterFilter(L);
+                    setVisibleCount(200);
+                  }}
+                  color={letterFilter === L ? "primary" : "default"}
+                  sx={{ height: 22 }}
+                />
               ))}
-            </Tabs>
+            </Stack>
 
-            {/* Age Filter */}
-            <ToggleButtonGroup
-              value={ageBand}
-              exclusive
-              onChange={(_, val) => val && setAgeBand(val)}
-              size="small"
-              sx={{
-                flexWrap: "wrap",
-              }}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ pl: 0.5 }}
             >
-              <ToggleButton value="all">All</ToggleButton>
-              <ToggleButton value="18-25">18–25</ToggleButton>
-              <ToggleButton value="26-35">26–35</ToggleButton>
-              <ToggleButton value="36-45">36–45</ToggleButton>
-              <ToggleButton value="46-60">46–60</ToggleButton>
-              <ToggleButton value="61+">61+</ToggleButton>
-            </ToggleButtonGroup>
+              Voters{" "}
+              {filteredVoters.length.toLocaleString()} · Total{" "}
+              {allRows.length.toLocaleString()}
+            </Typography>
           </Stack>
         </Container>
       </Box>
 
-      {/* Results */}
+      {/* Voter list (flattened, sorted alphabetically) */}
       <Container
         maxWidth="lg"
         sx={{
@@ -1278,197 +652,138 @@ export default function Search() {
           pb: 10,
         }}
       >
-        <Stack spacing={0.5}>
-          {/* Voter list */}
-          <Stack spacing={0.4}>
-            {visible.map((r, i) => {
-              const name = getName(r);
-              const epic = getEPIC(r);
-              const serialTxt = getSerialText(r);
-              const serialNum = getSerialNum(r);
-              const age = getAge(r);
-              const gender = getGender(r);
-              const mobRaw = getMobile(r);
-              const mob = normalizePhone(mobRaw);
-              const shareText = buildShareText(r, collectionName);
-              const waHref = mob
-                ? `https://wa.me/91${mob}?text=${encodeURIComponent(
-                    shareText
-                  )}`
-                : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+        <Stack spacing={0.4}>
+          {visible.map((v) => {
+            const r = v.record;
+            const name = v.name || getName(r);
+            const epic = v.epic || getEPIC(r);
+            const age = getAge(r);
+            const gender = getGender(r);
+            const mobRaw = getMobile(r);
+            const mob = normalizePhone(mobRaw);
+            const shareText = buildShareText(r, collectionName);
+            const waHref = mob
+              ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+              : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
-              const serialDisplay = !Number.isNaN(serialNum)
-                ? serialNum
-                : serialTxt || "—";
-
-              return (
-                <Paper
-                  key={r._id || `${i}-${serialTxt}`}
-                  sx={{
-                    p: 0.5, // narrower padding
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 0.15,
-                    borderRadius: 0.5, // smaller radius
-                  }}
+            return (
+              <Paper
+                key={r._id || `${v.surname}-${epic}`}
+                sx={{
+                  p: 0.7,
+                  display: "flex",
+                  flexDirection: "column",
+                  borderRadius: 0.75,
+                  bgcolor: "#ffffff",
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ width: "100%" }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    justifyContent="space-between"
-                    flexWrap="wrap"
-                  >
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      flexWrap="wrap"
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        Sn. {serialDisplay}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
-                      </Typography>
-                    </Stack>
-
-                    <Stack direction="row" spacing={0.25} alignItems="center">
-                      {/* 1) Caste (via + icon) */}
-                      <IconButton size="small" onClick={() => setCasteVoter(r)}>
-                        <AddRoundedIcon fontSize="small" />
-                      </IconButton>
-
-                      {/* 2) Political interest */}
-                      <IconButton
-                        size="small"
-                        onClick={() => setInterestVoter(r)}
-                      >
-                        <FlagRoundedIcon fontSize="small" />
-                      </IconButton>
-
-                      {/* 3) Volunteer assigned */}
-                      <IconButton
-                        size="small"
-                        onClick={() => setVolunteerVoter(r)}
-                      >
-                        <GroupRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  </Stack>
-
-                  {/* Row 2: Name + Call + WhatsApp + Edit */}
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    sx={{ width: "100%", mt: 0.15 }}
-                  >
-                    {/* Name */}
+                  {/* LEFT: Name + surname */}
+                  <Box sx={{ minWidth: 0 }}>
                     <Typography
                       variant="subtitle1"
                       fontWeight={700}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "none",
-                        "&:hover": { textDecoration: "underline" },
-                        flex: 1,
-                        pr: 1,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         color: "primary.main",
                       }}
-                      onClick={() => setDetail(r)}
                     >
-                      {name}
+                      {name || "—"}
                     </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {v.surname ? `Surname: ${v.surname}` : "Surname: —"}
+                    </Typography>
+                  </Box>
 
-                    {/* Actions */}
-                    <Stack direction="row" spacing={0.25} alignItems="center">
-                      <IconButton
-                        size="small"
-                        disabled={!mob}
-                        component={mob ? "a" : "button"}
-                        href={mob ? `tel:${mob}` : undefined}
-                      >
-                        <CallRoundedIcon fontSize="small" />
-                      </IconButton>
-
-                      <IconButton
-                        size="small"
-                        component="a"
-                        href={waHref}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <WhatsAppIcon fontSize="small" />
-                      </IconButton>
-
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => setSelected(r)}
-                      >
-                        <EditRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
+                  {/* RIGHT: caste chip + family count */}
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    sx={{ whiteSpace: "nowrap" }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontWeight: 500 }}
+                    >
+                      {v.familyCount.toLocaleString()} परिवार / voters
+                    </Typography>
+                    <Chip
+                      label={v.caste || "OPEN"}
+                      size="small"
+                      sx={getCasteChipSx(v.caste)}
+                    />
                   </Stack>
-                </Paper>
-              );
-            })}
-            <Box ref={sentinelRef} sx={{ height: 32 }} />
-          </Stack>
+                </Stack>
+
+                {/* EPIC / Age / Gender */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 0.3 }}
+                >
+                  EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"}
+                </Typography>
+
+                {/* House / C/O if needed */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 0.2 }}
+                >
+                  {getHouseNo(r)
+                    ? `House: ${getHouseNo(r)}`
+                    : "House: —"}{" "}
+                  {getCareOf(r) ? `· C/O: ${getCareOf(r)}` : ""}
+                </Typography>
+
+                {/* Call + WhatsApp buttons */}
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  justifyContent="flex-end"
+                  sx={{ mt: 0.3 }}
+                >
+                  <IconButton
+                    size="small"
+                    disabled={!mob}
+                    component={mob ? "a" : "button"}
+                    href={mob ? `tel:${mob}` : undefined}
+                  >
+                    <CallRoundedIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    component="a"
+                    href={waHref}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <WhatsAppIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Paper>
+            );
+          })}
+          <Box ref={sentinelRef} sx={{ height: 32 }} />
         </Stack>
       </Container>
-
-      <MobileEditModal
-        open={!!selected}
-        voter={selected}
-        onClose={async (ok) => {
-          setSelected(null);
-          if (ok) await loadAll();
-        }}
-        onSynced={showSnack}
-      />
-
-      <CasteModal
-        open={!!casteVoter}
-        voter={casteVoter}
-        options={casteOptions}
-        onClose={async (ok) => {
-          setCasteVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
-
-      <InterestModal
-        open={!!interestVoter}
-        voter={interestVoter}
-        options={interestOptions}
-        onClose={async (ok) => {
-          setInterestVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
-
-      <VolunteerModal
-        open={!!volunteerVoter}
-        voter={volunteerVoter}
-        options={volunteerOptions}
-        onClose={async (ok) => {
-          setVolunteerVoter(null);
-          if (ok) await loadAll();
-        }}
-      />
-
-      <RecordModal
-        open={!!detail}
-        voter={detail}
-        onClose={() => setDetail(null)}
-        collectionName={collectionName}
-      />
 
       {/* Fixed footer with stats */}
       <Box
@@ -1484,13 +799,13 @@ export default function Search() {
           zIndex: 30,
         }}
       >
-        {visible.length === 0 ? (
+        {filteredVoters.length === 0 ? (
           <Typography
             color="text.secondary"
             variant="caption"
             textAlign="center"
           >
-            No voters match your filters yet.
+            No voters found for this search.
           </Typography>
         ) : (
           <Typography
@@ -1499,14 +814,13 @@ export default function Search() {
             textAlign="center"
             sx={{ fontWeight: 500 }}
           >
-            M {male.toLocaleString()} · F {female.toLocaleString()} · Total{" "}
-            {total.toLocaleString()} · Synced{" "}
-            {allRows.length.toLocaleString()}
+            Showing {filteredVoters.length.toLocaleString()} /{" "}
+            {allRows.length.toLocaleString()} voters
           </Typography>
         )}
       </Box>
 
-      {/* Sync + info messages */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
