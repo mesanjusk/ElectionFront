@@ -24,7 +24,6 @@ import {
 } from "@mui/material";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 
 import { setAuthToken } from "../services/api";
@@ -40,7 +39,7 @@ import VoiceSearchButton from "../components/VoiceSearchButton.jsx";
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
 import TopNavbar from "../components/TopNavbar.jsx";
 
-/* ---------------- helpers (same style as Search.jsx) ---------------- */
+/* ---------------- helpers ---------------- */
 const pick = (obj, keys) => {
   if (!obj) return "";
   for (const k of keys) {
@@ -96,7 +95,7 @@ const getCaste = (r) =>
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
   "";
 
-/* Normalize phone for tel:/WhatsApp */
+/* Normalize phone for WhatsApp */
 const normalizePhone = (raw) => {
   if (!raw) return "";
   let d = String(raw).replace(/[^\d]/g, "");
@@ -105,7 +104,7 @@ const normalizePhone = (raw) => {
   return d.length === 10 ? d : "";
 };
 
-/* Simple transliteration: Devanagari to Latin (approx) – for surname search / A–Z */
+/* Devanagari → Latin (for A–Z filter & search) */
 const DEV_TO_LATIN = {
   अ: "a",
   आ: "aa",
@@ -159,7 +158,7 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp (simple version for per-voter row) */
+/* WhatsApp share text (can be detailed even if UI is simple) */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
@@ -181,41 +180,6 @@ const buildShareText = (r, collectionName) => {
     dbName ? `Database: ${dbName}` : null,
   ].filter(Boolean);
   return lines.join("\n");
-};
-
-/* Extract surname from full name – FIRST word considered as surname */
-const getSurname = (r) => {
-  const name = getName(r);
-  if (!name) return "";
-  const clean = String(name).replace(/[.,]/g, " ").trim();
-  if (!clean) return "";
-  const parts = clean.split(/\s+/);
-  return parts[0];
-};
-
-/* Caste color tag style */
-const getCasteChipSx = (caste) => {
-  const v = String(caste || "OPEN").toUpperCase();
-  const base = {
-    height: 20,
-    borderRadius: "999px",
-    fontSize: 11,
-    px: 1,
-  };
-
-  if (v.includes("SC")) {
-    return { ...base, bgcolor: "#fee2e2", color: "#b91c1c" };
-  }
-  if (v.includes("ST")) {
-    return { ...base, bgcolor: "#dcfce7", color: "#166534" };
-  }
-  if (v.includes("OBC")) {
-    return { ...base, bgcolor: "#ffedd5", color: "#9a3412" };
-  }
-  if (v.includes("OPEN")) {
-    return { ...base, bgcolor: "#e0f2fe", color: "#075985" };
-  }
-  return { ...base, bgcolor: "#e5e7eb", color: "#111827" };
 };
 
 /* ================================== PAGE ================================== */
@@ -274,8 +238,8 @@ export default function Family() {
   const voiceLang = "hi-IN";
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
-  const [q, setQ] = useState(""); // surname / name search
-  const [letterFilter, setLetterFilter] = useState("ALL"); // A–Z filter
+  const [q, setQ] = useState(""); // name / EPIC search
+  const [letterFilter, setLetterFilter] = useState("ALL"); // A–Z filter on name
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -309,70 +273,31 @@ export default function Family() {
     loadAll().catch(() => {});
   }, [loadAll]);
 
-  // Build per-surname stats, then flatten to voter list sorted alphabetically
+  // Build flat voter list with alphaKey for A–Z (based on name)
   const votersList = useMemo(() => {
-    const surnameStats = new Map();
-
-    // 1) collect stats per surname
-    for (const r of allRows) {
-      const surname = getSurname(r) || "";
-      if (!surname) continue;
-
-      const caste = getCaste(r) || "OPEN";
-
-      let stat = surnameStats.get(surname);
-      if (!stat) {
-        stat = { count: 0, casteCounts: {} };
-        surnameStats.set(surname, stat);
-      }
-      stat.count += 1;
-      stat.casteCounts[caste] = (stat.casteCounts[caste] || 0) + 1;
-    }
-
-    // 2) build per-voter list with surname + main caste + family count
     const list = allRows.map((r) => {
-      const surname = getSurname(r) || "";
       const name = getName(r) || "";
       const epic = getEPIC(r) || "";
-      const stat = surnameStats.get(surname);
-
-      let mainCaste = getCaste(r) || "OPEN";
-      let familyCount = stat?.count || 1;
-
-      if (stat) {
-        const casteKeys = Object.keys(stat.casteCounts);
-        if (casteKeys.length === 1) {
-          mainCaste = casteKeys[0];
-        } else if (casteKeys.length > 1) {
-          casteKeys.sort((a, b) => stat.casteCounts[b] - stat.casteCounts[a]);
-          mainCaste = casteKeys[0];
-        }
-      }
-
-      const latin = devToLatin(surname);
-      const alphaSource = (latin || surname || "").trim();
+      const latin = devToLatin(name || epic);
+      const alphaSource = (latin || name || epic || "").trim();
       const alphaKey = alphaSource ? alphaSource[0].toUpperCase() : "";
-
       return {
         record: r,
-        surname,
         name,
         epic,
-        caste: mainCaste,
-        familyCount,
         alphaKey,
       };
     });
 
-    // 3) sort alphabetically: surname, then name
+    // sort alphabetically: by name, then EPIC
     list.sort((a, b) => {
-      const sa = (a.surname || "").toString();
-      const sb = (b.surname || "").toString();
-      const cmpS = sa.localeCompare(sb, "en-IN");
-      if (cmpS !== 0) return cmpS;
       const na = (a.name || "").toString();
       const nb = (b.name || "").toString();
-      return na.localeCompare(nb, "en-IN");
+      const cmpN = na.localeCompare(nb, "en-IN");
+      if (cmpN !== 0) return cmpN;
+      const ea = (a.epic || "").toString();
+      const eb = (b.epic || "").toString();
+      return ea.localeCompare(eb, "en-IN");
     });
 
     return list;
@@ -384,7 +309,7 @@ export default function Family() {
     const letter = letterFilter;
 
     return votersList.filter((v) => {
-      // A–Z filter on surname
+      // A–Z filter on name
       if (letter !== "ALL" && v.alphaKey && v.alphaKey !== letter) {
         return false;
       }
@@ -394,21 +319,18 @@ export default function Family() {
       const lower = term.toLowerCase();
       const latinTerm = devToLatin(term).toLowerCase();
 
-      const surnameStr = String(v.surname || "");
       const nameStr = String(v.name || "");
       const epicStr = String(v.epic || "");
 
-      const s = surnameStr.toLowerCase();
       const n = nameStr.toLowerCase();
       const e = epicStr.toLowerCase();
 
-      const latinSurname = devToLatin(surnameStr).toLowerCase();
+      const latinName = devToLatin(nameStr).toLowerCase();
 
       return (
-        s.includes(lower) ||
         n.includes(lower) ||
         e.includes(lower) ||
-        latinSurname.includes(latinTerm)
+        latinName.includes(latinTerm)
       );
     });
   }, [votersList, q, letterFilter]);
@@ -551,7 +473,7 @@ export default function Family() {
             <TextField
               fullWidth
               size="medium"
-              placeholder="उपनाम / Surname / Name / EPIC से मतदाता खोजें..."
+              placeholder="नाम / Name / EPIC से मतदाता खोजें..."
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
@@ -644,7 +566,7 @@ export default function Family() {
         </Container>
       </Box>
 
-      {/* Voter list (flattened, sorted alphabetically) */}
+      {/* Voter list: each row = Name + EPIC + WhatsApp */}
       <Container
         maxWidth="lg"
         sx={{
@@ -657,8 +579,6 @@ export default function Family() {
             const r = v.record;
             const name = v.name || getName(r);
             const epic = v.epic || getEPIC(r);
-            const age = getAge(r);
-            const gender = getGender(r);
             const mobRaw = getMobile(r);
             const mob = normalizePhone(mobRaw);
             const shareText = buildShareText(r, collectionName);
@@ -668,116 +588,54 @@ export default function Family() {
 
             return (
               <Paper
-                key={r._id || `${v.surname}-${epic}`}
+                key={r._id || `${name}-${epic}`}
                 sx={{
                   p: 0.7,
                   display: "flex",
-                  flexDirection: "column",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                   borderRadius: 0.75,
                   bgcolor: "#ffffff",
                 }}
               >
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ width: "100%" }}
-                >
-                  {/* LEFT: Name + surname */}
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={700}
-                      sx={{
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        color: "primary.main",
-                      }}
-                    >
-                      {name || "—"}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {v.surname ? `Surname: ${v.surname}` : "Surname: —"}
-                    </Typography>
-                  </Box>
-
-                  {/* RIGHT: caste chip + family count */}
-                  <Stack
-                    direction="row"
-                    spacing={0.75}
-                    alignItems="center"
-                    sx={{ whiteSpace: "nowrap" }}
+                {/* LEFT: Name + EPIC */}
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      color: "primary.main",
+                    }}
                   >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ fontWeight: 500 }}
-                    >
-                      {v.familyCount.toLocaleString()} परिवार / voters
-                    </Typography>
-                    <Chip
-                      label={v.caste || "OPEN"}
-                      size="small"
-                      sx={getCasteChipSx(v.caste)}
-                    />
-                  </Stack>
-                </Stack>
-
-                {/* EPIC / Age / Gender */}
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 0.3 }}
-                >
-                  EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"}
-                </Typography>
-
-                {/* House / C/O if needed */}
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 0.2 }}
-                >
-                  {getHouseNo(r)
-                    ? `House: ${getHouseNo(r)}`
-                    : "House: —"}{" "}
-                  {getCareOf(r) ? `· C/O: ${getCareOf(r)}` : ""}
-                </Typography>
-
-                {/* Call + WhatsApp buttons */}
-                <Stack
-                  direction="row"
-                  spacing={0.5}
-                  justifyContent="flex-end"
-                  sx={{ mt: 0.3 }}
-                >
-                  <IconButton
-                    size="small"
-                    disabled={!mob}
-                    component={mob ? "a" : "button"}
-                    href={mob ? `tel:${mob}` : undefined}
+                    {name || "—"}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
                   >
-                    <CallRoundedIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    component="a"
-                    href={waHref}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <WhatsAppIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
+                    EPIC: {epic || "—"}
+                  </Typography>
+                </Box>
+
+                {/* RIGHT: WhatsApp button */}
+                <IconButton
+                  size="small"
+                  component="a"
+                  href={waHref}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <WhatsAppIcon fontSize="small" />
+                </IconButton>
               </Paper>
             );
           })}
