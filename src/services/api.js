@@ -12,7 +12,15 @@ if (stored) authToken = stored;
 
 export function setAuthToken(token) {
   authToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      window.localStorage.setItem('token', token);
+    } else {
+      window.localStorage.removeItem('token');
+    }
+  }
 }
+
 
 async function http(method, path, body, { signal } = {}) {
   const headers = { 'Content-Type': 'application/json' };
