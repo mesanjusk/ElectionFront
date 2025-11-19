@@ -107,10 +107,18 @@ export default function Login() {
 
   // Fast-path: if token exists and session is unlocked, go home
   useEffect(() => {
-    if (getToken() && isSessionUnlocked()) {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
+  if (typeof window === "undefined") return;
+
+  const storedToken = window.localStorage.getItem("token");
+  if (storedToken) {
+    // restore token into API layer
+    setAuthToken(storedToken);
+    // mark session as unlocked so rest of app behaves as "logged in"
+    unlockSession();
+    navigate("/", { replace: true });
+  }
+}, [navigate]);
+
 
   // Helper: where to go after login
   const goAfterLogin = (user, fallbackUserType) => {
