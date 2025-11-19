@@ -73,6 +73,10 @@ export async function apiLogin({ username, password, deviceId, userType }) {
   return http('POST', '/api/auth/login', { username, password, deviceId, userType });
 }
 
+export async function apiPinLogin({ username, pin, deviceId }) {
+  return http('POST', '/api/auth/pin-login', { username, pin, deviceId });
+}
+
 /* =========================
    VOTERS
    ========================= */

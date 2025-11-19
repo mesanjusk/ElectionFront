@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { apiLogin, setAuthToken } from "../services/api";
+import { apiLogin, apiPinLogin, setAuthToken } from "../services/api";
 import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
 import {
   setSession,
@@ -306,7 +306,6 @@ export default function Login() {
   };
 
   // PIN unlock submit (NO sync, NO session reset)
-    // PIN unlock submit
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -348,43 +347,61 @@ export default function Login() {
 
         const deviceId = await getDeviceId();
 
-        const resp = await fetch("/api/auth/pin-login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        let sessionPayload = null;
+
+        try {
+          const data = await apiPinLogin({
             username: usernameForPin,
             pin: pinInput,
             deviceId,
-          }),
-        });
+          });
 
-        if (!resp.ok) {
-          let errMsg =
-            "Unable to restore session with PIN. Please login once with username & password.";
-          try {
-            const errJson = await resp.json();
-            if (errJson?.message) errMsg = errJson.message;
-            else if (errJson?.error) errMsg = errJson.error;
-          } catch (e) {
-            // ignore JSON parse errors
+          sessionPayload = {
+            token: data.token,
+            user: data.user,
+            databases: data.databases,
+            activeDatabaseId: data.activeDatabaseId,
+          };
+
+          // Refresh cached activation snapshot so future offline unlocks have latest data
+          await storeActivation({
+            username: usernameForPin,
+            pin: pinInput,
+            deviceId,
+            userType: data?.user?.userType,
+            user: data?.user,
+            databases: data?.databases,
+            activeDatabaseId: data?.activeDatabaseId,
+          });
+        } catch (apiErr) {
+          if (activationState?.user) {
+            sessionPayload = {
+              token: null,
+              user: activationState.user,
+              databases: activationState.databases || [],
+              activeDatabaseId: activationState.activeDatabaseId,
+            };
+            setInfoMessage(
+              "Working offline with the last synced data. Connect to the internet to sync changes."
+            );
+          } else {
+            setError(
+              apiErr?.message ||
+                "Unable to restore session with PIN. Please login once with username & password."
+            );
+            setLoading(false);
+            setProgress(0);
+            setProgressLabel("");
+            return;
           }
-          setError(errMsg);
-          setLoading(false);
-          setProgress(0);
-          setProgressLabel("");
-          return;
         }
 
-        const data = await resp.json();
-
-        // Re-create full session from server response but SKIP heavy sync
+        // Re-create full session from server response (or cached activation) but SKIP heavy sync
         await completeLogin({
-          token: data.token,
-          user: data.user,
-          databases: data.databases,
-          activeDatabaseId: data.activeDatabaseId,
+          token: sessionPayload?.token,
+          user: sessionPayload?.user,
+          databases: sessionPayload?.databases,
+          activeDatabaseId: sessionPayload?.activeDatabaseId,
           skipSync: true,
         });
 
