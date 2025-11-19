@@ -31,25 +31,28 @@ async function http(method, path, body, { signal } = {}) {
     signal,
   });
 
-  if (!res.ok) {
+   if (!res.ok) {
     let message = `${res.status}`;
     try {
       const data = await res.json();
       message = data?.error || data?.message || message;
     } catch (_) {}
 
+    // 🔁 Normal expiry / auth error: just lock the session
     if (res.status === 401 || res.status === 403) {
       authToken = null;
       clearToken();
       lockSession();
-      markActivationRevoked('Your session expired. Reactivate with your credentials.');
+      // ⛔ DO NOT markActivationRevoked here.
+      // We want the device to stay activated so PIN login continues to work.
     } else if (res.status === 409) {
+      // Logged in somewhere else → ask for reactivation
       authToken = null;
       clearToken();
       lockSession();
       markActivationRevoked('You signed in on another device. Reactivate here to resume.');
     } else if (res.status === 423) {
-      // device-bound on another device
+      // Device bound on another device → real activation conflict
       authToken = null;
       clearToken();
       lockSession();
@@ -58,6 +61,7 @@ async function http(method, path, body, { signal } = {}) {
 
     throw new Error(message);
   }
+
   return res.json();
 }
 
