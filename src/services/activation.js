@@ -1,12 +1,8 @@
-// client/src/services/activation.js
-
-const ACTIVATION_KEY = "activationState";
-const DEVICE_ID_KEY = "activationDeviceId";
-
-// ---------------- Device ID helpers ----------------
+const ACTIVATION_KEY = 'activationState';
+const DEVICE_ID_KEY = 'activationDeviceId';
 
 function generateDeviceId() {
-  if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+  if (typeof window !== 'undefined' && window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
   }
   const random = Math.random().toString(36).slice(2, 10);
@@ -15,7 +11,7 @@ function generateDeviceId() {
 }
 
 function ensureDeviceId() {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   let deviceId = window.localStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId) {
     deviceId = generateDeviceId();
@@ -24,15 +20,13 @@ function ensureDeviceId() {
   return deviceId;
 }
 
-// ---------------- Safe JSON helpers ----------------
-
 function safeParse(value) {
   if (!value) return null;
   try {
     return JSON.parse(value);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn("Failed to parse activation state", err);
+    console.warn('Failed to parse activation state', err);
     return null;
   }
 }
@@ -42,18 +36,18 @@ function safeStringify(value) {
     return JSON.stringify(value);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn("Failed to serialise activation state", err);
+    console.warn('Failed to serialise activation state', err);
     return null;
   }
 }
 
 function readActivation() {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   return safeParse(window.localStorage.getItem(ACTIVATION_KEY));
 }
 
 function writeActivation(state) {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   const payload = safeStringify(state);
   if (!payload) {
     window.localStorage.removeItem(ACTIVATION_KEY);
@@ -62,42 +56,25 @@ function writeActivation(state) {
   window.localStorage.setItem(ACTIVATION_KEY, payload);
 }
 
-// ---------------- PIN hashing ----------------
-
-function simpleFallbackHash(pin) {
-  let hash = 0;
-  for (let i = 0; i < pin.length; i += 1) {
-    hash = (hash << 5) - hash + pin.charCodeAt(i);
-    hash |= 0; // Convert to 32-bit integer
-  }
-  return `fallback-${Math.abs(hash)}`;
-}
-
+/**
+ * NOTE:
+ * Frontend no longer hashes PINs.
+ * This helper is kept only so existing imports keep working.
+ * It now simply returns the raw PIN value.
+ */
 export async function hashPin(pin) {
-  if (typeof window !== "undefined" && window.crypto?.subtle) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin);
-    const digest = await window.crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
-  return simpleFallbackHash(pin);
+  return pin;
 }
-
-// ---------------- Public API ----------------
 
 export function getActivationState() {
   const state = readActivation();
   if (!state) return null;
-
   const deviceId = ensureDeviceId();
   if (deviceId && state.deviceId !== deviceId) {
     const next = { ...state, deviceId };
     writeActivation(next);
     return next;
   }
-
   return state;
 }
 
@@ -105,13 +82,9 @@ export function setActivationState(nextState) {
   const current = getActivationState() || {};
   const state = { ...current, ...nextState };
 
-  // Normalise revoked flag
-  if (
-    nextState &&
-    Object.prototype.hasOwnProperty.call(nextState, "revoked")
-  ) {
+  if (nextState && Object.prototype.hasOwnProperty.call(nextState, 'revoked')) {
     state.revoked = Boolean(nextState.revoked);
-  } else if (Object.prototype.hasOwnProperty.call(state, "revoked")) {
+  } else if (Object.prototype.hasOwnProperty.call(state, 'revoked')) {
     state.revoked = Boolean(state.revoked);
   }
 
@@ -129,57 +102,38 @@ export function setActivationState(nextState) {
 }
 
 export function clearActivationState() {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   window.localStorage.removeItem(ACTIVATION_KEY);
 }
 
-// ⭐ FIX: store username + extra data so PIN login can work without re-entering credentials
-export async function storeActivation({
-  email,
-  username,
-  language = "en",
-  userType,
-  user,
-  databases,
-  activeDatabaseId,
-  pin,
-  deviceId: explicitDeviceId,
-} = {}) {
-  if (!pin) {
-    throw new Error("PIN is required for activation");
-  }
-
-  const pinHash = await hashPin(pin);
-  const deviceId = explicitDeviceId || ensureDeviceId();
-
-  const base = {
-    // we keep both for flexibility
-    email: email || username || null,
-    username: username || email || null,
+/**
+ * Store activation with RAW PIN (no hashing on frontend).
+ */
+export async function storeActivation({ email, language, userType, pin }) {
+  const deviceId = ensureDeviceId();
+  const payload = {
+    email,
     language,
-    userType: userType || user?.userType || null,
-    user: user || null,
-    databases: databases || null,
-    activeDatabaseId: activeDatabaseId || null,
-    pinHash,
+    userType,
+    pin, // store raw PIN now
     revoked: false,
     activatedAt: Date.now(),
     deviceId,
   };
-
-  // Merge with any existing activation state
-  const state = setActivationState(base);
-  return state;
+  writeActivation(payload);
+  return payload;
 }
 
+/**
+ * Verify by direct string comparison with stored raw PIN.
+ */
 export async function verifyPin(pin) {
   const state = getActivationState();
-  if (!state?.pinHash) return false;
-  const hashed = await hashPin(pin);
-  return hashed === state.pinHash;
+  if (!state?.pin) return false;
+  return pin === state.pin;
 }
 
-export function markActivationRevoked(message = "") {
+export function markActivationRevoked(message = '') {
   const state = getActivationState() || {};
   state.revoked = true;
   state.revokedMessage = message;
