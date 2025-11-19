@@ -108,18 +108,22 @@ export function clearActivationState() {
 
 /**
  * Store activation with RAW PIN (no hashing on frontend).
+ * We now keep EVERYTHING we get (username, user, databases, etc.)
+ * so PIN login can restore sessions later.
  */
-export async function storeActivation({ email, language, userType, pin }) {
+export async function storeActivation(data) {
   const deviceId = ensureDeviceId();
+
+  const previous = readActivation() || {};
+
   const payload = {
-    email,
-    language,
-    userType,
-    pin, // store raw PIN now
+    ...previous,
+    ...data,
+    deviceId: deviceId || data.deviceId || null,
     revoked: false,
     activatedAt: Date.now(),
-    deviceId,
   };
+
   writeActivation(payload);
   return payload;
 }

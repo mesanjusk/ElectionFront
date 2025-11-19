@@ -76,15 +76,16 @@ function chooseEffectiveDatabase({ activeDatabaseId, user } = {}) {
 export default function Login() {
   const navigate = useNavigate();
 
-  const [activation, setActivation] = useState(() => getActivationState());
+    const [activation, setActivation] = useState(() => getActivationState());
 
-  // If any user is already activated (has a pinHash and not revoked), default to PIN screen.
+  // If any user is already activated (has a PIN and not revoked), default to PIN screen.
   const initialMode = (() => {
-    if (activation?.pinHash && !activation?.revoked) return "pin";
+    if (activation?.pin && !activation?.revoked) return "pin";
     return "activate";
   })();
   const [mode, setMode] = useState(initialMode);
-  const showPinTab = Boolean(activation?.pinHash && !activation?.revoked);
+  const showPinTab = Boolean(activation?.pin && !activation?.revoked);
+
 
   useEffect(() => {
     if (!showPinTab && mode === "pin") {
