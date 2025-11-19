@@ -1,3 +1,5 @@
+// client/src/services/activation.js
+
 const ACTIVATION_KEY = 'activationState';
 const DEVICE_ID_KEY = 'activationDeviceId';
 
@@ -58,9 +60,9 @@ function writeActivation(state) {
 
 /**
  * NOTE:
- * Frontend no longer hashes PINs.
+ * Frontend no longer hashes or stores PINs.
  * This helper is kept only so existing imports keep working.
- * It now simply returns the raw PIN value.
+ * It now simply returns the raw value.
  */
 export async function hashPin(pin) {
   return pin;
@@ -107,34 +109,37 @@ export function clearActivationState() {
 }
 
 /**
- * Store activation with RAW PIN (no hashing on frontend).
- * We now keep EVERYTHING we get (username, user, databases, etc.)
- * so PIN login can restore sessions later.
+ * Store activation info for this device.
+ * NO PIN is stored — only identity and device binding metadata.
  */
-export async function storeActivation(data) {
+export async function storeActivation({
+  username,
+  email,
+  language,
+  userType,
+  user,
+  databases,
+  activeDatabaseId,
+}) {
   const deviceId = ensureDeviceId();
-
   const previous = readActivation() || {};
 
   const payload = {
     ...previous,
-    ...data,
-    deviceId: deviceId || data.deviceId || null,
+    username: username ?? previous.username ?? null,
+    email: email ?? previous.email ?? null,
+    language: language ?? previous.language ?? null,
+    userType: userType ?? previous.userType ?? null,
+    user: user ?? previous.user ?? null,
+    databases: databases ?? previous.databases ?? [],
+    activeDatabaseId: activeDatabaseId ?? previous.activeDatabaseId ?? null,
+    deviceId,
     revoked: false,
     activatedAt: Date.now(),
   };
 
   writeActivation(payload);
   return payload;
-}
-
-/**
- * Verify by direct string comparison with stored raw PIN.
- */
-export async function verifyPin(pin) {
-  const state = getActivationState();
-  if (!state?.pin) return false;
-  return pin === state.pin;
 }
 
 export function markActivationRevoked(message = '') {

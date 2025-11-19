@@ -10,12 +10,10 @@ import {
   Container,
   LinearProgress,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
-import { apiLogin, apiPinLogin, setAuthToken } from "../services/api";
+import { apiLogin, setAuthToken } from "../services/api";
 import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
 import {
   setSession,
@@ -27,23 +25,18 @@ import {
   isSessionUnlocked,
   lockSession,
   clearToken,
-  getUser, // 👈 added so we can reuse existing user on PIN login
+  getUser,
 } from "../auth";
 import {
-  clearActivationState,
   clearRevocationFlag,
   getActivationState,
   getDeviceId,
   setActivationState,
   storeActivation,
-  verifyPin,
 } from "../services/activation";
 
 // Fixed defaults per requirement
 const DEFAULT_LANGUAGE = "en";
-const DEFAULT_PIN = "11";
-
-const PIN_REGEX_2DIGIT = /^\d{2}$/;
 
 /**
  * Choose a concrete database id to use for syncing.
@@ -76,32 +69,14 @@ function chooseEffectiveDatabase({ activeDatabaseId, user } = {}) {
 export default function Login() {
   const navigate = useNavigate();
 
-    const [activation, setActivation] = useState(() => getActivationState());
-
-  // If any user is already activated (has a PIN and not revoked), default to PIN screen.
-  const initialMode = (() => {
-    if (activation?.pin && !activation?.revoked) return "pin";
-    return "activate";
-  })();
-  const [mode, setMode] = useState(initialMode);
-  const showPinTab = Boolean(activation?.pin && !activation?.revoked);
-
-
-  useEffect(() => {
-    if (!showPinTab && mode === "pin") {
-      setMode("activate");
-    }
-  }, [showPinTab, mode]);
+  const [activation, setActivation] = useState(() => getActivationState());
 
   // Language is fixed to English — no UI controls
   const [language] = useState(DEFAULT_LANGUAGE);
 
-  // Username/password only for activation
+  // Username/password for login
   const [username, setUsername] = useState(() => activation?.username || "");
   const [password, setPassword] = useState("");
-
-  // PIN entry for unlock (2-digit)
-  const [pinInput, setPinInput] = useState("");
 
   // UX state
   const [loading, setLoading] = useState(false);
@@ -121,15 +96,14 @@ export default function Login() {
   // Handle revocation message
   useEffect(() => {
     if (activation?.revoked) {
-      setMode("activate");
       setInfoMessage(
         activation?.revokedMessage ||
-          "This device was signed out because your account was activated elsewhere. Reactivate to continue."
+          "This device was signed out because your account was activated elsewhere. Please login again."
       );
-    } else if (infoMessage) {
+    } else {
       setInfoMessage("");
     }
-  }, [activation, infoMessage]);
+  }, [activation]);
 
   // Fast-path: if token exists and session is unlocked, go home
   useEffect(() => {
@@ -148,7 +122,7 @@ export default function Login() {
   };
 
   /**
-   * Full login + sync (used ONLY for username/password activation)
+   * Full login + sync (used for username/password login)
    */
   const completeLogin = async ({
     token,
@@ -199,7 +173,7 @@ export default function Login() {
 
     const shouldSync = !skipSync && effectiveDatabase;
 
-    // 🔁 Full push + pull only when NOT skipping (i.e., on activation login)
+    // 🔁 Full push + pull only when NOT skipping
     if (shouldSync) {
       setProgress(0);
       setProgressLabel("Uploading offline updates…");
@@ -263,30 +237,27 @@ export default function Login() {
     setProgressLabel("");
   };
 
-  // Activation submit (username + password + default PIN)
+  // Username/password submit
   const handleActivationSubmit = async (event) => {
     event.preventDefault();
     setError("");
     setInfoMessage("");
     setLoading(true);
     setProgress(0);
-    setProgressLabel("Activating device…");
+    setProgressLabel("Signing in…");
 
     try {
       const deviceId = await getDeviceId();
-      const pin = DEFAULT_PIN; // fixed 2-digit pin "11"
 
       const res = await apiLogin({
         username,
         password,
         deviceId,
-        pin,
       });
 
-      // 🔐 Store richer activation info so future PIN unlock can reuse it
+      // Store activation info for this device (no PIN)
       await storeActivation({
         username,
-        pin,
         deviceId,
         userType: res?.user?.userType,
         user: res?.user,
@@ -294,194 +265,16 @@ export default function Login() {
         activeDatabaseId: res?.activeDatabaseId,
       });
 
-      // For full login (activation) => do sync
+      // Do full login + sync
       await completeLogin(res);
     } catch (err) {
-      setError(err?.message || "Activation failed.");
+      setError(err?.message || "Login failed.");
       setLoading(false);
       setProgress(0);
       setProgressLabel("");
       clearRevocationFlag();
       return;
     }
-  };
-
-  // PIN unlock submit (NO sync, NO session reset)
-  const handlePinSubmit = async (event) => {
-    event.preventDefault();
-    setError("");
-    setLoading(true);
-    setProgress(0);
-    setProgressLabel("Verifying PIN…");
-
-    try {
-      // 1) Local PIN check (matches what you stored on activation)
-      const ok = await verifyPin(pinInput);
-      if (!ok) {
-        setError("Invalid PIN. Try again.");
-        setLoading(false);
-        setProgress(0);
-        setProgressLabel("");
-        return;
-      }
-
-      let token = getToken();
-
-      // 2) If there is NO token (session expired/cleared) → use backend /auth/pin-login
-      if (!token) {
-        setProgressLabel("Restoring session from server…");
-
-        // Read latest activation info from storage
-        const activationState = getActivationState();
-        const usernameForPin =
-          activationState?.username || username || "";
-
-        if (!usernameForPin) {
-          setError(
-            "Could not find saved username. Please login once with your credentials."
-          );
-          setLoading(false);
-          setProgress(0);
-          setProgressLabel("");
-          return;
-        }
-
-        const deviceId = await getDeviceId();
-
-        let sessionPayload = null;
-
-        try {
-          const data = await apiPinLogin({
-            username: usernameForPin,
-            pin: pinInput,
-            deviceId,
-          });
-
-          sessionPayload = {
-            token: data.token,
-            user: data.user,
-            databases: data.databases,
-            activeDatabaseId: data.activeDatabaseId,
-          };
-
-          // Refresh cached activation snapshot so future offline unlocks have latest data
-          await storeActivation({
-            username: usernameForPin,
-            pin: pinInput,
-            deviceId,
-            userType: data?.user?.userType,
-            user: data?.user,
-            databases: data?.databases,
-            activeDatabaseId: data?.activeDatabaseId,
-          });
-        } catch (apiErr) {
-          if (activationState?.user) {
-            sessionPayload = {
-              token: null,
-              user: activationState.user,
-              databases: activationState.databases || [],
-              activeDatabaseId: activationState.activeDatabaseId,
-            };
-            setInfoMessage(
-              "Working offline with the last synced data. Connect to the internet to sync changes."
-            );
-          } else {
-            setError(
-              apiErr?.message ||
-                "Unable to restore session with PIN. Please login once with username & password."
-            );
-            setLoading(false);
-            setProgress(0);
-            setProgressLabel("");
-            return;
-          }
-        }
-
-        // Re-create full session from server response (or cached activation) but SKIP heavy sync
-        await completeLogin({
-          token: sessionPayload?.token,
-          user: sessionPayload?.user,
-          databases: sessionPayload?.databases,
-          activeDatabaseId: sessionPayload?.activeDatabaseId,
-          skipSync: true,
-        });
-
-        // Clear revoked flag (helper should keep other activation fields)
-        const updatedActivation = setActivationState({
-          language: DEFAULT_LANGUAGE,
-          revoked: false,
-        });
-        setActivation(updatedActivation);
-
-        // Unlock session and navigate according to role / userType
-        unlockSession();
-
-        const fallbackType =
-          activationState?.userType ||
-          updatedActivation?.userType ||
-          data.user?.userType;
-        goAfterLogin(data.user, fallbackType);
-
-        setLoading(false);
-        setProgress(0);
-        setProgressLabel("");
-        return;
-      }
-
-      // 3) Fast path: token still exists → just unlock locally (old behaviour)
-      setAuthToken(token);
-
-      const updatedActivation = setActivationState({
-        language: DEFAULT_LANGUAGE,
-        revoked: false,
-      });
-      setActivation(updatedActivation);
-
-      unlockSession();
-
-      let user = null;
-      try {
-        user = getUser && getUser();
-      } catch {
-        // ignore
-      }
-
-      const fallbackType =
-        activation?.userType || updatedActivation?.userType;
-      goAfterLogin(user || updatedActivation?.user, fallbackType);
-
-      setLoading(false);
-      setProgress(0);
-      setProgressLabel("");
-    } catch (err) {
-      console.error("PIN_SUBMIT_ERROR", err);
-      setError(err?.message || "PIN verification failed.");
-      setLoading(false);
-      setProgress(0);
-      setProgressLabel("");
-    }
-  };
-
-
-  const startReactivation = () => {
-    lockSession();
-    clearToken();
-    clearActivationState();
-    setActivation(null);
-    setMode("activate");
-    setPinInput("");
-    setPassword("");
-    setError("");
-    setInfoMessage(
-      "Reactivate this device with your username and password."
-    );
-  };
-
-  const currentTab = showPinTab ? mode : "activate";
-  const isActivationView = currentTab === "activate";
-
-  const handlePinInputChange = (value) => {
-    setPinInput(value.replace(/[^0-9]/g, "").slice(0, 2));
   };
 
   return (
@@ -502,13 +295,9 @@ export default function Login() {
                   variant="overline"
                   color="text.secondary"
                   sx={{ letterSpacing: 3 }}
-                >
-                  
-                </Typography>
-                <Typography variant="h4">Instify </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  
-                </Typography>
+                ></Typography>
+                <Typography variant="h4">Instify</Typography>
+                <Typography variant="body2" color="text.secondary"></Typography>
               </Stack>
 
               {(infoMessage || error) && (
@@ -520,76 +309,38 @@ export default function Login() {
                 </Stack>
               )}
 
-              <Tabs
-                value={currentTab}
-                onChange={(_, value) => setMode(value)}
-                variant="fullWidth"
-                textColor="primary"
-                indicatorColor="primary"
+              {/* Single login form: username + password */}
+              <Stack
+                component="form"
+                spacing={2}
+                onSubmit={handleActivationSubmit}
               >
-                <Tab label="Activate Account" value="activate" />
-                {showPinTab && (
-                  <Tab label="Unlock with PIN" value="pin" />
-                )}
-              </Tabs>
-
-              {isActivationView ? (
-                <Stack
-                  component="form"
-                  spacing={2}
-                  onSubmit={handleActivationSubmit}
+                <TextField
+                  label="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  fullWidth
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
                 >
-                  <TextField
-                    label="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoComplete="username"
-                    required
-                    fullWidth
-                  />
-                  <TextField
-                    label="Password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    required
-                    fullWidth
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    disabled={loading}
-                  >
-                    {loading ? "Syncing data…" : "Activate & sync"}
-                  </Button>
-                </Stack>
-              ) : (
-                <Stack
-                  component="form"
-                  spacing={2}
-                  onSubmit={handlePinSubmit}
-                >
-                  <TextField
-                    label="2 digit PIN"
-                    value={pinInput}
-                    onChange={(e) => handlePinInputChange(e.target.value)}
-                    inputProps={{
-                      inputMode: "numeric",
-                      maxLength: 2,
-                      pattern: "[0-9]{2}",
-                    }}
-                    required
-                  />
-                  <Button type="submit" variant="contained" size="large">
-                    Login
-                  </Button>
-                  <Button variant="outlined" onClick={startReactivation}>
-                    Reactivate this device
-                  </Button>
-                </Stack>
-              )}
+                  {loading ? "Syncing data…" : "Login & sync"}
+                </Button>
+              </Stack>
 
               {loading && (
                 <Stack spacing={1} role="status" aria-live="polite">
