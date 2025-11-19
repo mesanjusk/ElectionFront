@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { apiLogin, setAuthToken } from "../services/api";
+import { apiLogin, apiPinLogin, setAuthToken } from "../services/api";
 import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
 import {
   setSession,
@@ -348,36 +348,23 @@ export default function Login() {
 
         const deviceId = await getDeviceId();
 
-        const resp = await fetch("/api/auth/pin-login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        let data;
+        try {
+          data = await apiPinLogin({
             username: usernameForPin,
             pin: pinInput,
             deviceId,
-          }),
-        });
-
-        if (!resp.ok) {
-          let errMsg =
-            "Unable to restore session with PIN. Please login once with username & password.";
-          try {
-            const errJson = await resp.json();
-            if (errJson?.message) errMsg = errJson.message;
-            else if (errJson?.error) errMsg = errJson.error;
-          } catch (e) {
-            // ignore JSON parse errors
-          }
-          setError(errMsg);
+          });
+        } catch (apiErr) {
+          setError(
+            apiErr?.message ||
+              "Unable to restore session with PIN. Please login once with username & password."
+          );
           setLoading(false);
           setProgress(0);
           setProgressLabel("");
           return;
         }
-
-        const data = await resp.json();
 
         // Re-create full session from server response but SKIP heavy sync
         await completeLogin({
