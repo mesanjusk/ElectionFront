@@ -306,6 +306,7 @@ export default function Login() {
   };
 
   // PIN unlock submit (NO sync, NO session reset)
+    // PIN unlock submit
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -314,34 +315,112 @@ export default function Login() {
     setProgressLabel("Verifying PIN…");
 
     try {
+      // 1) Local PIN check (matches what you stored on activation)
       const ok = await verifyPin(pinInput);
       if (!ok) {
         setError("Invalid PIN. Try again.");
         setLoading(false);
+        setProgress(0);
+        setProgressLabel("");
         return;
       }
 
-      const token = getToken();
+      let token = getToken();
+
+      // 2) If there is NO token (session expired/cleared) → use backend /auth/pin-login
       if (!token) {
-        setError("Session expired. Reactivate this device.");
+        setProgressLabel("Restoring session from server…");
+
+        // Read latest activation info from storage
+        const activationState = getActivationState();
+        const usernameForPin =
+          activationState?.username || username || "";
+
+        if (!usernameForPin) {
+          setError(
+            "Could not find saved username. Please login once with your credentials."
+          );
+          setLoading(false);
+          setProgress(0);
+          setProgressLabel("");
+          return;
+        }
+
+        const deviceId = await getDeviceId();
+
+        const resp = await fetch("/api/auth/pin-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: usernameForPin,
+            pin: pinInput,
+            deviceId,
+          }),
+        });
+
+        if (!resp.ok) {
+          let errMsg =
+            "Unable to restore session with PIN. Please login once with username & password.";
+          try {
+            const errJson = await resp.json();
+            if (errJson?.message) errMsg = errJson.message;
+            else if (errJson?.error) errMsg = errJson.error;
+          } catch (e) {
+            // ignore JSON parse errors
+          }
+          setError(errMsg);
+          setLoading(false);
+          setProgress(0);
+          setProgressLabel("");
+          return;
+        }
+
+        const data = await resp.json();
+
+        // Re-create full session from server response but SKIP heavy sync
+        await completeLogin({
+          token: data.token,
+          user: data.user,
+          databases: data.databases,
+          activeDatabaseId: data.activeDatabaseId,
+          skipSync: true,
+        });
+
+        // Clear revoked flag (helper should keep other activation fields)
+        const updatedActivation = setActivationState({
+          language: DEFAULT_LANGUAGE,
+          revoked: false,
+        });
+        setActivation(updatedActivation);
+
+        // Unlock session and navigate according to role / userType
+        unlockSession();
+
+        const fallbackType =
+          activationState?.userType ||
+          updatedActivation?.userType ||
+          data.user?.userType;
+        goAfterLogin(data.user, fallbackType);
+
         setLoading(false);
+        setProgress(0);
+        setProgressLabel("");
         return;
       }
 
-      // Restore axios auth header using existing token
+      // 3) Fast path: token still exists → just unlock locally (old behaviour)
       setAuthToken(token);
 
-      // Clear revoked flag and keep language
       const updatedActivation = setActivationState({
         language: DEFAULT_LANGUAGE,
         revoked: false,
       });
       setActivation(updatedActivation);
 
-      // Unlock existing session WITHOUT touching databases/user
       unlockSession();
 
-      // Reuse existing user (and DBs) from previous activation login
       let user = null;
       try {
         user = getUser && getUser();
@@ -357,12 +436,14 @@ export default function Login() {
       setProgress(0);
       setProgressLabel("");
     } catch (err) {
+      console.error("PIN_SUBMIT_ERROR", err);
       setError(err?.message || "PIN verification failed.");
       setLoading(false);
       setProgress(0);
       setProgressLabel("");
     }
   };
+
 
   const startReactivation = () => {
     lockSession();
