@@ -306,7 +306,6 @@ export default function Login() {
   };
 
   // PIN unlock submit (NO sync, NO session reset)
-    // PIN unlock submit
   const handlePinSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -348,30 +347,61 @@ export default function Login() {
 
         const deviceId = await getDeviceId();
 
-        let data;
+        let sessionPayload = null;
+
         try {
-          data = await apiPinLogin({
+          const data = await apiPinLogin({
             username: usernameForPin,
             pin: pinInput,
             deviceId,
           });
+
+          sessionPayload = {
+            token: data.token,
+            user: data.user,
+            databases: data.databases,
+            activeDatabaseId: data.activeDatabaseId,
+          };
+
+          // Refresh cached activation snapshot so future offline unlocks have latest data
+          await storeActivation({
+            username: usernameForPin,
+            pin: pinInput,
+            deviceId,
+            userType: data?.user?.userType,
+            user: data?.user,
+            databases: data?.databases,
+            activeDatabaseId: data?.activeDatabaseId,
+          });
         } catch (apiErr) {
-          setError(
-            apiErr?.message ||
-              "Unable to restore session with PIN. Please login once with username & password."
-          );
-          setLoading(false);
-          setProgress(0);
-          setProgressLabel("");
-          return;
+          if (activationState?.user) {
+            sessionPayload = {
+              token: null,
+              user: activationState.user,
+              databases: activationState.databases || [],
+              activeDatabaseId: activationState.activeDatabaseId,
+            };
+            setInfoMessage(
+              "Working offline with the last synced data. Connect to the internet to sync changes."
+            );
+          } else {
+            setError(
+              apiErr?.message ||
+                "Unable to restore session with PIN. Please login once with username & password."
+            );
+            setLoading(false);
+            setProgress(0);
+            setProgressLabel("");
+            return;
+          }
         }
 
-        // Re-create full session from server response but SKIP heavy sync
+        // Re-create full session from server response (or cached activation) but SKIP heavy sync
         await completeLogin({
-          token: data.token,
-          user: data.user,
-          databases: data.databases,
-          activeDatabaseId: data.activeDatabaseId,
+          token: sessionPayload?.token,
+          user: sessionPayload?.user,
+          databases: sessionPayload?.databases,
+          activeDatabaseId: sessionPayload?.activeDatabaseId,
           skipSync: true,
         });
 
