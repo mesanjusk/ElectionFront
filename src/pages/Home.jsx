@@ -165,10 +165,10 @@ export default function Home() {
       action: () => navigate("/family"),
     },
     {
-      label: "Caste Search",
+      label: "Coming Soon",
       description: "",
       icon: <MapRoundedIcon color="primary" />,
-      action: () => navigate("/caste"),
+      action: () => navigate(""),
     },
   ];
 

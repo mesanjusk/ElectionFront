@@ -296,15 +296,10 @@ const buildShareText = (r, collectionName) => {
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
-    `Part: ${part || "—"}  Serial: ${!Number.isNaN(serial) ? serial : "—"}`,
+    
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
-    house ? `House: ${house}` : null,
-    co ? `C/O: ${co}` : null,
-    `Caste: ${caste}`,
-    `Political interest: ${interest}`,
-    volunteer ? `Volunteer: ${volunteer}` : null,
-    dbName ? `Database: ${dbName}` : null,
+    
     photo ? `Photo: ${photo}` : null, // image URL
   ].filter(Boolean);
   return lines.join("\n");

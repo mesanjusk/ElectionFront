@@ -485,12 +485,11 @@ export default function Login() {
                   color="text.secondary"
                   sx={{ letterSpacing: 3 }}
                 >
-                  Smart Book access
+                  
                 </Typography>
-                <Typography variant="h4">Secure login</Typography>
+                <Typography variant="h4">Instify </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Activate this device once and unlock daily with your quick
-                  PIN.
+                  
                 </Typography>
               </Stack>
 
@@ -510,7 +509,7 @@ export default function Login() {
                 textColor="primary"
                 indicatorColor="primary"
               >
-                <Tab label="Activate device" value="activate" />
+                <Tab label="Activate Account" value="activate" />
                 {showPinTab && (
                   <Tab label="Unlock with PIN" value="pin" />
                 )}
