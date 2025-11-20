@@ -199,7 +199,7 @@ const buildShareText = (r, collectionName) => {
     `Name: ${name}`,
     `EPIC: ${epic || "—"}`,
     `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
-    dbName ? `Booth: ${dbName}` : "",
+    
   ].filter(Boolean);
 
   return lines.join("\n");
