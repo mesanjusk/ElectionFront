@@ -6,12 +6,9 @@ import {
   Stack,
   Typography,
   Paper,
-  Chip,
+  Button,
 } from "@mui/material";
-import HowToVoteRoundedIcon from "@mui/icons-material/HowToVoteRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import OfflineBoltRoundedIcon from "@mui/icons-material/OfflineBoltRounded";
-import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import AddToHomeScreenRoundedIcon from "@mui/icons-material/AddToHomeScreenRounded";
 import { useNavigate } from "react-router-dom";
 
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
@@ -20,14 +17,42 @@ import { unlockSession } from "../auth";
 export default function Intro() {
   const navigate = useNavigate();
 
-  // 🔥 Auto redirect if user already logged in
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const token = window.localStorage.getItem("token");
+
+    // 1️⃣ If already logged in → go directly to HOME
     if (token) {
       unlockSession();
-      navigate("/home", { replace: true });
+      navigate("/", { replace: true });
+      return;
+    }
+
+    // 2️⃣ If app is installed as PWA → skip intro, go to LOGIN
+    const isStandalone =
+      (window.matchMedia &&
+        window.matchMedia("(display-mode: standalone)").matches) ||
+      window.navigator.standalone;
+
+    if (isStandalone) {
+      navigate("/login", { replace: true });
     }
   }, [navigate]);
+
+  // Manual install trigger (for browsers that support beforeinstallprompt)
+  const handleManualInstall = async () => {
+    const event = window.deferredPrompt;
+    if (event) {
+      event.prompt();
+      await event.userChoice;
+      window.deferredPrompt = null;
+    } else {
+      alert(
+        "Install option is not available right now.\nTry opening in Chrome on Android or Safari on iPhone, then use 'Add to Home Screen'."
+      );
+    }
+  };
 
   return (
     <Box
@@ -38,38 +63,40 @@ export default function Intro() {
         justifyContent: "center",
         px: 2,
         py: 4,
-        bgcolor:
-          "linear-gradient(135deg, #0f172a 0%, #020617 40%, #111827 100%)",
+        bgcolor: "#f3f4f6", // 🌤 light background
       }}
     >
       <Container maxWidth="sm">
         <Paper
-          elevation={10}
+          elevation={4}
           sx={{
             borderRadius: 4,
             p: 4,
             textAlign: "center",
-            bgcolor: "rgba(15,23,42,0.96)",
-            color: "white",
-            backdropFilter: "blur(10px)",
+            bgcolor: "#ffffff",
           }}
         >
-          {/* Main Icon */}
+          {/* App logo (from public/icon-192.png) */}
           <Box
             sx={{
-              width: 72,
-              height: 72,
-              borderRadius: "24px",
-              mx: "auto",
-              mb: 2,
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "rgba(34,197,94,0.12)",
+              mb: 2,
+              gap: 1,
             }}
           >
-            <HowToVoteRoundedIcon
-              sx={{ fontSize: 40, color: "#22c55e" }}
+            <Box
+              component="img"
+              src="/icon-192.png"
+              alt="Instify logo"
+              sx={{
+                width: 72,
+                height: 72,
+                borderRadius: 3,
+                objectFit: "cover",
+                boxShadow: 2,
+              }}
             />
           </Box>
 
@@ -81,57 +108,29 @@ export default function Intro() {
           {/* Subtitle */}
           <Typography
             variant="body1"
-            sx={{ color: "rgba(249,250,251,0.8)", mb: 3 }}
+            color="text.secondary"
+            sx={{ mb: 3 }}
           >
             Smart voter management platform with{" "}
-            <b>offline search</b>, <b>household insights</b> and{" "}
-            <b>secure multi-device access</b>.
+            <b>offline search</b>, <b>family insights</b> and{" "}
+            <b>secure access</b>.
           </Typography>
 
-          {/* Feature Chips */}
-          <Stack
-            direction="row"
-            spacing={1}
-            justifyContent="center"
-            flexWrap="wrap"
-            mb={3}
+          {/* Install App button */}
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<AddToHomeScreenRoundedIcon />}
+            sx={{
+              py: 1.7,
+              fontSize: 17,
+              borderRadius: 3,
+              mb: 2.5,
+            }}
+            onClick={handleManualInstall}
           >
-            <Chip
-              icon={
-                <SearchRoundedIcon sx={{ color: "#22c55e!important" }} />
-              }
-              label="Ultra-fast search"
-              variant="outlined"
-              sx={{
-                borderColor: "rgba(148,163,184,0.6)",
-                color: "rgba(248,250,252,0.9)",
-              }}
-            />
-            <Chip
-              icon={
-                <OfflineBoltRoundedIcon
-                  sx={{ color: "#22c55e!important" }}
-                />
-              }
-              label="Works offline"
-              variant="outlined"
-              sx={{
-                borderColor: "rgba(148,163,184,0.6)",
-                color: "rgba(248,250,252,0.9)",
-              }}
-            />
-            <Chip
-              icon={
-                <ShieldRoundedIcon sx={{ color: "#22c55e!important" }} />
-              }
-              label="Secure login"
-              variant="outlined"
-              sx={{
-                borderColor: "rgba(148,163,184,0.6)",
-                color: "rgba(248,250,252,0.9)",
-              }}
-            />
-          </Stack>
+            Install App
+          </Button>
 
           {/* Login link */}
           <Stack spacing={0.5}>
@@ -139,7 +138,7 @@ export default function Intro() {
               variant="body2"
               sx={{
                 cursor: "pointer",
-                color: "#38bdf8",
+                color: "primary.main",
                 "&:hover": { textDecoration: "underline" },
               }}
               onClick={() => navigate("/login")}
@@ -147,17 +146,14 @@ export default function Intro() {
               <b>Login</b>
             </Typography>
 
-            <Typography
-              variant="caption"
-              sx={{ color: "rgba(148,163,184,0.9)" }}
-            >
+            <Typography variant="caption" color="text.secondary">
               After login, your data syncs once and is available offline.
             </Typography>
           </Stack>
         </Paper>
       </Container>
 
-      {/* Full-screen PWA install modal */}
+      {/* Full-screen PWA install modal (auto prompt) */}
       <PWAInstallPrompt />
     </Box>
   );
