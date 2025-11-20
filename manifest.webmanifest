@@ -1,5 +1,5 @@
 {
-  "name": "Voter Console",
+  "name": "Voter Management",
   "short_name": "Voter",
   "description": "Search and manage voter records with offline-ready access for field teams.",
   "start_url": "/",

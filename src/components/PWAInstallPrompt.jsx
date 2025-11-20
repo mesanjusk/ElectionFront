@@ -136,7 +136,7 @@ export default function PWAInstallPrompt({ delayMs = 2500, bottom = 72 }) {
                   <strong> "Add to Home Screen".</strong>
                 </>
               ) : (
-                <>Install the voter console for faster access and reliable offline search.</>
+                <>Install the Voter Management for faster access and reliable offline search.</>
               )}
             </Typography>
           </Stack>

@@ -102,9 +102,7 @@ export default function Intro() {
               variant="body1"
               sx={{ color: "rgb(90,90,90)", mb: 3 }}
             >
-              Smart voter management platform with{" "}
-              <b>offline search</b>, <b>household insights</b> and{" "}
-              <b>secure multi-device access</b>.
+              SMART VOTER MANAGEMENT
             </Typography>
 
             {/* Feature Chips */}
@@ -115,35 +113,7 @@ export default function Intro() {
               flexWrap="wrap"
               mb={3}
             >
-              <Chip
-                icon={<SearchRoundedIcon sx={{ color: "#22c55e!important" }} />}
-                label="Ultra-fast search"
-                variant="outlined"
-                sx={{
-                  borderColor: "rgba(148,163,184,0.8)",
-                  color: "rgb(55,65,81)",
-                }}
-              />
-              <Chip
-                icon={
-                  <OfflineBoltRoundedIcon sx={{ color: "#22c55e!important" }} />
-                }
-                label="Works offline"
-                variant="outlined"
-                sx={{
-                  borderColor: "rgba(148,163,184,0.8)",
-                  color: "rgb(55,65,81)",
-                }}
-              />
-              <Chip
-                icon={<ShieldRoundedIcon sx={{ color: "#22c55e!important" }} />}
-                label="Secure login"
-                variant="outlined"
-                sx={{
-                  borderColor: "rgba(148,163,184,0.8)",
-                  color: "rgb(55,65,81)",
-                }}
-              />
+              
             </Stack>
 
             {/* Login link + iOS hint */}
@@ -161,7 +131,7 @@ export default function Intro() {
               </Typography>
 
               <Typography variant="caption" sx={{ color: "rgb(120,120,120)" }}>
-                After login, your data syncs once and is available offline.
+                After login, your data available.
               </Typography>
 
               {isIOS && (
