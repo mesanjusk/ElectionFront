@@ -5,6 +5,7 @@ import Login from "./pages/Login.jsx";
 import AdminLogin from "./pages/AdminLogin.jsx";
 import Home from "./pages/Home.jsx";
 import Search from "./pages/Search.jsx";
+import Search1 from "./pages/Search1.jsx";
 import AdminHome from "./pages/AdminHome.jsx";
 import Family from "./pages/Family.jsx";
 import Alpha from "./pages/alphafamily.jsx";
@@ -45,6 +46,15 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Search />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/search"
+        element={
+          <ProtectedRoute>
+            <Search1 />
           </ProtectedRoute>
         }
       />
