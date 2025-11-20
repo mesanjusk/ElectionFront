@@ -845,11 +845,7 @@ export default function Family() {
                   >
                     {fam.count.toLocaleString()}
                   </Typography>
-                  <Chip
-                    label={fam.caste || "OPEN"}
-                    size="small"
-                    sx={getCasteChipSx(fam.caste)}
-                  />
+                  
                 </Stack>
               </Stack>
             </Paper>
