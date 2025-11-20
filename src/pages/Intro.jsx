@@ -1,5 +1,5 @@
 // client/src/pages/Intro.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Container,
@@ -7,11 +7,13 @@ import {
   Typography,
   Paper,
   Chip,
+  Button,
 } from "@mui/material";
 import HowToVoteRoundedIcon from "@mui/icons-material/HowToVoteRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import OfflineBoltRoundedIcon from "@mui/icons-material/OfflineBoltRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import AddToHomeScreenRoundedIcon from "@mui/icons-material/AddToHomeScreenRounded";
 import { useNavigate } from "react-router-dom";
 
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
@@ -19,6 +21,7 @@ import { unlockSession } from "../auth";
 
 export default function Intro() {
   const navigate = useNavigate();
+  const [isIOS, setIsIOS] = useState(false);
 
   // 🔥 Auto redirect if user already logged in
   useEffect(() => {
@@ -29,6 +32,27 @@ export default function Intro() {
     }
   }, [navigate]);
 
+  // Detect iOS for help section
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ua = navigator.userAgent.toLowerCase();
+    setIsIOS(/iphone|ipad|ipod/.test(ua));
+  }, []);
+
+  // Manual install for Android/Supported browsers
+  const handleManualInstall = () => {
+    const event = window.deferredPrompt;
+    if (event) {
+      event.prompt();
+    } else if (isIOS) {
+      alert(
+        "On iPhone/iPad: Open in Safari → Share button → Add to Home Screen."
+      );
+    } else {
+      alert("Install option is not available. Try Chrome on Android.");
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -38,126 +62,191 @@ export default function Intro() {
         justifyContent: "center",
         px: 2,
         py: 4,
-        bgcolor:
-          "linear-gradient(135deg, #0f172a 0%, #020617 40%, #111827 100%)",
+        bgcolor: "#f3f4f6",
       }}
     >
       <Container maxWidth="sm">
-        <Paper
-          elevation={10}
+        {/* ⭐ Animated Gradient Border */}
+        <Box
           sx={{
-            borderRadius: 4,
-            p: 4,
-            textAlign: "center",
-            bgcolor: "rgba(15,23,42,0.96)",
-            color: "white",
-            backdropFilter: "blur(10px)",
+            borderRadius: 5,
+            p: 1.5,
+            background:
+              "linear-gradient(120deg, #22c55e, #0ea5e9, #6366f1, #22c55e)",
+            backgroundSize: "250% 250%",
+            animation: "gradientBorder 8s ease infinite",
+            "@keyframes gradientBorder": {
+              "0%": { backgroundPosition: "0% 50%" },
+              "50%": { backgroundPosition: "100% 50%" },
+              "100%": { backgroundPosition: "0% 50%" },
+            },
           }}
         >
-          {/* Main Icon */}
-          <Box
+          <Paper
+            elevation={4}
             sx={{
-              width: 72,
-              height: 72,
-              borderRadius: "24px",
-              mx: "auto",
-              mb: 2,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "rgba(34,197,94,0.12)",
+              borderRadius: 4,
+              p: 4,
+              textAlign: "center",
+              bgcolor: "white",
             }}
           >
-            <HowToVoteRoundedIcon
-              sx={{ fontSize: 40, color: "#22c55e" }}
-            />
-          </Box>
-
-          {/* Title */}
-          <Typography variant="h4" fontWeight={700} gutterBottom>
-            Instify
-          </Typography>
-
-          {/* Subtitle */}
-          <Typography
-            variant="body1"
-            sx={{ color: "rgba(249,250,251,0.8)", mb: 3 }}
-          >
-            Smart voter management platform with{" "}
-            <b>offline search</b>, <b>household insights</b> and{" "}
-            <b>secure multi-device access</b>.
-          </Typography>
-
-          {/* Feature Chips */}
-          <Stack
-            direction="row"
-            spacing={1}
-            justifyContent="center"
-            flexWrap="wrap"
-            mb={3}
-          >
-            <Chip
-              icon={
-                <SearchRoundedIcon sx={{ color: "#22c55e!important" }} />
-              }
-              label="Ultra-fast search"
-              variant="outlined"
+            {/* ⭐ App Logo ABOVE Title */}
+            <Box
               sx={{
-                borderColor: "rgba(148,163,184,0.6)",
-                color: "rgba(248,250,252,0.9)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                mb: 2,
+                gap: 1,
               }}
-            />
-            <Chip
-              icon={
-                <OfflineBoltRoundedIcon
-                  sx={{ color: "#22c55e!important" }}
+            >
+              <Box
+                component="img"
+                src="/icon-192.png" // ✔ CORRECT PUBLIC FOLDER PATH
+                alt="Instify logo"
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 2,
+                  objectFit: "cover",
+                  boxShadow: 3,
+                }}
+              />
+
+              <Box
+                sx={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: "18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  bgcolor: "#e7f5e9",
+                }}
+              >
+                <HowToVoteRoundedIcon
+                  sx={{ fontSize: 32, color: "#16a34a" }}
                 />
-              }
-              label="Works offline"
-              variant="outlined"
-              sx={{
-                borderColor: "rgba(148,163,184,0.6)",
-                color: "rgba(248,250,252,0.9)",
-              }}
-            />
-            <Chip
-              icon={
-                <ShieldRoundedIcon sx={{ color: "#22c55e!important" }} />
-              }
-              label="Secure login"
-              variant="outlined"
-              sx={{
-                borderColor: "rgba(148,163,184,0.6)",
-                color: "rgba(248,250,252,0.9)",
-              }}
-            />
-          </Stack>
+              </Box>
+            </Box>
 
-          {/* Login link */}
-          <Stack spacing={0.5}>
-            <Typography
-              variant="body2"
-              sx={{
-                cursor: "pointer",
-                color: "#38bdf8",
-                "&:hover": { textDecoration: "underline" },
-              }}
-              onClick={() => navigate("/login")}
-            >
-              <b>Login</b>
+            {/* ⭐ Title */}
+            <Typography variant="h4" fontWeight={700} gutterBottom>
+              Instify
             </Typography>
 
+            {/* Subtitle */}
             <Typography
-              variant="caption"
-              sx={{ color: "rgba(148,163,184,0.9)" }}
+              variant="body1"
+              sx={{ color: "rgb(90,90,90)", mb: 3 }}
             >
-              After login, your data syncs once and is available offline.
+              Smart Voter Management Platform with{" "}
+              <b>offline search</b>, <b>family insights</b> and{" "}
+              <b>secure access</b>.
             </Typography>
-          </Stack>
-        </Paper>
+
+            {/* ⭐ Feature Chips */}
+            <Stack
+              direction="row"
+              spacing={1}
+              justifyContent="center"
+              flexWrap="wrap"
+              mb={3}
+            >
+              <Chip
+                icon={<SearchRoundedIcon sx={{ color: "#16a34a!important" }} />}
+                label="Fast Search"
+                variant="outlined"
+              />
+              <Chip
+                icon={
+                  <OfflineBoltRoundedIcon sx={{ color: "#16a34a!important" }} />
+                }
+                label="Offline Ready"
+                variant="outlined"
+              />
+              <Chip
+                icon={
+                  <ShieldRoundedIcon sx={{ color: "#16a34a!important" }} />
+                }
+                label="Secure Login"
+                variant="outlined"
+              />
+            </Stack>
+
+            {/* ⭐ Manual Install Button */}
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<AddToHomeScreenRoundedIcon />}
+              sx={{
+                py: 1.7,
+                fontSize: 17,
+                borderRadius: 3,
+                mb: 2.5,
+                bgcolor: "#16a34a",
+                "&:hover": { bgcolor: "#15803d" },
+              }}
+              onClick={handleManualInstall}
+            >
+              Install App
+            </Button>
+
+            {/* ⭐ iOS INSTALL HELP BLOCK */}
+            {isIOS && (
+              <Box
+                sx={{
+                  mb: 2.5,
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 2,
+                  bgcolor: "#f1f5f9",
+                  textAlign: "left",
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 0.8 }}>
+                  📱 Install on iPhone / iPad
+                </Typography>
+                <Typography variant="body2" sx={{ color: "rgb(75,85,99)" }}>
+                  1. Open this page in <b>Safari</b>.
+                  <br />
+                  2. Tap the <b>Share</b> button (⬆️).
+                  <br />
+                  3. Choose <b>“Add to Home Screen”</b>.
+                  <br />
+                  4. Tap <b>Add</b> to install Instify as an app.
+                </Typography>
+              </Box>
+            )}
+
+            {/* ⭐ Login Link */}
+            <Stack spacing={0.5}>
+              <Typography
+                variant="body2"
+                sx={{
+                  cursor: "pointer",
+                  color: "#0ea5e9",
+                  "&:hover": { textDecoration: "underline" },
+                }}
+                onClick={() => navigate("/login")}
+              >
+                <b>Login</b>
+              </Typography>
+
+              <Typography
+                variant="caption"
+                sx={{ color: "rgb(120,120,120)" }}
+              >
+                After login, your database syncs once and becomes available
+                offline.
+              </Typography>
+            </Stack>
+          </Paper>
+        </Box>
       </Container>
 
-      {/* Full-screen PWA install modal */}
+      {/* ⭐ Full-screen PWA auto prompt modal */}
       <PWAInstallPrompt />
     </Box>
   );
