@@ -6,13 +6,8 @@ import {
   Stack,
   Typography,
   Paper,
-  Chip,
   Button,
 } from "@mui/material";
-import HowToVoteRoundedIcon from "@mui/icons-material/HowToVoteRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import OfflineBoltRoundedIcon from "@mui/icons-material/OfflineBoltRounded";
-import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import AddToHomeScreenRoundedIcon from "@mui/icons-material/AddToHomeScreenRounded";
 import { useNavigate } from "react-router-dom";
 
@@ -23,7 +18,7 @@ export default function Intro() {
   const navigate = useNavigate();
   const [isIOS, setIsIOS] = useState(false);
 
-  // 🔥 Auto redirect if user already logged in
+  // Auto redirect if user already logged in
   useEffect(() => {
     const token = window.localStorage.getItem("token");
     if (token) {
@@ -40,16 +35,24 @@ export default function Intro() {
   }, []);
 
   // Manual install for Android/Supported browsers
-  const handleManualInstall = () => {
+  const handleManualInstall = async () => {
     const event = window.deferredPrompt;
     if (event) {
       event.prompt();
+      const choice = await event.userChoice;
+      // clear global reference once used
+      window.deferredPrompt = null;
+      if (choice?.outcome !== "accepted") {
+        // user dismissed, no need to alert
+      }
     } else if (isIOS) {
       alert(
         "On iPhone/iPad: Open in Safari → Share button → Add to Home Screen."
       );
     } else {
-      alert("Install option is not available. Try Chrome on Android.");
+      alert(
+        "Install option is not available right now.\nMake sure you opened this site as a PWA-capable URL (HTTPS, not in incognito) and try Chrome on Android."
+      );
     }
   };
 
@@ -66,7 +69,7 @@ export default function Intro() {
       }}
     >
       <Container maxWidth="sm">
-        {/* ⭐ Animated Gradient Border */}
+        {/* Animated Gradient Border */}
         <Box
           sx={{
             borderRadius: 5,
@@ -91,7 +94,7 @@ export default function Intro() {
               bgcolor: "white",
             }}
           >
-            {/* ⭐ App Logo ABOVE Title */}
+            {/* App Logo (only) */}
             <Box
               sx={{
                 display: "flex",
@@ -103,35 +106,19 @@ export default function Intro() {
             >
               <Box
                 component="img"
-                src="/icon-192.png" // ✔ CORRECT PUBLIC FOLDER PATH
+                src="/icon-192.png"
                 alt="Instify logo"
                 sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 2,
+                  width: 72,
+                  height: 72,
+                  borderRadius: 3,
                   objectFit: "cover",
                   boxShadow: 3,
                 }}
               />
-
-              <Box
-                sx={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "18px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  bgcolor: "#e7f5e9",
-                }}
-              >
-                <HowToVoteRoundedIcon
-                  sx={{ fontSize: 32, color: "#16a34a" }}
-                />
-              </Box>
             </Box>
 
-            {/* ⭐ Title */}
+            {/* Title */}
             <Typography variant="h4" fontWeight={700} gutterBottom>
               Instify
             </Typography>
@@ -146,36 +133,7 @@ export default function Intro() {
               <b>secure access</b>.
             </Typography>
 
-            {/* ⭐ Feature Chips */}
-            <Stack
-              direction="row"
-              spacing={1}
-              justifyContent="center"
-              flexWrap="wrap"
-              mb={3}
-            >
-              <Chip
-                icon={<SearchRoundedIcon sx={{ color: "#16a34a!important" }} />}
-                label="Fast Search"
-                variant="outlined"
-              />
-              <Chip
-                icon={
-                  <OfflineBoltRoundedIcon sx={{ color: "#16a34a!important" }} />
-                }
-                label="Offline Ready"
-                variant="outlined"
-              />
-              <Chip
-                icon={
-                  <ShieldRoundedIcon sx={{ color: "#16a34a!important" }} />
-                }
-                label="Secure Login"
-                variant="outlined"
-              />
-            </Stack>
-
-            {/* ⭐ Manual Install Button */}
+            {/* Install Button */}
             <Button
               variant="contained"
               size="large"
@@ -193,7 +151,7 @@ export default function Intro() {
               Install App
             </Button>
 
-            {/* ⭐ iOS INSTALL HELP BLOCK */}
+            {/* iOS Install Help */}
             {isIOS && (
               <Box
                 sx={{
@@ -220,7 +178,7 @@ export default function Intro() {
               </Box>
             )}
 
-            {/* ⭐ Login Link */}
+            {/* Login link */}
             <Stack spacing={0.5}>
               <Typography
                 variant="body2"
@@ -246,7 +204,7 @@ export default function Intro() {
         </Box>
       </Container>
 
-      {/* ⭐ Full-screen PWA auto prompt modal */}
+      {/* Full-screen PWA auto prompt modal */}
       <PWAInstallPrompt />
     </Box>
   );
