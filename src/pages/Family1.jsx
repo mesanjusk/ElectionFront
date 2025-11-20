@@ -86,7 +86,7 @@ const getHouseNo = (r) =>
 
 const getCareOf = (r) =>
   pick(r, ["CareOf", "careof", "C/O", "CO", "Father", "Husband"]) ||
-  pick(r?.__raw, ["Father", "Husband", "Care Of", "C/O", "वڈील", "पती"]) ||
+  pick(r?.__raw, ["Father", "Husband", "Care Of", "C/O", "वडील", "पती"]) ||
   "";
 
 const getMobile = (r) =>
@@ -199,26 +199,14 @@ const buildShareText = (r, collectionName) => {
     `Name: ${name}`,
     `EPIC: ${epic || "—"}`,
     `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
-    // dbName is currently not printed, but kept if you want later
-    // dbName && `Database: ${dbName}`,
+    
   ].filter(Boolean);
 
   return lines.join("\n");
 };
 
-/* NEW: read surname directly from Surname column (preferred) */
-const getSurnameFromColumn = (r) =>
-  pick(r, ["Surname", "SURNAME", "Last Name", "LastName"]) ||
-  pick(r?.__raw, ["Surname", "SURNAME", "उपनाम", "आडनाव"]) ||
-  "";
-
-/* Extract surname – NOW primarily from Surname column */
+/* Extract surname from full name – FIRST word considered as surname */
 const getSurname = (r) => {
-  // 1) Prefer explicit Surname column
-  const col = getSurnameFromColumn(r);
-  if (col) return String(col).replace(/[.,]/g, " ").trim();
-
-  // 2) Fallback: FIRST word from full name
   const name = getName(r);
   if (!name) return "";
   const clean = String(name).replace(/[.,]/g, " ").trim();
@@ -486,27 +474,23 @@ export default function Family() {
     loadAll().catch(() => {});
   }, [loadAll]);
 
-  // Group voters by surname (from Surname column)
+  // Group voters by surname
   const families = useMemo(() => {
     const map = new Map();
 
     for (const r of allRows) {
-      const surnameRaw = getSurname(r); // now uses Surname column
-      if (!surnameRaw) continue;
+      const surname = getSurname(r);
+      if (!surname) continue;
 
-      // Normalize key so same surname groups together
-      const surnameKey = surnameRaw.replace(/[.,]/g, " ").trim().toUpperCase();
-      if (!surnameKey) continue;
-
-      let fam = map.get(surnameKey);
+      let fam = map.get(surname);
       if (!fam) {
         fam = {
-          surname: surnameRaw.replace(/[.,]/g, " ").trim(), // display value
+          surname,
           count: 0,
           voters: [],
           casteCounts: {},
         };
-        map.set(surnameKey, fam);
+        map.set(surname, fam);
       }
 
       fam.count += 1;
@@ -549,7 +533,7 @@ export default function Family() {
     return list;
   }, [allRows]);
 
-  // Search by surname + A–Z filter (surname from Surname column)
+  // Search by surname + A–Z filter
   const filteredFamilies = useMemo(() => {
     const term = q.trim();
     const letter = letterFilter;
