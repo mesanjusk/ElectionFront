@@ -1,4 +1,3 @@
-
 // client/src/pages/Search.jsx
 import React, {
   useEffect,
@@ -624,13 +623,12 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
             ))}
           </TextField>
 
-          {/* OR type custom volunteer name */}
+          {/* Or type custom volunteer name */}
           <TextField
             label="Or type volunteer name"
             value={volunteerName}
             onChange={(e) => {
               setVolunteerName(e.target.value);
-              // if typing manually, clear dropdown selection
               if (selectedVolunteerId) setSelectedVolunteerId("");
             }}
             placeholder="Volunteer / party worker name"
@@ -722,7 +720,7 @@ export default function Search() {
       if (authUser?.name) setUserName(authUser.name);
       else if (authUser?.username) setUserName(authUser.username);
 
-      // 🔗 same image as Home page banner/avatar for share
+      // 🔗 same image as Home page banner/avatar for share (currently unused in WhatsApp share)
       if (authUser) {
         const url =
           authUser.bannerUrl ||
@@ -1081,44 +1079,14 @@ export default function Search() {
 
   const visible = filtered.slice(0, visibleCount);
 
-  // 🔹 Share handler: attach Home image (if possible) + text
-  const handleShareWhatsApp = async (r) => {
+  // 🔹 Share via WhatsApp: ALWAYS send voter details text (no image)
+  const handleShareWhatsApp = (r) => {
     const mobRaw = getMobile(r);
     const mob = normalizePhone(mobRaw);
     const shareText = buildShareText(r, collectionName);
 
-    // Try Web Share API with image (best: shows candidate image + text)
-    if (
-      typeof navigator !== "undefined" &&
-      navigator.share &&
-      shareImageUrl
-    ) {
-      try {
-        const resp = await fetch(shareImageUrl);
-        const blob = await resp.blob();
-        const file = new File([blob], "instify-share.jpg", {
-          type: blob.type || "image/jpeg",
-        });
-
-        const canShareFiles =
-          !navigator.canShare || navigator.canShare({ files: [file], text: shareText });
-
-        if (canShareFiles) {
-          await navigator.share({
-            files: [file],
-            text: shareText,
-          });
-          return; // done, no need for WhatsApp URL fallback
-        }
-      } catch (err) {
-        console.error("Image share failed, falling back to WhatsApp URL:", err);
-      }
-    }
-
-    // Fallback: classic WhatsApp URL with ONLY text (no image URL)
-    const waHref = mob
-      ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
-      : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+    const base = mob ? `https://wa.me/91${mob}` : "https://wa.me/";
+    const waHref = `${base}?text=${encodeURIComponent(shareText)}`;
 
     window.open(waHref, "_blank");
   };
@@ -1400,7 +1368,7 @@ export default function Search() {
                         <CallRoundedIcon fontSize="small" />
                       </IconButton>
 
-                      {/* WhatsApp share: image + details (or text-only fallback) */}
+                      {/* WhatsApp share: ALWAYS text details */}
                       <IconButton
                         size="small"
                         onClick={() => handleShareWhatsApp(r)}
