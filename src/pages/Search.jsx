@@ -1,3 +1,4 @@
+
 // client/src/pages/Search.jsx
 import React, {
   useEffect,
@@ -179,7 +180,7 @@ const getMobile = (r) =>
   pick(r?.__raw, ["Mobile", "mobile", "Phone"]) ||
   "";
 
-/* Image URL – used in WhatsApp share text */
+/* Image URL – from voter (NOT used in text anymore, per requirement) */
 const getPhotoUrl = (r) =>
   pick(r, [
     "photoUrl",
@@ -274,33 +275,20 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp – includes photo, caste, interest, volunteer, DB */
+/* Share text for WhatsApp – ONLY voter details (no image URL) */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r); // EPIC = Voter ID
-  const part = getPart(r);
-  const serial = getSerialNum(r);
   const rps = getRPS(r);
   const age = getAge(r);
   const gender = getGender(r);
-  const house = getHouseNo(r);
-  const co = getCareOf(r);
-  const photo = getPhotoUrl(r);
-
-  const caste = getCaste(r) || "OPEN";
-  const interest = getPoliticalInterest(r) || "—";
-  const volunteer = getVolunteer(r) || "";
-  const dbName = collectionName || "";
 
   const lines = [
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
-    
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
-    
-    photo ? `Photo: ${photo}` : null, // image URL
   ].filter(Boolean);
   return lines.join("\n");
 };
@@ -365,9 +353,7 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
             <Typography variant="caption" color="text.secondary">
               EPIC
             </Typography>
-            <Typography fontFamily="monospace">
-              {getEPIC(voter)}
-            </Typography>
+            <Typography fontFamily="monospace">{getEPIC(voter)}</Typography>
           </Stack>
           <TextField
             label="Mobile number"
@@ -411,9 +397,7 @@ function CasteModal({ open, voter, onClose, options = [] }) {
 
   const handleSave = async () => {
     const finalCaste =
-      (customCaste && customCaste.trim()) ||
-      (caste && caste.trim()) ||
-      "OPEN";
+      (customCaste && customCaste.trim()) || (caste && caste.trim()) || "OPEN";
 
     await updateVoterLocal(voter._id, {
       caste: finalCaste,
@@ -599,7 +583,6 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
 
   const volunteers = options || [];
 
-
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="xs">
       <DialogTitle>Assigned volunteer</DialogTitle>
@@ -731,12 +714,25 @@ export default function Search() {
   // username and collection
   const [userName, setUserName] = useState("User");
   const [collectionName, setCollectionName] = useState("");
+  const [shareImageUrl, setShareImageUrl] = useState("");
 
   useEffect(() => {
     try {
       const authUser = getUser && getUser();
       if (authUser?.name) setUserName(authUser.name);
       else if (authUser?.username) setUserName(authUser.username);
+
+      // 🔗 same image as Home page banner/avatar for share
+      if (authUser) {
+        const url =
+          authUser.bannerUrl ||
+          authUser.coverUrl ||
+          authUser.posterUrl ||
+          authUser.avatarUrl ||
+          authUser.avatar ||
+          "";
+        if (url) setShareImageUrl(url);
+      }
     } catch {
       // ignore
     }
@@ -1085,6 +1081,48 @@ export default function Search() {
 
   const visible = filtered.slice(0, visibleCount);
 
+  // 🔹 Share handler: attach Home image (if possible) + text
+  const handleShareWhatsApp = async (r) => {
+    const mobRaw = getMobile(r);
+    const mob = normalizePhone(mobRaw);
+    const shareText = buildShareText(r, collectionName);
+
+    // Try Web Share API with image (best: shows candidate image + text)
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.share &&
+      shareImageUrl
+    ) {
+      try {
+        const resp = await fetch(shareImageUrl);
+        const blob = await resp.blob();
+        const file = new File([blob], "instify-share.jpg", {
+          type: blob.type || "image/jpeg",
+        });
+
+        const canShareFiles =
+          !navigator.canShare || navigator.canShare({ files: [file], text: shareText });
+
+        if (canShareFiles) {
+          await navigator.share({
+            files: [file],
+            text: shareText,
+          });
+          return; // done, no need for WhatsApp URL fallback
+        }
+      } catch (err) {
+        console.error("Image share failed, falling back to WhatsApp URL:", err);
+      }
+    }
+
+    // Fallback: classic WhatsApp URL with ONLY text (no image URL)
+    const waHref = mob
+      ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
+      : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+    window.open(waHref, "_blank");
+  };
+
   return (
     <Box
       sx={{
@@ -1262,12 +1300,6 @@ export default function Search() {
               const gender = getGender(r);
               const mobRaw = getMobile(r);
               const mob = normalizePhone(mobRaw);
-              const shareText = buildShareText(r, collectionName);
-              const waHref = mob
-                ? `https://wa.me/91${mob}?text=${encodeURIComponent(
-                    shareText
-                  )}`
-                : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
 
               const serialDisplay = !Number.isNaN(serialNum)
                 ? serialNum
@@ -1368,12 +1400,10 @@ export default function Search() {
                         <CallRoundedIcon fontSize="small" />
                       </IconButton>
 
+                      {/* WhatsApp share: image + details (or text-only fallback) */}
                       <IconButton
                         size="small"
-                        component="a"
-                        href={waHref}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={() => handleShareWhatsApp(r)}
                       >
                         <WhatsAppIcon fontSize="small" />
                       </IconButton>
