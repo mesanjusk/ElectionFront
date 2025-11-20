@@ -67,7 +67,7 @@ export default function Intro() {
       </Container>
 
       {/* Our existing PWA prompt component */}
-      <PWAInstallPrompt bottom={80} />
+      <PWAInstallPrompt  />
     </Box>
   );
 }
