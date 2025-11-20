@@ -623,12 +623,13 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
             ))}
           </TextField>
 
-          {/* Or type custom volunteer name */}
+          {/* OR type custom volunteer name */}
           <TextField
             label="Or type volunteer name"
             value={volunteerName}
             onChange={(e) => {
               setVolunteerName(e.target.value);
+              // if typing manually, clear dropdown selection
               if (selectedVolunteerId) setSelectedVolunteerId("");
             }}
             placeholder="Volunteer / party worker name"
@@ -720,7 +721,7 @@ export default function Search() {
       if (authUser?.name) setUserName(authUser.name);
       else if (authUser?.username) setUserName(authUser.username);
 
-      // 🔗 same image as Home page banner/avatar for share (currently unused in WhatsApp share)
+      // 🔗 same image as Home page banner/avatar for share
       if (authUser) {
         const url =
           authUser.bannerUrl ||
@@ -1079,12 +1080,47 @@ export default function Search() {
 
   const visible = filtered.slice(0, visibleCount);
 
-  // 🔹 Share via WhatsApp: ALWAYS send voter details text (no image)
-  const handleShareWhatsApp = (r) => {
+  // 🔹 Share via WhatsApp: TRY image + details via Web Share, else text fallback
+  const handleShareWhatsApp = async (r) => {
     const mobRaw = getMobile(r);
     const mob = normalizePhone(mobRaw);
     const shareText = buildShareText(r, collectionName);
 
+    // 1️⃣ BEST TRY: Web Share with image file + text (caption)
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.share &&
+      shareImageUrl
+    ) {
+      try {
+        const resp = await fetch(shareImageUrl);
+        const blob = await resp.blob();
+        const file = new File([blob], "candidate.jpg", {
+          type: blob.type || "image/jpeg",
+        });
+
+        const data = {
+          files: [file],
+          text: shareText,
+          title: "Voter Details",
+        };
+
+        const canShare =
+          !navigator.canShare || navigator.canShare(data);
+
+        if (canShare) {
+          await navigator.share(data);
+          return; // ✅ done, user picks WhatsApp from sheet
+        }
+      } catch (err) {
+        console.error(
+          "Image + text Web Share failed, falling back to WhatsApp text link:",
+          err
+        );
+      }
+    }
+
+    // 2️⃣ FALLBACK: classic WhatsApp URL with ONLY text
     const base = mob ? `https://wa.me/91${mob}` : "https://wa.me/";
     const waHref = `${base}?text=${encodeURIComponent(shareText)}`;
 
@@ -1368,7 +1404,7 @@ export default function Search() {
                         <CallRoundedIcon fontSize="small" />
                       </IconButton>
 
-                      {/* WhatsApp share: ALWAYS text details */}
+                      {/* WhatsApp share: TRY image + text, fallback text */}
                       <IconButton
                         size="small"
                         onClick={() => handleShareWhatsApp(r)}
