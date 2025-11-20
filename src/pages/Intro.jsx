@@ -1,14 +1,17 @@
 // client/src/pages/Intro.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Container,
   Stack,
   Typography,
   Paper,
-  Button,
+  Chip,
 } from "@mui/material";
-import AddToHomeScreenRoundedIcon from "@mui/icons-material/AddToHomeScreenRounded";
+import HowToVoteRoundedIcon from "@mui/icons-material/HowToVoteRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import OfflineBoltRoundedIcon from "@mui/icons-material/OfflineBoltRounded";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import { useNavigate } from "react-router-dom";
 
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
@@ -16,43 +19,23 @@ import { unlockSession } from "../auth";
 
 export default function Intro() {
   const navigate = useNavigate();
+  const [isIOS, setIsIOS] = useState(false);
 
+  // 🔥 Auto redirect if user already logged in
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const token = window.localStorage.getItem("token");
-
-    // 1️⃣ If already logged in → go directly to HOME
     if (token) {
       unlockSession();
-      navigate("/", { replace: true });
-      return;
-    }
-
-    // 2️⃣ If app is installed as PWA → skip intro, go to LOGIN
-    const isStandalone =
-      (window.matchMedia &&
-        window.matchMedia("(display-mode: standalone)").matches) ||
-      window.navigator.standalone;
-
-    if (isStandalone) {
-      navigate("/login", { replace: true });
+      navigate("/home", { replace: true });
     }
   }, [navigate]);
 
-  // Manual install trigger (for browsers that support beforeinstallprompt)
-  const handleManualInstall = async () => {
-    const event = window.deferredPrompt;
-    if (event) {
-      event.prompt();
-      await event.userChoice;
-      window.deferredPrompt = null;
-    } else {
-      alert(
-        "Install option is not available right now.\nTry opening in Chrome on Android or Safari on iPhone, then use 'Add to Home Screen'."
-      );
-    }
-  };
+  // Detect iOS for extra instructions
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ua = window.navigator.userAgent.toLowerCase();
+    setIsIOS(/iphone|ipad|ipod/.test(ua));
+  }, []);
 
   return (
     <Box
@@ -67,93 +50,136 @@ export default function Intro() {
       }}
     >
       <Container maxWidth="sm">
-        <Paper
-          elevation={4}
+        {/* ✨ animated gradient border wrapper */}
+        <Box
           sx={{
-            borderRadius: 4,
-            p: 4,
-            textAlign: "center",
-            bgcolor: "#ffffff",
+            borderRadius: 5,
+            p: 1.5,
+            background:
+              "linear-gradient(120deg, #22c55e, #0ea5e9, #6366f1, #22c55e)",
+            backgroundSize: "250% 250%",
+            animation: "introGradientBorder 10s ease infinite",
+            "@keyframes introGradientBorder": {
+              "0%": { backgroundPosition: "0% 50%" },
+              "50%": { backgroundPosition: "100% 50%" },
+              "100%": { backgroundPosition: "0% 50%" },
+            },
           }}
         >
-          {/* App logo (from public/icon-192.png) */}
-          <Box
+          <Paper
+            elevation={4}
             sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              mb: 2,
-              gap: 1,
+              borderRadius: 4,
+              p: 4,
+              textAlign: "center",
+              bgcolor: "#ffffff",
             }}
           >
+            {/* Main Icon */}
             <Box
-              component="img"
-              src="/icon-192.png"
-              alt="Instify logo"
               sx={{
                 width: 72,
                 height: 72,
-                borderRadius: 3,
-                objectFit: "cover",
-                boxShadow: 2,
+                borderRadius: "24px",
+                mx: "auto",
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "#e7f5e9",
               }}
-            />
-          </Box>
-
-          {/* Title */}
-          <Typography variant="h4" fontWeight={700} gutterBottom>
-            Instify
-          </Typography>
-
-          {/* Subtitle */}
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ mb: 3 }}
-          >
-            Smart voter management platform with{" "}
-            <b>offline search</b>, <b>family insights</b> and{" "}
-            <b>secure access</b>.
-          </Typography>
-
-          {/* Install App button */}
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<AddToHomeScreenRoundedIcon />}
-            sx={{
-              py: 1.7,
-              fontSize: 17,
-              borderRadius: 3,
-              mb: 2.5,
-            }}
-            onClick={handleManualInstall}
-          >
-            Install App
-          </Button>
-
-          {/* Login link */}
-          <Stack spacing={0.5}>
-            <Typography
-              variant="body2"
-              sx={{
-                cursor: "pointer",
-                color: "primary.main",
-                "&:hover": { textDecoration: "underline" },
-              }}
-              onClick={() => navigate("/login")}
             >
-              <b>Login</b>
+              <HowToVoteRoundedIcon sx={{ fontSize: 40, color: "#22c55e" }} />
+            </Box>
+
+            {/* Title */}
+            <Typography variant="h4" fontWeight={700} gutterBottom>
+              Instify
             </Typography>
 
-            <Typography variant="caption" color="text.secondary">
-              After login, your data syncs once and is available offline.
+            {/* Subtitle */}
+            <Typography
+              variant="body1"
+              sx={{ color: "rgb(90,90,90)", mb: 3 }}
+            >
+              Smart voter management platform with{" "}
+              <b>offline search</b>, <b>household insights</b> and{" "}
+              <b>secure multi-device access</b>.
             </Typography>
-          </Stack>
-        </Paper>
+
+            {/* Feature Chips */}
+            <Stack
+              direction="row"
+              spacing={1}
+              justifyContent="center"
+              flexWrap="wrap"
+              mb={3}
+            >
+              <Chip
+                icon={<SearchRoundedIcon sx={{ color: "#22c55e!important" }} />}
+                label="Ultra-fast search"
+                variant="outlined"
+                sx={{
+                  borderColor: "rgba(148,163,184,0.8)",
+                  color: "rgb(55,65,81)",
+                }}
+              />
+              <Chip
+                icon={
+                  <OfflineBoltRoundedIcon sx={{ color: "#22c55e!important" }} />
+                }
+                label="Works offline"
+                variant="outlined"
+                sx={{
+                  borderColor: "rgba(148,163,184,0.8)",
+                  color: "rgb(55,65,81)",
+                }}
+              />
+              <Chip
+                icon={<ShieldRoundedIcon sx={{ color: "#22c55e!important" }} />}
+                label="Secure login"
+                variant="outlined"
+                sx={{
+                  borderColor: "rgba(148,163,184,0.8)",
+                  color: "rgb(55,65,81)",
+                }}
+              />
+            </Stack>
+
+            {/* Login link + iOS hint */}
+            <Stack spacing={0.5}>
+              <Typography
+                variant="body2"
+                sx={{
+                  cursor: "pointer",
+                  color: "primary.main",
+                  "&:hover": { textDecoration: "underline" },
+                }}
+                onClick={() => navigate("/login")}
+              >
+                <b>Login</b>
+              </Typography>
+
+              <Typography variant="caption" sx={{ color: "rgb(120,120,120)" }}>
+                After login, your data syncs once and is available offline.
+              </Typography>
+
+              {isIOS && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: "rgb(100,116,139)", mt: 1 }}
+                >
+                  📱 On iPhone / iPad: open in <b>Safari</b>, tap{" "}
+                  <b>Share (⬆️)</b> → <b>Add to Home Screen</b> to install as an
+                  app.
+                </Typography>
+              )}
+            </Stack>
+          </Paper>
+        </Box>
       </Container>
 
-      {/* Full-screen PWA install modal (auto prompt) */}
+      {/* PWA install modal / logic */}
       <PWAInstallPrompt />
     </Box>
   );
