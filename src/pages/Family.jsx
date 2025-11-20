@@ -173,16 +173,15 @@ const buildShareText = (r, collectionName) => {
   const co = getCareOf(r);
   const caste = getCaste(r) || "OPEN";
   const dbName = collectionName || "";
+  const rps = getRPS(r);
 
   const lines = [
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic || "—"}`,
-    `Age: ${age || "—"}  Sex: ${gender || "—"}`,
-    house ? `House: ${house}` : null,
-    co ? `C/O: ${co}` : null,
-    `Caste: ${caste}`,
-    dbName ? `Database: ${dbName}` : null,
+    
+    `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
+  
   ].filter(Boolean);
   return lines.join("\n");
 };
