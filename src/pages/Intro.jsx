@@ -6,12 +6,10 @@ import {
   Stack,
   Typography,
   Paper,
-  Chip,
+  Button
 } from "@mui/material";
 import HowToVoteRoundedIcon from "@mui/icons-material/HowToVoteRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import OfflineBoltRoundedIcon from "@mui/icons-material/OfflineBoltRounded";
-import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import AddToHomeScreenRoundedIcon from "@mui/icons-material/AddToHomeScreenRounded";
 import { useNavigate } from "react-router-dom";
 
 import PWAInstallPrompt from "../components/PWAInstallPrompt.jsx";
@@ -19,9 +17,12 @@ import { unlockSession } from "../auth";
 
 export default function Intro() {
   const navigate = useNavigate();
-  const [isIOS, setIsIOS] = useState(false);
 
-  // 🔥 Auto redirect if user already logged in
+  const [isIOS, setIsIOS] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [canInstall, setCanInstall] = useState(false); // show Install App button
+
+  // Detect login → skip intro
   useEffect(() => {
     const token = window.localStorage.getItem("token");
     if (token) {
@@ -30,12 +31,48 @@ export default function Intro() {
     }
   }, [navigate]);
 
-  // Detect iOS for extra instructions
+  // Detect iOS
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const ua = window.navigator.userAgent.toLowerCase();
+    const ua = navigator.userAgent.toLowerCase();
     setIsIOS(/iphone|ipad|ipod/.test(ua));
   }, []);
+
+  // Detect if app is already installed
+  useEffect(() => {
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone;
+
+    if (standalone) {
+      setIsInstalled(true);
+    }
+  }, []);
+
+  // Listen for install prompt availability
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      window.deferredPrompt = e;
+      setCanInstall(true); // Show button only when install possible
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  // Install button click
+  const handleInstall = async () => {
+    const event = window.deferredPrompt;
+    if (!event) return; // If not available, button will not be visible anyway
+
+    event.prompt();
+    await event.userChoice;
+    window.deferredPrompt = null;
+    setCanInstall(false);
+  };
 
   return (
     <Box
@@ -46,11 +83,11 @@ export default function Intro() {
         justifyContent: "center",
         px: 2,
         py: 4,
-        bgcolor: "#f3f4f6", // 🌤 light background
+        bgcolor: "#f3f4f6",
       }}
     >
       <Container maxWidth="sm">
-        {/* ✨ animated gradient border wrapper */}
+        {/* Animated gradient border */}
         <Box
           sx={{
             borderRadius: 5,
@@ -105,16 +142,23 @@ export default function Intro() {
               SMART VOTER MANAGEMENT
             </Typography>
 
-            {/* Feature Chips */}
-            <Stack
-              direction="row"
-              spacing={1}
-              justifyContent="center"
-              flexWrap="wrap"
-              mb={3}
-            >
-              
-            </Stack>
+            {/* Install App button (only if: NOT installed + prompt available) */}
+            {!isInstalled && canInstall && (
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AddToHomeScreenRoundedIcon />}
+                sx={{
+                  py: 1.7,
+                  fontSize: 17,
+                  borderRadius: 3,
+                  mb: 3,
+                }}
+                onClick={handleInstall}
+              >
+                Install App
+              </Button>
+            )}
 
             {/* Login link + iOS hint */}
             <Stack spacing={0.5}>
@@ -140,8 +184,7 @@ export default function Intro() {
                   sx={{ color: "rgb(100,116,139)", mt: 1 }}
                 >
                   📱 On iPhone / iPad: open in <b>Safari</b>, tap{" "}
-                  <b>Share (⬆️)</b> → <b>Add to Home Screen</b> to install as an
-                  app.
+                  <b>Share (⬆️)</b> → <b>Add to Home Screen</b>.
                 </Typography>
               )}
             </Stack>
@@ -149,7 +192,7 @@ export default function Intro() {
         </Box>
       </Container>
 
-      {/* PWA install modal / logic */}
+      {/* Auto PWA install modal */}
       <PWAInstallPrompt />
     </Box>
   );
