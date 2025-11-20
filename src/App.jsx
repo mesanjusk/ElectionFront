@@ -1,26 +1,28 @@
 // client/src/App.jsx
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login.jsx';
-import AdminLogin from './pages/AdminLogin.jsx';
-import Home from './pages/Home.jsx';
-import Search from './pages/Search.jsx';
-import AdminHome from './pages/AdminHome.jsx';
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login.jsx";
+import AdminLogin from "./pages/AdminLogin.jsx";
+import Home from "./pages/Home.jsx";
+import Search from "./pages/Search.jsx";
+import AdminHome from "./pages/AdminHome.jsx";
 import Family from "./pages/Family.jsx";
 import Alpha from "./pages/alphafamily.jsx";
 import Caste from "./pages/Caste.jsx";
-import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import Intro from "./pages/Intro.jsx"; // ⬅️ new intro/landing page
 
 export default function App() {
   return (
     <Routes>
       {/* Public routes */}
+      <Route path="/" element={<Intro />} />
       <Route path="/login" element={<Login />} />
       <Route path="/adminlogin" element={<AdminLogin />} />
 
       {/* Protected routes */}
       <Route
-        path="/"
+        path="/home"
         element={
           <ProtectedRoute>
             <Home />
@@ -56,7 +58,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-       <Route
+      <Route
         path="/alpha"
         element={
           <ProtectedRoute>
