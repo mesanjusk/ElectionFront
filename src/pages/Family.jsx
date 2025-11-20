@@ -100,6 +100,28 @@ const getCaste = (r) =>
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
   "";
 
+/* NEW: R/P/S helper – Roll/Part/Serial */
+const getRPS = (r) =>
+  pick(r, [
+    "Roll/Part/Serial",
+    "RollPartSerial",
+    "Roll_Part_Serial",
+    "RPS",
+    "rps",
+    "Status",
+    "status",
+  ]) ||
+  pick(r?.__raw, [
+    "Roll/Part/Serial",
+    "RollPartSerial",
+    "Roll_Part_Serial",
+    "RPS",
+    "rps",
+    "Status",
+    "status",
+  ]) ||
+  "";
+
 /* Normalize phone for tel:/WhatsApp */
 const normalizePhone = (raw) => {
   if (!raw) return "";
@@ -169,20 +191,17 @@ const buildShareText = (r, collectionName) => {
   const epic = getEPIC(r);
   const age = getAge(r);
   const gender = getGender(r);
-  const house = getHouseNo(r);
-  const co = getCareOf(r);
-  const caste = getCaste(r) || "OPEN";
-  const dbName = collectionName || "";
   const rps = getRPS(r);
+  const dbName = collectionName || "";
 
   const lines = [
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic || "—"}`,
-    
     `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
-  
+    dbName ? `Booth: ${dbName}` : "",
   ].filter(Boolean);
+
   return lines.join("\n");
 };
 
@@ -283,6 +302,7 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
                   const epic = getEPIC(r);
                   const age = getAge(r);
                   const gender = getGender(r);
+                  const rps = getRPS(r);
                   const mobRaw = getMobile(r);
                   const mob = normalizePhone(mobRaw);
                   const shareText = buildShareText(r, collectionName);
@@ -341,7 +361,8 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
                         </Stack>
                       </Stack>
                       <Typography variant="caption" color="text.secondary">
-                        EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"}
+                        EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"} ·
+                        {" R/P/S "} {rps || "—"}
                       </Typography>
                     </Paper>
                   );
