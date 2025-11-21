@@ -13,22 +13,23 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { apiLogin, setAuthToken } from "./services/api";
-import { pullAll, pushOutbox, resetSyncState } from "./services/sync";
+
+import { apiLogin, setAuthToken } from "../services/api";
+import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
 import {
   setSession,
   setActiveDatabase,
   getActiveDatabase,
   getAvailableDatabases,
   unlockSession,
-} from "./auth";
+} from "../auth";
 import {
   clearRevocationFlag,
   getActivationState,
   getDeviceId,
   setActivationState,
   storeActivation,
-} from "./services/activation";
+} from "../services/activation";
 
 // Fixed defaults per requirement
 const DEFAULT_LANGUAGE = "en";
@@ -82,10 +83,12 @@ export default function Login() {
 
   // Keep document lang in sync (even though it’s fixed)
   useEffect(() => {
-    if (typeof document !== "undefined")
+    if (typeof document !== "undefined") {
       document.documentElement.lang = language;
-    if (typeof window !== "undefined")
+    }
+    if (typeof window !== "undefined") {
       window.localStorage.setItem("appLanguage", language);
+    }
   }, [language]);
 
   // Handle revocation message
@@ -171,13 +174,11 @@ export default function Login() {
       const existing = getAvailableDatabases();
       if (existing && existing.length) {
         available = existing;
+      } else if (user?.userDatabases && user.userDatabases.length) {
+        // New multi-tenant model: per-user clones under user.userDatabases
+        available = user.userDatabases;
       } else {
-        // New multi-tenant model: backend usually stores per-user clones under user.userDatabases
-        if (user?.userDatabases && user.userDatabases.length) {
-          available = user.userDatabases;
-        } else {
-          available = user?.databases || [];
-        }
+        available = user?.databases || [];
       }
     }
 
@@ -343,7 +344,10 @@ export default function Login() {
                   sx={{ letterSpacing: 3 }}
                 ></Typography>
                 <Typography variant="h4">Instify</Typography>
-                <Typography variant="body2" color="text.secondary"></Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                ></Typography>
               </Stack>
 
               {(infoMessage || error) && (

@@ -1,7 +1,6 @@
 // client/src/services/sync.js
 import { db, getLastSync, setLastSync, clearLastSync } from "../db/indexedDb";
-import api from "../api"; // axios instance with interceptors
-import { apiExport } from "./api"; // wrapper around /api/voters/export
+import api, { apiExport } from "./api";
 import { getActiveDatabase } from "../auth";
 
 /**
