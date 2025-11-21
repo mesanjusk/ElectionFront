@@ -1,12 +1,12 @@
 // client/src/services/sync.js
 import { db, getLastSync, setLastSync, clearLastSync } from "../db/indexedDb";
 import api from "../api"; // axios instance with interceptors
-import { apiExport } from "./api"; // keep using your existing wrapper
+import { apiExport } from "./api"; // wrapper around /api/voters/export
 import { getActiveDatabase } from "../auth";
 
 /**
  * Pull all voters from server into IndexedDB for the active database.
- * Uses incremental sync via `since` + `lastSync` key.
+ * Uses incremental sync via `since` + per-database `lastSync` key.
  */
 export async function pullAll({
   onProgress,
@@ -15,54 +15,81 @@ export async function pullAll({
   const activeDatabase = explicitDatabaseId || getActiveDatabase();
   const syncKey = activeDatabase ? `lastSync:${activeDatabase}` : "lastSync";
 
-  // last sync timestamp
   let since = await getLastSync(syncKey);
-  if (!since) {
-    // default to midnight of 2020
-    since = new Date("2020-01-01T00:00:00Z").toISOString();
-  }
-
   let page = 1;
-  const limit = 2000;
+  const limit = 5000;
+  let total = 0;
+  let lastServerTime = since || null;
 
-  let totalPulled = 0;
-  let newestTimestamp = since;
+  console.log("[SYNC] pullAll start", { activeDatabase, syncKey, since, limit });
 
   while (true) {
-    const { items = [], hasMore = false, serverTime } = await apiExport({
-      page,
-      limit,
-      since,
-      databaseId: activeDatabase || undefined,
-    });
-
-    if (!items.length) break;
-
-    await db.voters.bulkPut(items);
-
-    totalPulled += items.length;
-    if (serverTime && serverTime > newestTimestamp) {
-      newestTimestamp = serverTime;
+    let response;
+    try {
+      response = await apiExport({
+        page,
+        limit,
+        since,
+        databaseId: activeDatabase || undefined,
+      });
+    } catch (e) {
+      console.error("[SYNC] pullAll apiExport error", e?.response || e);
+      throw e;
     }
 
-    if (onProgress) {
-      onProgress({ page, pulled: items.length, totalPulled });
+    const { items = [], hasMore = false, serverTime } = response || {};
+    console.log("[SYNC] pullAll batch", {
+      page,
+      batch: items.length,
+      hasMore,
+      serverTime,
+    });
+
+    if (items.length) {
+      await db.voters.bulkPut(items);
+      total += items.length;
+      onProgress?.({ page, batch: items.length, total });
+    }
+
+    if (serverTime && (!lastServerTime || serverTime > lastServerTime)) {
+      lastServerTime = serverTime;
     }
 
     if (!hasMore) break;
     page += 1;
   }
 
-  // if changed, update lastSync
-  if (newestTimestamp !== since) {
-    await setLastSync(syncKey, newestTimestamp);
+  if (lastServerTime) {
+    await setLastSync(lastServerTime, syncKey);
+    console.log("[SYNC] pullAll setLastSync", { syncKey, lastServerTime });
   }
 
-  return totalPulled;
+  console.log("[SYNC] pullAll done", {
+    activeDatabase,
+    total,
+    lastServerTime,
+  });
+
+  // Return rich object but still compatible with old callers that treat it as a number
+  return { pulled: total, lastSync: lastServerTime, databaseId: activeDatabase };
 }
 
 /**
- * Push local updates (outbox entries) to the server.
+ * Clears all local voters + outbox + lastSync markers for a DB.
+ */
+export async function resetSyncState(databaseId) {
+  console.log("[SYNC] resetSyncState", { databaseId });
+  await db.voters.clear();
+  await db.outbox.clear();
+  if (databaseId) {
+    await clearLastSync(`lastSync:${databaseId}`);
+  } else {
+    await clearLastSync("lastSync");
+  }
+}
+
+/**
+ * Push queued outbox changes to server for a specific voter database.
  * - Accepts { databaseId } but also falls back to getActiveDatabase() for old callers.
  * - Sends databaseId both in body and as ?databaseId=... query param.
  * - On success, removes successfully synced entries from `db.outbox`.
@@ -71,11 +98,15 @@ export async function pushOutbox({ databaseId: explicitDatabaseId } = {}) {
   const activeDatabase = explicitDatabaseId || getActiveDatabase();
 
   if (!activeDatabase) {
-    // This is what backend is complaining about
     throw new Error("Missing databaseId for pushOutbox");
   }
 
   const queued = await db.outbox.toArray();
+  console.log("[SYNC] pushOutbox start", {
+    activeDatabase,
+    queued: queued.length,
+  });
+
   if (!queued.length) return { pushed: 0, failed: [] };
 
   const changes = queued.map(({ _id, op, payload, updatedAt }) => ({
@@ -85,21 +116,32 @@ export async function pushOutbox({ databaseId: explicitDatabaseId } = {}) {
     updatedAt,
   }));
 
-  // ✅ FIXED — correct backend route
-  const res = await api.post(
-    "/api/voters/bulk-upsert",
-    {
-      databaseId: activeDatabase,
-      changes,
-    },
-    {
-      params: { databaseId: activeDatabase },
-    }
-  );
+  let res;
+  try {
+    res = await api.post(
+      "/api/voters/bulk-upsert",
+      {
+        databaseId: activeDatabase,
+        changes,
+      },
+      {
+        params: { databaseId: activeDatabase },
+      }
+    );
+  } catch (e) {
+    console.error("[SYNC] pushOutbox api error", e?.response || e);
+    throw e;
+  }
 
-  const data = res.data || {};
+  const data = res?.data || {};
   const successIds = data.successIds || [];
   const failed = data.failed || [];
+
+  console.log("[SYNC] pushOutbox result", {
+    activeDatabase,
+    success: successIds.length,
+    failed: failed.length,
+  });
 
   const successSet = new Set(successIds);
   const toDelete = queued
@@ -114,8 +156,8 @@ export async function pushOutbox({ databaseId: explicitDatabaseId } = {}) {
 }
 
 /**
- * Update one voter in local IndexedDB, and enqueue an outbox entry.
- * This is used by Search.jsx's MobileEditModal, CasteModal, InterestModal, etc.
+ * Update one voter in local IndexedDB and enqueue an outbox entry.
+ * Used by Search.jsx editors (mobile, caste, interest, etc.).
  */
 export async function updateVoterLocal(_id, patch) {
   const now = new Date().toISOString();
@@ -124,24 +166,29 @@ export async function updateVoterLocal(_id, patch) {
 
   await db.voters.put(updated);
 
-  // queue in outbox
   await db.outbox.put({
     _id,
-    op: "update",
+    op: "upsert",
     payload: patch,
     updatedAt: now,
+  });
+
+  console.log("[SYNC] updateVoterLocal", {
+    _id,
+    patchKeys: Object.keys(patch || {}),
   });
 
   return updated;
 }
 
-export async function searchLocal(q, limit = 50, offset = 0) {
+/**
+ * Simple local search helper – not used in your main Search page, but kept for compatibility.
+ */
+export async function searchLocal({ q = "", limit = 50, offset = 0 } = {}) {
   const term = q.trim().toLowerCase();
-
   if (!term) {
     return db.voters.orderBy("name").offset(offset).limit(limit).toArray();
   }
-
   const batch = await db.voters.toCollection().offset(0).limit(10000).toArray();
 
   const matches = batch.filter((r) => {

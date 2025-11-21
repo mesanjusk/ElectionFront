@@ -1047,56 +1047,73 @@ export default function Search() {
   }, [filtered]);
 
   const onPull = async () => {
-    setBusy(true);
-    try {
-      const id = getActiveDatabase();
-      if (!id) {
-        showSnack("No voter database is assigned to this device.");
+  setBusy(true);
+  try {
+    const id = getActiveDatabase();
+    if (!id) {
+      showSnack("No voter database is assigned to this device.");
+    } else {
+      console.log("[SYNC] onPull clicked", { databaseId: id });
+      const res = await pullAll({
+        databaseId: id,
+        onProgress: ({ page, batch, total }) => {
+          console.log("[SYNC] pullAll progress", { page, batch, total });
+        },
+      });
+      await loadAll();
+      const pulled =
+        res?.pulled ?? res?.count ?? (typeof res === "number" ? res : null);
+      console.log("[SYNC] pullAll finished", { databaseId: id, res, pulled });
+      if (pulled != null) {
+        showSnack(`Pulled ${pulled.toLocaleString()} records from server.`);
       } else {
-        const res = await pullAll({ databaseId: id });
-        await loadAll();
-        const pulled = res?.pulled ?? res?.count ?? res ?? null;
-        if (pulled != null) {
-          showSnack(`Pulled ${pulled.toLocaleString()} records from server.`);
-        } else {
-          showSnack("Pull completed.");
-        }
+        showSnack("Pull completed.");
       }
-    } catch (e) {
-      showSnack("Pull failed. Please try again.");
-    } finally {
-      setBusy(false);
     }
-  };
+  } catch (e) {
+    console.error("[SYNC] pullAll error", e);
+    showSnack("Pull failed. Please try again.");
+  } finally {
+    setBusy(false);
+  }
+};
+
 
   const onPush = async () => {
-    setBusy(true);
-    try {
-      const id = getActiveDatabase();
-      if (!id) {
-        showSnack("No voter database is assigned to this device.");
+  setBusy(true);
+  try {
+    const id = getActiveDatabase();
+    if (!id) {
+      showSnack("No voter database is assigned to this device.");
+    } else {
+      console.log("[SYNC] onPush clicked", { databaseId: id });
+      const res = await pushOutbox({ databaseId: id });
+      const pushed =
+        res?.pushed ??
+        res?.count ??
+        res?.synced ??
+        (typeof res === "number" ? res : null);
+      console.log("[SYNC] pushOutbox finished", { databaseId: id, res, pushed });
+      if (pushed != null) {
+        showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
       } else {
-        const res = await pushOutbox({ databaseId: id });
-        const pushed = res?.pushed ?? res?.count ?? res?.synced ?? null;
-        if (pushed != null) {
-          showSnack(`Pushed ${pushed.toLocaleString()} record(s) to server.`);
-        } else {
-          showSnack("Push completed.");
-        }
-        await loadAll();
+        showSnack("Push completed.");
       }
-    } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e.message ||
-        "Push failed. Please try again.";
-      console.error("Push error:", e?.response || e);
-      showSnack(msg);
-    } finally {
-      setBusy(false);
+      await loadAll();
     }
-  };
+  } catch (e) {
+    const msg =
+      e?.response?.data?.message ||
+      e?.response?.data?.error ||
+      e.message ||
+      "Push failed. Please try again.";
+    console.error("[SYNC] pushOutbox error", e?.response || e);
+    showSnack(msg);
+  } finally {
+    setBusy(false);
+  }
+};
+
 
   const filterTabs = [
     { key: "all", label: "All" },
