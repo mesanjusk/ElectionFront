@@ -1,6 +1,6 @@
 // client/src/services/sync.js
 import { db, getLastSync, setLastSync, clearLastSync } from "../db/indexedDb";
-import api, { apiExport } from "./api";
+import { apiExport, apiBulkUpsert } from "./api";
 import { getActiveDatabase } from "../auth";
 
 /**
@@ -90,7 +90,6 @@ export async function resetSyncState(databaseId) {
 /**
  * Push queued outbox changes to server for a specific voter database.
  * - Accepts { databaseId } but also falls back to getActiveDatabase() for old callers.
- * - Sends databaseId both in body and as ?databaseId=... query param.
  * - On success, removes successfully synced entries from `db.outbox`.
  */
 export async function pushOutbox({ databaseId: explicitDatabaseId } = {}) {
@@ -117,22 +116,17 @@ export async function pushOutbox({ databaseId: explicitDatabaseId } = {}) {
 
   let res;
   try {
-    res = await api.post(
-      "/api/voters/bulk-upsert",
-      {
-        databaseId: activeDatabase,
-        changes,
-      },
-      {
-        params: { databaseId: activeDatabase },
-      }
-    );
+    // use shared API helper that hits /api/voters/bulk-upsert
+    res = await apiBulkUpsert({
+      databaseId: activeDatabase,
+      changes,
+    });
   } catch (e) {
-    console.error("[SYNC] pushOutbox api error", e?.response || e);
+    console.error("[SYNC] pushOutbox apiBulkUpsert error", e?.response || e);
     throw e;
   }
 
-  const data = res?.data || {};
+  const data = res || {};
   const successIds = data.successIds || [];
   const failed = data.failed || [];
 

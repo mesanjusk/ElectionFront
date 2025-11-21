@@ -14,13 +14,12 @@ export function setAuthToken(token) {
   authToken = token;
   if (typeof window !== 'undefined') {
     if (token) {
-      window.localStorage.setItem('token', token);
+      localStorage.setItem('token', token);
     } else {
-      window.localStorage.removeItem('token');
+      localStorage.removeItem('token');
     }
   }
 }
-
 
 async function http(method, path, body, { signal } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -30,7 +29,9 @@ async function http(method, path, body, { signal } = {}) {
   try {
     const deviceId = getDeviceId();
     if (deviceId) headers['X-Device-Id'] = deviceId;
-  } catch (_) { /* ignore */ }
+  } catch (_) {
+    /* ignore */
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
@@ -39,7 +40,7 @@ async function http(method, path, body, { signal } = {}) {
     signal,
   });
 
-   if (!res.ok) {
+  if (!res.ok) {
     let message = `${res.status}`;
     try {
       const data = await res.json();
@@ -58,13 +59,17 @@ async function http(method, path, body, { signal } = {}) {
       authToken = null;
       clearToken();
       lockSession();
-      markActivationRevoked('You signed in on another device. Reactivate here to resume.');
+      markActivationRevoked(
+        'You signed in on another device. Reactivate here to resume.'
+      );
     } else if (res.status === 423) {
       // Device bound on another device → real activation conflict
       authToken = null;
       clearToken();
       lockSession();
-      markActivationRevoked('This account is activated on another device. Ask admin to reset device binding.');
+      markActivationRevoked(
+        'This account is activated on another device. Ask admin to reset device binding.'
+      );
     }
 
     throw new Error(message);
@@ -78,7 +83,12 @@ async function http(method, path, body, { signal } = {}) {
    ========================= */
 // deviceId is optional here; header already carries X-Device-Id
 export async function apiLogin({ username, password, deviceId, userType }) {
-  return http('POST', '/api/auth/login', { username, password, deviceId, userType });
+  return http('POST', '/api/auth/login', {
+    username,
+    password,
+    deviceId,
+    userType,
+  });
 }
 
 export async function apiPinLogin({ username, pin, deviceId }) {
@@ -88,7 +98,13 @@ export async function apiPinLogin({ username, pin, deviceId }) {
 /* =========================
    VOTERS
    ========================= */
-export async function apiExport({ page = 1, limit = 5000, since = null, databaseId = null, signal } = {}) {
+export async function apiExport({
+  page = 1,
+  limit = 5000,
+  since = null,
+  databaseId = null,
+  signal,
+} = {}) {
   const qs = new URLSearchParams();
   qs.set('page', String(page));
   qs.set('limit', String(limit));
@@ -97,8 +113,10 @@ export async function apiExport({ page = 1, limit = 5000, since = null, database
   return http('GET', `/api/voters/export?${qs}`, null, { signal });
 }
 
-export async function apiBulkUpsert(changes) {
-  return http('POST', '/api/voters/bulk-upsert', { changes });
+export async function apiBulkUpsert({ changes, databaseId } = {}) {
+  const body = { changes };
+  if (databaseId) body.databaseId = databaseId;
+  return http('POST', '/api/voters/bulk-upsert', body);
 }
 
 /* =========================
@@ -109,8 +127,18 @@ export async function adminListUsers() {
   return res?.users || [];
 }
 
-export async function adminCreateUser({ username, password, role = 'user', allowedDatabaseIds = [] }) {
-  return http('POST', '/api/admin/users', { username, password, role, allowedDatabaseIds });
+export async function adminCreateUser({
+  username,
+  password,
+  role = 'user',
+  allowedDatabaseIds = [],
+}) {
+  return http('POST', '/api/admin/users', {
+    username,
+    password,
+    role,
+    allowedDatabaseIds,
+  });
 }
 
 export async function adminDeleteUser(id) {
@@ -126,7 +154,9 @@ export async function adminUpdateUserPassword(id, password) {
 }
 
 export async function adminUpdateUserDatabases(id, allowedDatabaseIds) {
-  return http('PATCH', `/api/admin/users/${id}/databases`, { allowedDatabaseIds });
+  return http('PATCH', `/api/admin/users/${id}/databases`, {
+    allowedDatabaseIds,
+  });
 }
 
 export async function adminListDatabases() {

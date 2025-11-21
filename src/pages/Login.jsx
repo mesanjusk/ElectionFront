@@ -13,7 +13,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
 import { apiLogin, setAuthToken } from "../services/api";
 import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
 import {
@@ -156,7 +155,7 @@ export default function Login() {
 
     const fallbackType = activation?.userType;
     goAfterLogin(storedUser, fallbackType);
-  }, [navigate, activation?.userType, goAfterLogin]);
+  }, [navigate, activation?.userType]);
 
   /**
    * Full login + sync (used for username/password login)
