@@ -13,27 +13,22 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { apiLogin, setAuthToken } from "../services/api";
-import { pullAll, pushOutbox, resetSyncState } from "../services/sync";
+import { apiLogin, setAuthToken } from "./services/api";
+import { pullAll, pushOutbox, resetSyncState } from "./services/sync";
 import {
   setSession,
   setActiveDatabase,
   getActiveDatabase,
   getAvailableDatabases,
   unlockSession,
-  getToken,
-  isSessionUnlocked,
-  lockSession,
-  clearToken,
-  getUser,
-} from "../auth";
+} from "./auth";
 import {
   clearRevocationFlag,
   getActivationState,
   getDeviceId,
   setActivationState,
   storeActivation,
-} from "../services/activation";
+} from "./services/activation";
 
 // Fixed defaults per requirement
 const DEFAULT_LANGUAGE = "en";
@@ -105,51 +100,60 @@ export default function Login() {
     }
   }, [activation]);
 
-  // Fast-path: if token + user exist in localStorage, restore session and go home
+  // Helper: where to go after login
+  const goAfterLogin = (user, fallbackUserType) => {
+    const userType = user?.userType || fallbackUserType;
+    if (user?.role === "admin") return navigate("/admin", { replace: true });
+    if (userType === "candidate") return navigate("/search", { replace: true });
+    return navigate("/", { replace: true });
+  };
+
+  // 🔁 Fast-path auto-login: rebuild session from localStorage if possible
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const storedToken = window.localStorage.getItem("token");
     const storedUserRaw = window.localStorage.getItem("user");
 
-    if (storedToken && storedUserRaw) {
-      try {
-        const storedUser = JSON.parse(storedUserRaw);
+    if (!storedToken || !storedUserRaw) return;
 
-        // Rebuild available DB list from user if needed
-        const existingDbs = getAvailableDatabases() || [];
-        const userDbs = storedUser?.userDatabases || storedUser?.databases || [];
-        const databases =
-          existingDbs.length > 0
-            ? existingDbs
-            : Array.isArray(userDbs)
-            ? userDbs
-            : [];
+    let storedUser = null;
+    let storedDatabases = [];
 
-        // Restore central auth session so getToken/getUser work correctly
-        setSession({
-          token: storedToken,
-          user: storedUser,
-          databases,
-        });
-      } catch {
-        // ignore JSON parse errors
-      }
-
-      setAuthToken(storedToken);
-      unlockSession();
-      navigate("/", { replace: true });
+    try {
+      storedUser = JSON.parse(storedUserRaw);
+    } catch {
+      // bad JSON – force re-login
+      return;
     }
-  }, [navigate]);
 
-  // Helper: where to go after login
-  const goAfterLogin = (user, fallbackUserType) => {
-    const userType = user?.userType || fallbackUserType;
-    if (user?.role === "admin") return navigate("/admin", { replace: true });
-    if (userType === "candidate")
-      return navigate("/search", { replace: true });
-    return navigate("/", { replace: true });
-  };
+    try {
+      const dbsRaw = window.localStorage.getItem("databases");
+      if (dbsRaw) {
+        const parsed = JSON.parse(dbsRaw);
+        if (Array.isArray(parsed)) storedDatabases = parsed;
+      } else {
+        // fallback from user payload if present
+        const userDbs =
+          storedUser?.userDatabases || storedUser?.databases || [];
+        if (Array.isArray(userDbs)) storedDatabases = userDbs;
+      }
+    } catch {
+      // ignore DB parse error
+    }
+
+    // Restore central session state
+    setSession({
+      token: storedToken,
+      user: storedUser,
+      databases: storedDatabases,
+    });
+    setAuthToken(storedToken);
+    unlockSession();
+
+    const fallbackType = activation?.userType;
+    goAfterLogin(storedUser, fallbackType);
+  }, [navigate, activation?.userType, goAfterLogin]);
 
   /**
    * Full login + sync (used for username/password login)
@@ -180,7 +184,7 @@ export default function Login() {
     setSession({ token, user, databases: available });
     setAuthToken(token);
 
-    // 🔹 Explicitly persist token & user for ALL roles (incl. volunteers)
+    // 🔹 Persist login for ALL roles (admin, candidate, volunteer, etc.)
     try {
       if (typeof window !== "undefined") {
         if (token) {
@@ -189,21 +193,19 @@ export default function Login() {
         if (user) {
           window.localStorage.setItem("user", JSON.stringify(user));
         }
-      }
-    } catch {
-      // ignore storage errors
-    }
-
-    // store userName for greeting
-    try {
-      if (user) {
-        const name = user.username || user.name || "";
+        if (Array.isArray(available) && available.length) {
+          window.localStorage.setItem(
+            "databases",
+            JSON.stringify(available)
+          );
+        }
+        const name = user?.username || user?.name || "";
         if (name) {
           window.localStorage.setItem("userName", name);
         }
       }
     } catch {
-      // ignore
+      // ignore storage errors
     }
 
     // Decide an effective DB, persist it, and use it for sync.
