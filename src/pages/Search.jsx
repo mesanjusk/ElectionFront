@@ -74,8 +74,8 @@ const getEPIC = (r) =>
   "";
 
 const getPart = (r) =>
-  pick(r, ["Part", "part", "Booth", "booth"]) ||
-  pick(r?.__raw, ["Part", "Part No", "Booth", "भाग नं."]) ||
+  pick(r, ["Part No", "Part", "part", "Booth", "booth"]) ||
+  pick(r?.__raw, ["Part No", "Part", "Booth", "भाग नं."]) ||
   "";
 
 const getSerialText = (r) =>
