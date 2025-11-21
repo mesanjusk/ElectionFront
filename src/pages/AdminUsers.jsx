@@ -314,16 +314,57 @@ export default function AdminUsers({ onCreated }) {
       return copy;
     });
   };
-  const saveDbEdit = async (id) => {
+    const saveDbEdit = async (id) => {
     try {
-      await adminUpdateUserDatabases(id, Array.from(dbEditing[id] || []));
-      setStatus({ type: 'ok', text: 'Allowed databases updated' });
+      // New DB list selected for this user
+      const newDbList = Array.from(dbEditing[id] || []);
+
+      // 1) Update the selected user
+      await adminUpdateUserDatabases(id, newDbList);
+
+      // 2) If this user is a candidate, also update all their volunteers
+      const parentUser = users.find((u) => getId(u) === id);
+      const parentRole = parentUser ? getRole(parentUser) : null;
+
+      let extraMsg = '';
+
+      if (parentUser && parentRole === 'candidate') {
+        const volunteers = users.filter((u) => {
+          if (getRole(u) !== 'volunteer') return false;
+          const pId = u.parentUserId;
+          if (!pId) return false;
+
+          // Normalize to string to be safe
+          return (
+            String(pId) === String(id) ||
+            String(pId) === String(parentUser.id) ||
+            String(pId) === String(parentUser._id)
+          );
+        });
+
+        for (const v of volunteers) {
+          const vId = getId(v);
+          if (!vId) continue;
+          await adminUpdateUserDatabases(vId, newDbList);
+        }
+
+        extraMsg = ` (and ${volunteers.length} volunteer${
+          volunteers.length === 1 ? '' : 's'
+        })`;
+      }
+
+      setStatus({
+        type: 'ok',
+        text: `Allowed databases updated${extraMsg}`,
+      });
+
       cancelDbEdit(id);
       await loadAll();
     } catch (e) {
       setStatus({ type: 'error', text: e?.message || String(e) });
     }
   };
+
 
   const onResetDevice = async (id) => {
     if (!window.confirm('Reset bound device for this user?')) return;
