@@ -105,15 +105,38 @@ export default function Login() {
     }
   }, [activation]);
 
-  // Fast-path: if token exists and session is unlocked, go home
+  // Fast-path: if token + user exist in localStorage, restore session and go home
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const storedToken = window.localStorage.getItem("token");
-    if (storedToken) {
-      // restore token into API layer
+    const storedUserRaw = window.localStorage.getItem("user");
+
+    if (storedToken && storedUserRaw) {
+      try {
+        const storedUser = JSON.parse(storedUserRaw);
+
+        // Rebuild available DB list from user if needed
+        const existingDbs = getAvailableDatabases() || [];
+        const userDbs = storedUser?.userDatabases || storedUser?.databases || [];
+        const databases =
+          existingDbs.length > 0
+            ? existingDbs
+            : Array.isArray(userDbs)
+            ? userDbs
+            : [];
+
+        // Restore central auth session so getToken/getUser work correctly
+        setSession({
+          token: storedToken,
+          user: storedUser,
+          databases,
+        });
+      } catch {
+        // ignore JSON parse errors
+      }
+
       setAuthToken(storedToken);
-      // mark session as unlocked so rest of app behaves as "logged in"
       unlockSession();
       navigate("/", { replace: true });
     }
@@ -157,7 +180,7 @@ export default function Login() {
     setSession({ token, user, databases: available });
     setAuthToken(token);
 
-    // 🔹 NEW: Explicitly persist token & user for ALL roles (incl. volunteers)
+    // 🔹 Explicitly persist token & user for ALL roles (incl. volunteers)
     try {
       if (typeof window !== "undefined") {
         if (token) {
