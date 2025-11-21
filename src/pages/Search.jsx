@@ -775,6 +775,7 @@ export default function Search() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all"); // all | male | female
   const [ageBand, setAgeBand] = useState("all");
+  const [partFilter, setPartFilter] = useState("all"); // 🔹 Part-wise filter
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -835,6 +836,25 @@ export default function Search() {
     const list = Array.from(set).filter(Boolean);
     list.sort((a, b) => String(a).localeCompare(String(b), "en-IN"));
     setCasteOptions(list);
+  }, [allRows]);
+
+  // 🔹 Build Part tabs (from "Part No" / Part field)
+  const partTabs = useMemo(() => {
+    const set = new Set();
+    for (const r of allRows) {
+      const p = getPart(r);
+      if (p) set.add(String(p).trim());
+    }
+    const arr = Array.from(set);
+    arr.sort((a, b) => {
+      const ma = String(a).match(/\d+/);
+      const mb = String(b).match(/\d+/);
+      const na = ma ? parseInt(ma[0], 10) : NaN;
+      const nb = mb ? parseInt(mb[0], 10) : NaN;
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      return String(a).localeCompare(String(b), "en-IN", { numeric: true });
+    });
+    return arr;
   }, [allRows]);
 
   // Load party options from Party collection (same as AdminUsers)
@@ -985,6 +1005,12 @@ export default function Search() {
       if (ageBand === "46-60" && !(ageNum >= 46 && ageNum <= 60)) return false;
       if (ageBand === "61+" && !(ageNum >= 61)) return false;
 
+      // 🔹 Part-wise filter
+      if (partFilter !== "all") {
+        const p = getPart(r);
+        if (!p || String(p).trim() !== partFilter) return false;
+      }
+
       if (!term) return true;
 
       const fields = [
@@ -1007,7 +1033,7 @@ export default function Search() {
       const devHay = devToLatin(hay);
       return devHay.includes(lt);
     });
-  }, [allRows, q, tab, ageBand]);
+  }, [allRows, q, tab, ageBand, partFilter]);
 
   const { male, female, total } = useMemo(() => {
     let maleCount = 0;
@@ -1240,7 +1266,7 @@ export default function Search() {
               }}
             />
 
-            {/* Tabs */}
+            {/* Gender Tabs */}
             <Tabs
               value={tab}
               onChange={(_, value) => setTab(value)}
@@ -1280,6 +1306,35 @@ export default function Search() {
               <ToggleButton value="46-60">46–60</ToggleButton>
               <ToggleButton value="61+">61+</ToggleButton>
             </ToggleButtonGroup>
+
+            {/* 🔹 Part-wise Tabs (scrollable, uses "Part No" from DB) */}
+            {partTabs.length > 0 && (
+              <Tabs
+                value={partFilter}
+                onChange={(_, value) => {
+                  if (value !== null) setPartFilter(value);
+                }}
+                variant="scrollable"
+                allowScrollButtonsMobile
+                sx={{
+                  minHeight: 32,
+                  "& .MuiTab-root": {
+                    minHeight: 32,
+                    paddingY: 0,
+                    fontSize: 12,
+                    textTransform: "none",
+                  },
+                  "& .MuiTabs-indicator": {
+                    backgroundColor: "black",
+                  },
+                }}
+              >
+                <Tab key="all-parts" label="All Parts" value="all" />
+                {partTabs.map((p) => (
+                  <Tab key={p} label={String(p)} value={p} />
+                ))}
+              </Tabs>
+            )}
           </Stack>
         </Container>
       </Box>
