@@ -107,18 +107,17 @@ export default function Login() {
 
   // Fast-path: if token exists and session is unlocked, go home
   useEffect(() => {
-  if (typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
 
-  const storedToken = window.localStorage.getItem("token");
-  if (storedToken) {
-    // restore token into API layer
-    setAuthToken(storedToken);
-    // mark session as unlocked so rest of app behaves as "logged in"
-    unlockSession();
-    navigate("/", { replace: true });
-  }
-}, [navigate]);
-
+    const storedToken = window.localStorage.getItem("token");
+    if (storedToken) {
+      // restore token into API layer
+      setAuthToken(storedToken);
+      // mark session as unlocked so rest of app behaves as "logged in"
+      unlockSession();
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
 
   // Helper: where to go after login
   const goAfterLogin = (user, fallbackUserType) => {
@@ -157,6 +156,20 @@ export default function Login() {
 
     setSession({ token, user, databases: available });
     setAuthToken(token);
+
+    // 🔹 NEW: Explicitly persist token & user for ALL roles (incl. volunteers)
+    try {
+      if (typeof window !== "undefined") {
+        if (token) {
+          window.localStorage.setItem("token", token);
+        }
+        if (user) {
+          window.localStorage.setItem("user", JSON.stringify(user));
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
 
     // store userName for greeting
     try {
