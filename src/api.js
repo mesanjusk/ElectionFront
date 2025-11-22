@@ -33,28 +33,39 @@ api.interceptors.response.use(
   (resp) => resp,
   (error) => {
     const status = error?.response?.status;
-    if (status === 401 || status === 403) {
+
+    // 401 = real auth problem → logout + reactivation
+    if (status === 401) {
       clearToken();
       lockSession();
       markActivationRevoked(
         'Your session expired. Reactivate with your credentials.'
       );
-    } else if (status === 409) {
+    }
+
+    // 409 = logged in on another device
+    else if (status === 409) {
       clearToken();
       lockSession();
       markActivationRevoked(
         'You signed in on another device. Reactivate here to resume.'
       );
-    } else if (status === 423) {
+    }
+
+    // 423 = device binding issue
+    else if (status === 423) {
       clearToken();
       lockSession();
       markActivationRevoked(
         'This account is activated on another device. Ask admin to reset device binding.'
       );
     }
+
+    // 403 and others: do NOT clear token; just pass error to page
     return Promise.reject(error);
   }
 );
+
 
 /* ============================
    ADMIN API HELPERS

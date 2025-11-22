@@ -1,4 +1,3 @@
-// client/src/services/api.js
 import { clearToken, lockSession } from '../auth';
 import { markActivationRevoked, getDeviceId } from './activation';
 
@@ -7,7 +6,8 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 let authToken = null;
 
 // pick up token if app stored it earlier
-const stored = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+const stored =
+  typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (stored) authToken = stored;
 
 export function setAuthToken(token) {
@@ -41,47 +41,45 @@ async function http(method, path, body, { signal } = {}) {
   });
 
   if (!res.ok) {
-  let message = `${res.status}`;
-  try {
-    const data = await res.json();
-    message = data?.error || data?.message || message;
-  } catch (_) {
-    // ignore JSON parse error, keep basic message
+    let message = `${res.status}`;
+    try {
+      const data = await res.json();
+      message = data?.error || data?.message || message;
+    } catch (_) {
+      // ignore JSON parse error, keep basic message
+    }
+
+    // 🔐 Only these statuses should force a logout
+    if (res.status === 401) {
+      // Token invalid/expired
+      authToken = null;
+      clearToken();
+      lockSession();
+    } else if (res.status === 409) {
+      // Logged in on another device
+      authToken = null;
+      clearToken();
+      lockSession();
+      markActivationRevoked(
+        'You signed in on another device. Reactivate here to resume.'
+      );
+    } else if (res.status === 423) {
+      // Device binding issue
+      authToken = null;
+      clearToken();
+      lockSession();
+      markActivationRevoked(
+        'This account is activated on another device. Ask admin to reset device binding.'
+      );
+    }
+
+    // ❗ NOTE: 403 (Forbidden) and all other errors DO NOT clear the token.
+    // The UI will see the error text in `message` and can show it.
+    throw new Error(message);
   }
-
-  // 🔐 Only these statuses should force a logout
-  if (res.status === 401) {
-    // Token invalid/expired
-    authToken = null;
-    clearToken();
-    lockSession();
-  } else if (res.status === 409) {
-    // Logged in on another device
-    authToken = null;
-    clearToken();
-    lockSession();
-    markActivationRevoked(
-      'You signed in on another device. Reactivate here to resume.'
-    );
-  } else if (res.status === 423) {
-    // Device binding issue
-    authToken = null;
-    clearToken();
-    lockSession();
-    markActivationRevoked(
-      'This account is activated on another device. Ask admin to reset device binding.'
-    );
-  }
-
-  // NOTE: 403 (Forbidden) and all other errors DO NOT clear the token.
-  // The UI will see the error text in `message` and can show it.
-  throw new Error(message);
-}
-
 
   return res.json();
 }
-
 
 /* =========================
    AUTH (username-only)
