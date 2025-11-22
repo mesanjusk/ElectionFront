@@ -744,25 +744,49 @@ export default function Search() {
     }
   }, []);
 
-  const [activeDb, setActiveDbState] = useState(
-    () => getActiveDatabase() || ""
-  );
+  // 🔴 UPDATED activeDb logic: auto-pick single allowed DB for volunteers
+  const [activeDb, setActiveDbState] = useState(() => {
+    // Whatever auth says is active right now
+    const id = (getActiveDatabase && getActiveDatabase()) || "";
+    return id;
+  });
 
+  // Keep activeDb + label in sync with auth + available DBs
   useEffect(() => {
-    const id = getActiveDatabase() || "";
-    if (id && id !== activeDb) {
-      setActiveDbState(id);
-    }
     try {
-      const dbs = getAvailableDatabases() || [];
-      const found = dbs.find((d) => (d.id || d._id) === (id || activeDb));
+      const currentId = (getActiveDatabase && getActiveDatabase()) || "";
+      let effectiveId = currentId || activeDb || "";
+
+      // 🟢 Auto-pick DB if none is active but exactly ONE is available (typical volunteer case)
+      if (!effectiveId && getAvailableDatabases) {
+        const dbs = getAvailableDatabases() || [];
+        if (Array.isArray(dbs) && dbs.length === 1) {
+          const only = dbs[0];
+          const onlyId =
+            only.id || only._id || only.collection || only.name || "";
+          if (onlyId) {
+            effectiveId = onlyId;
+            if (onlyId !== activeDb) {
+              setActiveDbState(onlyId);
+            }
+          }
+        }
+      } else if (currentId && currentId !== activeDb) {
+        // If auth has a newer active DB, sync our state
+        setActiveDbState(currentId);
+      }
+
+      const dbs = (getAvailableDatabases && getAvailableDatabases()) || [];
+      const found = dbs.find(
+        (d) => (d.id || d._id || d.collection) === effectiveId
+      );
+
       const label =
         found?.name ||
         found?.title ||
         found?.label ||
-        (id || activeDb
-          ? `Collection ${id || activeDb}`
-          : "Unassigned collection");
+        (effectiveId ? `Collection ${effectiveId}` : "Unassigned collection");
+
       if (label) setCollectionName(label);
     } catch {
       // ignore
@@ -1046,13 +1070,33 @@ export default function Search() {
     return { male: maleCount, female: femaleCount, total: filtered.length };
   }, [filtered]);
 
+  // 🔴 UPDATED onPull: auto-use the single allowed DB if activeDb is empty
   const onPull = async () => {
-  setBusy(true);
-  try {
-    const id = getActiveDatabase();
-    if (!id) {
-      showSnack("No voter database is assigned to this device.");
-    } else {
+    setBusy(true);
+    try {
+      // 1) Try auth active DB, then local state
+      let id = (getActiveDatabase && getActiveDatabase()) || activeDb || "";
+
+      // 2) If still nothing, but exactly ONE DB is available, auto-use that
+      if (!id && getAvailableDatabases) {
+        const dbs = getAvailableDatabases() || [];
+        if (Array.isArray(dbs) && dbs.length === 1) {
+          const only = dbs[0];
+          id = only.id || only._id || only.collection || only.name || "";
+          if (id && id !== activeDb) {
+            setActiveDbState(id);
+          }
+        }
+      }
+
+      // 3) If still nothing, show message
+      if (!id) {
+        showSnack(
+          "No voter database is assigned to this device. Ask your candidate/admin to assign one."
+        );
+        return;
+      }
+
       console.log("[SYNC] onPull clicked", { databaseId: id });
       const res = await pullAll({
         databaseId: id,
@@ -1069,23 +1113,41 @@ export default function Search() {
       } else {
         showSnack("Pull completed.");
       }
+    } catch (e) {
+      console.error("[SYNC] pullAll error", e);
+      showSnack("Pull failed. Please try again.");
+    } finally {
+      setBusy(false);
     }
-  } catch (e) {
-    console.error("[SYNC] pullAll error", e);
-    showSnack("Pull failed. Please try again.");
-  } finally {
-    setBusy(false);
-  }
-};
+  };
 
-
+  // 🔴 UPDATED onPush: same auto-selection logic
   const onPush = async () => {
-  setBusy(true);
-  try {
-    const id = getActiveDatabase();
-    if (!id) {
-      showSnack("No voter database is assigned to this device.");
-    } else {
+    setBusy(true);
+    try {
+      // 1) Try auth active DB, then local state
+      let id = (getActiveDatabase && getActiveDatabase()) || activeDb || "";
+
+      // 2) If still nothing, but exactly ONE DB is available, auto-use that
+      if (!id && getAvailableDatabases) {
+        const dbs = getAvailableDatabases() || [];
+        if (Array.isArray(dbs) && dbs.length === 1) {
+          const only = dbs[0];
+          id = only.id || only._id || only.collection || only.name || "";
+          if (id && id !== activeDb) {
+            setActiveDbState(id);
+          }
+        }
+      }
+
+      // 3) If still nothing, show message
+      if (!id) {
+        showSnack(
+          "No voter database is assigned to this device. Ask your candidate/admin to assign one."
+        );
+        return;
+      }
+
       console.log("[SYNC] onPush clicked", { databaseId: id });
       const res = await pushOutbox({ databaseId: id });
       const pushed =
@@ -1100,20 +1162,18 @@ export default function Search() {
         showSnack("Push completed.");
       }
       await loadAll();
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e.message ||
+        "Push failed. Please try again.";
+      console.error("[SYNC] pushOutbox error", e?.response || e);
+      showSnack(msg);
+    } finally {
+      setBusy(false);
     }
-  } catch (e) {
-    const msg =
-      e?.response?.data?.message ||
-      e?.response?.data?.error ||
-      e.message ||
-      "Push failed. Please try again.";
-    console.error("[SYNC] pushOutbox error", e?.response || e);
-    showSnack(msg);
-  } finally {
-    setBusy(false);
-  }
-};
-
+  };
 
   const filterTabs = [
     { key: "all", label: "All" },
