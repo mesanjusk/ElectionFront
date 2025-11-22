@@ -47,23 +47,35 @@ async function http(method, path, body, { signal } = {}) {
       message = data?.error || data?.message || message;
     } catch (_) {}
 
-    // 🔁 Normal expiry / auth error: just lock the session
-    if (res.status === 401 || res.status === 403) {
+    // Detect "Forbidden: insufficient role" from requireRole()
+    const isInsufficientRole =
+      res.status === 403 &&
+      typeof message === 'string' &&
+      message.toLowerCase().includes('insufficient role');
+
+    // 401 → real auth problem => log out
+    if (res.status === 401) {
       authToken = null;
       clearToken();
       lockSession();
-      // ⛔ DO NOT markActivationRevoked here.
-      // We want the device to stay activated so PIN login continues to work.
-    } else if (res.status === 409) {
-      // Logged in somewhere else → ask for reactivation
+    }
+    // 403 but NOT "insufficient role" → still treat as auth problem
+    else if (res.status === 403 && !isInsufficientRole) {
+      authToken = null;
+      clearToken();
+      lockSession();
+    }
+    // 409 → logged in elsewhere => mark revoked
+    else if (res.status === 409) {
       authToken = null;
       clearToken();
       lockSession();
       markActivationRevoked(
         'You signed in on another device. Reactivate here to resume.'
       );
-    } else if (res.status === 423) {
-      // Device bound on another device → real activation conflict
+    }
+    // 423 → device binding issue
+    else if (res.status === 423) {
       authToken = null;
       clearToken();
       lockSession();
@@ -77,6 +89,7 @@ async function http(method, path, body, { signal } = {}) {
 
   return res.json();
 }
+
 
 /* =========================
    AUTH (username-only)
