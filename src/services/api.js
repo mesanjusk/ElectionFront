@@ -41,51 +41,43 @@ async function http(method, path, body, { signal } = {}) {
   });
 
   if (!res.ok) {
-    let message = `${res.status}`;
-    try {
-      const data = await res.json();
-      message = data?.error || data?.message || message;
-    } catch (_) {}
-
-    // Detect "Forbidden: insufficient role" from requireRole()
-    const isInsufficientRole =
-      res.status === 403 &&
-      typeof message === 'string' &&
-      message.toLowerCase().includes('insufficient role');
-
-    // 401 → real auth problem => log out
-    if (res.status === 401) {
-      authToken = null;
-      clearToken();
-      lockSession();
-    }
-    // 403 but NOT "insufficient role" → still treat as auth problem
-    else if (res.status === 403 && !isInsufficientRole) {
-      authToken = null;
-      clearToken();
-      lockSession();
-    }
-    // 409 → logged in elsewhere => mark revoked
-    else if (res.status === 409) {
-      authToken = null;
-      clearToken();
-      lockSession();
-      markActivationRevoked(
-        'You signed in on another device. Reactivate here to resume.'
-      );
-    }
-    // 423 → device binding issue
-    else if (res.status === 423) {
-      authToken = null;
-      clearToken();
-      lockSession();
-      markActivationRevoked(
-        'This account is activated on another device. Ask admin to reset device binding.'
-      );
-    }
-
-    throw new Error(message);
+  let message = `${res.status}`;
+  try {
+    const data = await res.json();
+    message = data?.error || data?.message || message;
+  } catch (_) {
+    // ignore JSON parse error, keep basic message
   }
+
+  // 🔐 Only these statuses should force a logout
+  if (res.status === 401) {
+    // Token invalid/expired
+    authToken = null;
+    clearToken();
+    lockSession();
+  } else if (res.status === 409) {
+    // Logged in on another device
+    authToken = null;
+    clearToken();
+    lockSession();
+    markActivationRevoked(
+      'You signed in on another device. Reactivate here to resume.'
+    );
+  } else if (res.status === 423) {
+    // Device binding issue
+    authToken = null;
+    clearToken();
+    lockSession();
+    markActivationRevoked(
+      'This account is activated on another device. Ask admin to reset device binding.'
+    );
+  }
+
+  // NOTE: 403 (Forbidden) and all other errors DO NOT clear the token.
+  // The UI will see the error text in `message` and can show it.
+  throw new Error(message);
+}
+
 
   return res.json();
 }
