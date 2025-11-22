@@ -115,79 +115,89 @@ export default function AdminUsers({ onCreated }) {
   const [volPassword, setVolPassword] = useState('');
 
   async function loadAll() {
-    setLoading(true);
-    try {
-      const [uRes, dRes, pRes] = await Promise.all([
-        adminListUsers(),
-        adminListDatabases(),
-        api
-          .get('/api/admin/parties')
-          .then((r) => r.data)
-          .catch(() => []),
-      ]);
+  setLoading(true);
+  try {
+    const [uRes, dRes, pRes] = await Promise.all([
+      adminListUsers(),
+      adminListDatabases(),
+      api
+        .get('/api/admin/parties')
+        .then((r) => r.data)
+        .catch(() => []),
+    ]);
 
-      // Base lists
-      let usersList = uRes || [];
-      setUsers(usersList);
-      setDbs(dRes || []);
-      setParties(Array.isArray(pRes) ? pRes : []);
+    // base lists
+    let usersList = uRes || [];
+    setDbs(dRes || []);
+    setParties(Array.isArray(pRes) ? pRes : []);
 
-      // 🔧 Auto-fix: if a volunteer has no DBs but their parent candidate has cloned DBs,
-      // copy parent's allowedDatabaseIds to that volunteer.
-      const fixes = [];
-      const updatedUsersById = {};
+    // 🔧 AUTO-REPAIR OLD VOLUNTEERS
+    // Make sure each volunteer's allowedDatabaseIds matches their parent's
+    const updates = [];
+    const updatedById = {};
 
-      for (const u of usersList) {
-        const role = getRole(u);
-        const hasNoDbs =
-          !Array.isArray(u.allowedDatabaseIds) ||
-          u.allowedDatabaseIds.length === 0;
-        const parentId = u.parentUserId;
+    for (const u of usersList) {
+      const role = getRole(u);
+      const id = getId(u);
+      const parentId = u.parentUserId;
 
-        if (role === 'volunteer' && hasNoDbs && parentId) {
-          const parent = usersList.find((p) => {
-            const pid = getId(p);
-            return (
-              pid === parentId ||
-              String(pid) === String(parentId)
-            );
-          });
+      if (!id || role !== 'volunteer' || !parentId) continue;
 
-          const parentDbs =
-            parent && Array.isArray(parent.allowedDatabaseIds)
-              ? parent.allowedDatabaseIds
-              : [];
+      const parent = usersList.find((p) => {
+        const pid = getId(p);
+        return (
+          pid === parentId ||
+          String(pid) === String(parentId)
+        );
+      });
 
-          if (parent && parentDbs.length) {
-            const vId = getId(u);
-            if (!vId) continue;
+      if (!parent) continue;
 
-            fixes.push(
-              adminUpdateUserDatabases(vId, parentDbs).then(() => {
-                updatedUsersById[vId] = {
-                  ...u,
-                  allowedDatabaseIds: parentDbs,
-                };
-              })
-            );
-          }
-        }
-      }
+      const parentDbs = Array.isArray(parent.allowedDatabaseIds)
+        ? parent.allowedDatabaseIds
+        : [];
 
-      if (fixes.length) {
-        await Promise.all(fixes);
-        usersList = usersList.map((u) => {
-          const id = getId(u);
-          return updatedUsersById[id] || u;
-        });
-        setUsers(usersList);
-      }
-    } catch (e) {
-      setStatus({ type: 'error', text: e?.message || String(e) });
-    } finally {
-      setLoading(false);
+      if (!parentDbs.length) continue;
+
+      const volDbs = Array.isArray(u.allowedDatabaseIds)
+        ? u.allowedDatabaseIds
+        : [];
+
+      // Compare sets: if different, we need to update
+      const sameLength = volDbs.length === parentDbs.length;
+      const sameContent =
+        sameLength &&
+        [...volDbs].sort().join(',') === [...parentDbs].sort().join(',');
+
+      if (sameContent) continue;
+
+      // backend update
+      updates.push(
+        adminUpdateUserDatabases(id, parentDbs).then(() => {
+          updatedById[id] = {
+            ...u,
+            allowedDatabaseIds: parentDbs,
+          };
+        })
+      );
     }
+
+    if (updates.length) {
+      await Promise.all(updates);
+      usersList = usersList.map((u) => {
+        const id = getId(u);
+        return updatedById[id] || u;
+      });
+    }
+
+    setUsers(usersList);
+  } catch (e) {
+    setStatus({ type: 'error', text: e?.message || String(e) });
+  } finally {
+    setLoading(false);
   }
+}
+
 
   useEffect(() => {
     loadAll();
