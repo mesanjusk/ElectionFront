@@ -300,10 +300,11 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp – use Source Serial + Booth + मतदान केंद्र */
+/* Share text for WhatsApp – now includes R/P/S + Number + Booth + मतदान केंद्र */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
+  const rps = getRPS(r);
   const sourceSerial = getSourceSerial(r);
   const booth = getBooth(r);
   const addr = getAddress(r);
@@ -311,7 +312,8 @@ const buildShareText = (r, collectionName) => {
   const lines = [
     "Voter Details",
     `नाम: ${name || "—"}`,
-    `EPIC: ${epic || "—"}`,
+    ` ${epic || "—"}`,
+    rps ? ` ${rps}` : null,
     `Number: ${sourceSerial || "—"}`,
     booth ? `Booth: ${booth}` : null,
     addr ? `मतदान केंद्र: ${addr}` : null,
@@ -1503,6 +1505,7 @@ export default function Search() {
               const booth = getBooth(r);
               const addr = getAddress(r);
               const sourceSerial = getSourceSerial(r);
+              const rps = getRPS(r);
 
               const serialDisplay = !Number.isNaN(serialNum)
                 ? serialNum
@@ -1519,7 +1522,7 @@ export default function Search() {
                     borderRadius: 0.5, // smaller radius
                   }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC + Booth + Number + 3 icons */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + R/P/S + Booth + Number + 3 icons */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1538,6 +1541,7 @@ export default function Search() {
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
+                        {rps ? ` · R/P/S ${rps}` : ""}
                         {booth ? ` · Booth ${booth}` : ""}
                         {sourceSerial ? ` · No ${sourceSerial}` : ""}
                       </Typography>

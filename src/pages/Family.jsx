@@ -89,6 +89,12 @@ const getCareOf = (r) =>
   pick(r?.__raw, ["Father", "Husband", "Care Of", "C/O", "वڈील", "पती"]) ||
   "";
 
+/* 🔹 Address getter (same as Search.jsx) */
+const getAddress = (r) =>
+  pick(r, ["Address", "address", "Address Line", "Address1"]) ||
+  pick(r?.__raw, ["Address", "address", "पत्ता"]) ||
+  "";
+
 const getMobile = (r) =>
   r?.mobile ||
   pick(r, ["Mobile", "mobile", "Phone"]) ||
@@ -192,6 +198,7 @@ const buildShareText = (r, collectionName) => {
   const age = getAge(r);
   const gender = getGender(r);
   const rps = getRPS(r);
+  const addr = getAddress(r); // ⭐ NEW: address
   const dbName = collectionName || "";
 
   const lines = [
@@ -199,7 +206,7 @@ const buildShareText = (r, collectionName) => {
     `Name: ${name}`,
     `EPIC: ${epic || "—"}`,
     `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
-    // dbName is currently not printed, but kept if you want later
+    addr ? `मतदान केंद्र: ${addr}` : null, // ⭐ NEW: address line
     // dbName && `Database: ${dbName}`,
   ].filter(Boolean);
 
@@ -845,7 +852,6 @@ export default function Family() {
                   >
                     {fam.count.toLocaleString()}
                   </Typography>
-                  
                 </Stack>
               </Stack>
             </Paper>

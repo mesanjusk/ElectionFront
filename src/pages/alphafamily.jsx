@@ -102,11 +102,44 @@ const getCaste = (r) =>
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
   "";
 
+// 🔹 Booth getter – same as Search.jsx
+const getBooth = (r) =>
+  pick(r, ["Booth No", "booth", "Booth", "BoothNo"]) ||
+  pick(r?.__raw, ["Booth No", "Booth", "booth", "BoothNo"]) ||
+  "";
+
+// 🔹 Address getter – same as Search.jsx
+const getAddress = (r) =>
+  pick(r, ["Address", "address", "Address Line", "Address1"]) ||
+  pick(r?.__raw, ["Address", "address", "पत्ता"]) ||
+  "";
+
+// 🔹 Source file and serial (Number) – from Search.jsx
+const getSourceFile = (r) =>
+  pick(r, ["Source File", "SourceFile", "sourceFile", "source_file"]) ||
+  pick(r?.__raw, ["Source File", "SourceFile", "sourceFile", "source_file"]) ||
+  "";
+
+const parseLastNumber = (s) => {
+  const m = String(s || "").match(/\d+/g);
+  if (!m) return NaN;
+  const n = parseInt(m[m.length - 1], 10);
+  return Number.isNaN(n) ? NaN : n;
+};
+
+const getSourceSerial = (r) => {
+  const sf = getSourceFile(r);
+  if (!sf) return "";
+  const n = parseLastNumber(sf);
+  if (Number.isNaN(n)) return "";
+  return String(n);
+};
+
 // NEW: R/P/S helper – adjust keys if your DB uses different field name
 // R/P/S helper – now mapped to Roll/Part/Serial
 const getRPS = (r) =>
   pick(r, [
-    "Roll/Part/Serial",  // main column in your DB
+    "Roll/Part/Serial", // main column in your DB
     "RollPartSerial",
     "Roll_Part_Serial",
     "RPS",
@@ -188,19 +221,23 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* WhatsApp share text: ONLY minimal details now */
+/* WhatsApp share text: नाम, EPIC, R/P/S, Number, Booth, मतदान केंद्र: Address (same as Search.jsx) */
 const buildShareText = (r, _collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
-  const age = getAge(r);
-  const gender = getGender(r);
   const rps = getRPS(r);
+  const sourceSerial = getSourceSerial(r);
+  const booth = getBooth(r);
+  const addr = getAddress(r);
 
   const lines = [
     "Voter Details",
-    `Name: ${name}`,
-    `EPIC: ${epic || "—"}`,
-    `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
+    `नाम: ${name || "—"}`,
+    ` ${epic || "—"}`,
+    rps ? ` ${rps}` : null,
+    `Number: ${sourceSerial || "—"}`,
+    booth ? `Booth: ${booth}` : null,
+    addr ? `मतदान केंद्र: ${addr}` : null,
   ].filter(Boolean);
 
   return lines.join("\n");
