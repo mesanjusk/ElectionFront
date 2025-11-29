@@ -78,12 +78,6 @@ const getPart = (r) =>
   pick(r?.__raw, ["Part No", "Part", "Booth", "भाग नं."]) ||
   "";
 
-// 🔹 NEW: Booth getter – reads explicit booth field
-const getBooth = (r) =>
-  pick(r, ["booth", "Booth", "Booth No", "BoothNo"]) ||
-  pick(r?.__raw, ["Booth", "booth", "Booth No", "BoothNo"]) ||
-  "";
-
 const getSerialText = (r) =>
   pick(r, [
     "Serial No",
@@ -806,7 +800,6 @@ export default function Search() {
   const [tab, setTab] = useState("all"); // all | male | female
   const [ageBand, setAgeBand] = useState("all");
   const [partFilter, setPartFilter] = useState("all"); // 🔹 Part-wise filter
-  const [boothFilter, setBoothFilter] = useState("all"); // 🔹 NEW Booth-wise filter
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -875,25 +868,6 @@ export default function Search() {
     for (const r of allRows) {
       const p = getPart(r);
       if (p) set.add(String(p).trim());
-    }
-    const arr = Array.from(set);
-    arr.sort((a, b) => {
-      const ma = String(a).match(/\d+/);
-      const mb = String(b).match(/\d+/);
-      const na = ma ? parseInt(ma[0], 10) : NaN;
-      const nb = mb ? parseInt(mb[0], 10) : NaN;
-      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-      return String(a).localeCompare(String(b), "en-IN", { numeric: true });
-    });
-    return arr;
-  }, [allRows]);
-
-  // 🔹 NEW: Build Booth tabs from "booth" field
-  const boothTabs = useMemo(() => {
-    const set = new Set();
-    for (const r of allRows) {
-      const b = getBooth(r);
-      if (b) set.add(String(b).trim());
     }
     const arr = Array.from(set);
     arr.sort((a, b) => {
@@ -1061,12 +1035,6 @@ export default function Search() {
         if (!p || String(p).trim() !== partFilter) return false;
       }
 
-      // 🔹 NEW Booth-wise filter
-      if (boothFilter !== "all") {
-        const b = getBooth(r);
-        if (!b || String(b).trim() !== boothFilter) return false;
-      }
-
       if (!term) return true;
 
       const fields = [
@@ -1089,7 +1057,7 @@ export default function Search() {
       const devHay = devToLatin(hay);
       return devHay.includes(lt);
     });
-  }, [allRows, q, tab, ageBand, partFilter, boothFilter]);
+  }, [allRows, q, tab, ageBand, partFilter]);
 
   const { male, female, total } = useMemo(() => {
     let maleCount = 0;
@@ -1444,35 +1412,6 @@ export default function Search() {
                 ))}
               </Tabs>
             )}
-
-            {/* 🔹 NEW Booth-wise Tabs (below Part filter) */}
-            {boothTabs.length > 0 && (
-              <Tabs
-                value={boothFilter}
-                onChange={(_, value) => {
-                  if (value !== null) setBoothFilter(value);
-                }}
-                variant="scrollable"
-                allowScrollButtonsMobile
-                sx={{
-                  minHeight: 32,
-                  "& .MuiTab-root": {
-                    minHeight: 32,
-                    paddingY: 0,
-                    fontSize: 12,
-                    textTransform: "none",
-                  },
-                  "& .MuiTabs-indicator": {
-                    backgroundColor: "black",
-                  },
-                }}
-              >
-                <Tab key="all-booths" label="All Booth" value="all" />
-                {boothTabs.map((b) => (
-                  <Tab key={b} label={String(b)} value={b} />
-                ))}
-              </Tabs>
-            )}
           </Stack>
         </Container>
       </Box>
@@ -1497,7 +1436,6 @@ export default function Search() {
               const gender = getGender(r);
               const mobRaw = getMobile(r);
               const mob = normalizePhone(mobRaw);
-              const booth = getBooth(r); // 🔹 NEW: booth for card
 
               const serialDisplay = !Number.isNaN(serialNum)
                 ? serialNum
@@ -1514,7 +1452,7 @@ export default function Search() {
                     borderRadius: 0.5, // smaller radius
                   }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC · Booth + 3 icons */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + 3 icons (caste / interest / volunteer) */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1533,7 +1471,6 @@ export default function Search() {
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
-                        {booth ? ` · Booth ${booth}` : ""}
                       </Typography>
                     </Stack>
 

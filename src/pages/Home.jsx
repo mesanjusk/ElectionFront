@@ -150,7 +150,7 @@ export default function Home() {
   const maxVal = Math.max(...chartData.map((d) => d.value), 10);
   const yTicks = [0, 100, 200, 300, 400];
 
-  // 🔹 Updated quick actions: Voter / Family / Caste / Booth
+  // 🔹 Updated quick actions: Voter / Family / Caste
   const quickActions = [
     {
       label: "Voter Search",
@@ -169,12 +169,6 @@ export default function Home() {
       description: "",
       icon: <MapRoundedIcon color="primary" />,
       action: () => navigate("/alpha"),
-    },
-    {
-      label: "Booth Search",
-      description: "",
-      icon: <SyncRoundedIcon color="primary" />,
-      action: () => navigate("/booth"),
     },
   ];
 
@@ -262,7 +256,7 @@ export default function Home() {
 
           {/* (chart + other content skipped – keep as you had or extend later) */}
 
-          {/* Bottom three pastel blocks (+ Booth Search now makes it 4) */}
+          {/* Bottom three pastel blocks */}
           <Grid container spacing={2}>
             {quickActions.map((action) => (
               <Grid item xs={4} key={action.label}>
