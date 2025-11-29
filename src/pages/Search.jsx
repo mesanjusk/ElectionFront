@@ -1546,9 +1546,9 @@ export default function Search() {
                         Sn. {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
+                        · Age {age || "—"} · {gender || "—"} ·  {epic || "—"}
                         {booth ? ` · Booth ${booth}` : ""}
-                        {sourceSerial ? ` · Sr2 ${sourceSerial}` : ""}
+                        {sourceSerial ? ` ·  ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
