@@ -299,6 +299,7 @@ const devToLatin = (s) => {
 };
 
 /* Share text for WhatsApp – voter details only */
+// 🔴 Number here = Source Serial (from "Source File")
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r); // EPIC = Voter ID
@@ -306,17 +307,14 @@ const buildShareText = (r, collectionName) => {
   const age = getAge(r);
   const gender = getGender(r);
   const booth = getBooth(r);
-
-  const serialNum = getSerialNum(r);
-  const serialTxt = getSerialText(r);
-  const numberStr = !Number.isNaN(serialNum) ? serialNum : serialTxt || "";
+  const sourceSerial = getSourceSerial(r); // this is the "Number" you want
 
   const lines = [
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
     booth ? `Booth: ${booth}` : null,
-    numberStr ? `Number: ${numberStr}` : null,
+    sourceSerial ? `Number: ${sourceSerial}` : null,
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
   ].filter(Boolean);
@@ -665,11 +663,13 @@ function RecordModal({ open, voter, onClose, collectionName }) {
     ? serialNum
     : serialTxt || "—";
 
+  const sourceSerial = getSourceSerial(voter); // 🔴 This is "Number" for modal
+
   const fields = [
     ["Name", getName(voter)],
     ["EPIC", getEPIC(voter)],
-    ["Booth", getBooth(voter) || "—"],          // 🔹 Booth in details
-    ["Number", serialDisplay || "—"],           // 🔹 Number in details
+    ["Booth", getBooth(voter) || "—"],
+    ["Number", sourceSerial || "—"], // 🔴 Number == Source Serial
     ["R/P/S", getRPS(voter) || "—"],
     ["Address", getAddress(voter) || "—"],
     ["Age", getAge(voter) || "—"],
@@ -1546,9 +1546,9 @@ export default function Search() {
                         Sn. {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} ·  {epic || "—"}
+                        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
                         {booth ? ` · Booth ${booth}` : ""}
-                        {sourceSerial ? ` ·  ${sourceSerial}` : ""}
+                        {sourceSerial ? ` · Sr2 ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
