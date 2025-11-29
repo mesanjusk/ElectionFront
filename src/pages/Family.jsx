@@ -122,6 +122,42 @@ const getRPS = (r) =>
   ]) ||
   "";
 
+/* NEW: Source Serial used as "Number" in WhatsApp text */
+const getSourceSerial = (r) =>
+  pick(r, ["source_serial", "SourceSerial", "Source Serial", "Source_Serial"]) ||
+  pick(r?.__raw, [
+    "source_serial",
+    "SourceSerial",
+    "Source Serial",
+    "Source_Serial",
+    "क्रमांक",
+  ]) ||
+  "";
+
+/* NEW: Booth number/name */
+const getBooth = (r) =>
+  pick(r, ["Booth", "Booth No", "BoothNo", "Booth_Number"]) ||
+  pick(r?.__raw, [
+    "Booth",
+    "Booth No",
+    "BoothNo",
+    "Booth_Number",
+    "मतदान केंद्र क्रमांक",
+  ]) ||
+  "";
+
+/* NEW: Booth address – used with "मतदान केंद्र" in WhatsApp text */
+const getAddress = (r) =>
+  pick(r, ["Address", "Booth Address", "BoothAddress"]) ||
+  pick(r?.__raw, [
+    "Address",
+    "Booth Address",
+    "BoothAddress",
+    "मतदान केंद्र",
+    "मतदान केंद्र पत्ता",
+  ]) ||
+  "";
+
 /* Normalize phone for tel:/WhatsApp */
 const normalizePhone = (raw) => {
   if (!raw) return "";
@@ -185,22 +221,22 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp (simple version for family modal) */
+/* Share text for WhatsApp – updated to use Number (source serial), Booth & मतदान केंद्र: Address */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
-  const age = getAge(r);
-  const gender = getGender(r);
-  const rps = getRPS(r);
-  const dbName = collectionName || "";
+  const sourceSerial = getSourceSerial(r);
+  const booth = getBooth(r);
+  const addr = getAddress(r);
+  // collectionName currently unused but kept for future if needed
 
   const lines = [
     "Voter Details",
-    `Name: ${name}`,
+    `नाम: ${name || "—"}`,
     `EPIC: ${epic || "—"}`,
-    `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
-    // dbName is currently not printed, but kept if you want later
-    // dbName && `Database: ${dbName}`,
+    `Number: ${sourceSerial || "—"}`, // Number = source serial
+    booth ? `Booth: ${booth}` : null,
+    addr ? `मतदान केंद्र: ${addr}` : null,
   ].filter(Boolean);
 
   return lines.join("\n");
@@ -315,6 +351,8 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
                   const age = getAge(r);
                   const gender = getGender(r);
                   const rps = getRPS(r);
+                  const sourceSerial = getSourceSerial(r);
+                  const booth = getBooth(r);
                   const mobRaw = getMobile(r);
                   const mob = normalizePhone(mobRaw);
                   const shareText = buildShareText(r, collectionName);
@@ -372,9 +410,15 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
                           </IconButton>
                         </Stack>
                       </Stack>
+                      {/* Main detail line */}
                       <Typography variant="caption" color="text.secondary">
                         EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"} ·
                         {" R/P/S "} {rps || "—"}
+                      </Typography>
+                      {/* Extra line showing Number (source serial) + Booth for on-screen record detail */}
+                      <Typography variant="caption" color="text.secondary">
+                        Number {sourceSerial || "—"}
+                        {booth ? ` · Booth ${booth}` : ""}
                       </Typography>
                     </Paper>
                   );
@@ -831,7 +875,7 @@ export default function Family() {
                   {fam.surname}
                 </Typography>
 
-                {/* RIGHT: Count + caste color tag */}
+                {/* RIGHT: Count + caste color tag (kept simple for now) */}
                 <Stack
                   direction="row"
                   spacing={0.75}
@@ -845,7 +889,6 @@ export default function Family() {
                   >
                     {fam.count.toLocaleString()}
                   </Typography>
-                  
                 </Stack>
               </Stack>
             </Paper>

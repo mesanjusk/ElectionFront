@@ -102,11 +102,10 @@ const getCaste = (r) =>
   pick(r?.__raw, ["caste", "Caste", "जात"]) ||
   "";
 
-// NEW: R/P/S helper – adjust keys if your DB uses different field name
 // R/P/S helper – now mapped to Roll/Part/Serial
 const getRPS = (r) =>
   pick(r, [
-    "Roll/Part/Serial",  // main column in your DB
+    "Roll/Part/Serial", // main column in your DB
     "RollPartSerial",
     "Roll_Part_Serial",
     "RPS",
@@ -122,6 +121,42 @@ const getRPS = (r) =>
     "rps",
     "Status",
     "status",
+  ]) ||
+  "";
+
+/* NEW: Source Serial used as "Number" in WhatsApp text */
+const getSourceSerial = (r) =>
+  pick(r, ["source_serial", "SourceSerial", "Source Serial", "Source_Serial"]) ||
+  pick(r?.__raw, [
+    "source_serial",
+    "SourceSerial",
+    "Source Serial",
+    "Source_Serial",
+    "क्रमांक",
+  ]) ||
+  "";
+
+/* NEW: Booth number/name */
+const getBooth = (r) =>
+  pick(r, ["Booth", "Booth No", "BoothNo", "Booth_Number"]) ||
+  pick(r?.__raw, [
+    "Booth",
+    "Booth No",
+    "BoothNo",
+    "Booth_Number",
+    "मतदान केंद्र क्रमांक",
+  ]) ||
+  "";
+
+/* NEW: Booth address – used with "मतदान केंद्र" in WhatsApp text */
+const getAddress = (r) =>
+  pick(r, ["Address", "Booth Address", "BoothAddress"]) ||
+  pick(r?.__raw, [
+    "Address",
+    "Booth Address",
+    "BoothAddress",
+    "मतदान केंद्र",
+    "मतदान केंद्र पत्ता",
   ]) ||
   "";
 
@@ -188,19 +223,21 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* WhatsApp share text: ONLY minimal details now */
+/* WhatsApp share text: updated with Number (source_serial), Booth & मतदान केंद्र: Address */
 const buildShareText = (r, _collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
-  const age = getAge(r);
-  const gender = getGender(r);
-  const rps = getRPS(r);
+  const sourceSerial = getSourceSerial(r);
+  const booth = getBooth(r);
+  const addr = getAddress(r);
 
   const lines = [
     "Voter Details",
-    `Name: ${name}`,
+    `नाम: ${name || "—"}`,
     `EPIC: ${epic || "—"}`,
-    `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
+    `Number: ${sourceSerial || "—"}`, // Number = source serial
+    booth ? `Booth: ${booth}` : null,
+    addr ? `मतदान केंद्र: ${addr}` : null,
   ].filter(Boolean);
 
   return lines.join("\n");
