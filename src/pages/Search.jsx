@@ -148,16 +148,18 @@ const getAddress = (r) =>
   pick(r?.__raw, ["Address", "address", "पत्ता"]) ||
   "";
 
-// 🔹 Second serial from "Source File" column (last number in the string)
+// 🔹 Source serial from "Source File"
+const getSourceFile = (r) =>
+  pick(r, ["Source File", "SourceFile", "sourceFile", "source_file"]) ||
+  pick(r?.__raw, ["Source File", "SourceFile", "sourceFile", "source_file"]) ||
+  "";
+
 const getSourceSerial = (r) => {
-  const raw =
-    pick(r, ["Source File", "SourceFile", "sourceFile", "Source", "source"]) ||
-    pick(r?.__raw, ["Source File", "SourceFile", "sourceFile", "Source", "source"]) ||
-    "";
-  if (!raw) return "";
-  const m = String(raw).match(/\d+/g);
-  if (!m || m.length === 0) return "";
-  return m[m.length - 1]; // last number
+  const sf = getSourceFile(r);
+  if (!sf) return "";
+  const n = parseLastNumber(sf);
+  if (Number.isNaN(n)) return "";
+  return String(n);
 };
 
 const getAge = (r) =>
@@ -298,26 +300,23 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp – voter details only */
-// 🔴 Number here = Source Serial (from "Source File")
+/* Share text for WhatsApp – use Source Serial + Booth + मतदान केंद्र */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
-  const epic = getEPIC(r); // EPIC = Voter ID
-  const rps = getRPS(r);
-  const age = getAge(r);
-  const gender = getGender(r);
+  const epic = getEPIC(r);
+  const sourceSerial = getSourceSerial(r);
   const booth = getBooth(r);
-  const sourceSerial = getSourceSerial(r); // this is the "Number" you want
+  const addr = getAddress(r);
 
   const lines = [
     "Voter Details",
-    `Name: ${name}`,
-    `EPIC: ${epic}`,
+    `नाम: ${name || "—"}`,
+    `EPIC: ${epic || "—"}`,
+    `Number: ${sourceSerial || "—"}`,
     booth ? `Booth: ${booth}` : null,
-    sourceSerial ? `Number: ${sourceSerial}` : null,
-    rps ? `R/P/S: ${rps}` : null,
-    `Age: ${age || "—"}  Sex: ${gender || "—"}`,
+    addr ? `मतदान केंद्र: ${addr}` : null,
   ].filter(Boolean);
+
   return lines.join("\n");
 };
 
@@ -657,30 +656,22 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
 function RecordModal({ open, voter, onClose, collectionName }) {
   if (!open || !voter) return null;
 
-  const serialTxt = getSerialText(voter);
-  const serialNum = getSerialNum(voter);
-  const serialDisplay = !Number.isNaN(serialNum)
-    ? serialNum
-    : serialTxt || "—";
-
-  const sourceSerial = getSourceSerial(voter); // 🔴 This is "Number" for modal
-
-  const fields = [
-    ["Name", getName(voter)],
-    ["EPIC", getEPIC(voter)],
-    ["Booth", getBooth(voter) || "—"],
-    ["Number", sourceSerial || "—"], // 🔴 Number == Source Serial
-    ["R/P/S", getRPS(voter) || "—"],
-    ["Address", getAddress(voter) || "—"],
-    ["Age", getAge(voter) || "—"],
-    ["Sex", getGender(voter) || "—"],
-  ];
   const shareText = buildShareText(voter, collectionName);
-
   const mob = getMobile(voter);
   const waUrl = mob
     ? `https://wa.me/91${mob}?text=${encodeURIComponent(shareText)}`
     : `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+
+  const fields = [
+    ["Name", getName(voter)],
+    ["EPIC", getEPIC(voter)],
+    ["R/P/S", getRPS(voter) || "—"],
+    ["Booth", getBooth(voter) || "—"],
+    ["Number", getSourceSerial(voter) || "—"],
+    ["Address", getAddress(voter) || "—"],
+    ["Age", getAge(voter) || "—"],
+    ["Sex", getGender(voter) || "—"],
+  ];
 
   return (
     <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="sm">
@@ -1088,7 +1079,7 @@ export default function Search() {
         getHouseNo(r),
         getCareOf(r),
         getMobile(r),
-        getAddress(r),
+        getAddress(r), // include address in search
       ];
 
       const hay = fields
@@ -1528,7 +1519,7 @@ export default function Search() {
                     borderRadius: 0.5, // smaller radius
                   }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC + Booth + Source Serial + 3 icons */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + Booth + Number + 3 icons */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1548,7 +1539,7 @@ export default function Search() {
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
                         {booth ? ` · Booth ${booth}` : ""}
-                        {sourceSerial ? ` · क्र. ${sourceSerial}` : ""}
+                        {sourceSerial ? ` · No ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
