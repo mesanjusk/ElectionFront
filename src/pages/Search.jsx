@@ -1540,10 +1540,10 @@ export default function Search() {
                         Sn. {serialDisplay}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
-                        {rps ? ` · R/P/S ${rps}` : ""}
-                        {booth ? ` · Booth ${booth}` : ""}
-                        {sourceSerial ? ` · No ${sourceSerial}` : ""}
+                        Age {age || "—"} · {gender || "—"} ·  {epic || "—"}
+                        {rps ? ` ·  ${rps}` : ""}
+                        {booth ? `- Booth ${booth}` : ""}
+                        {sourceSerial ? `- No ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
