@@ -78,10 +78,10 @@ const getPart = (r) =>
   pick(r?.__raw, ["Part No", "Part", "Booth", "भाग नं."]) ||
   "";
 
-// 🔹 NEW: Booth getter – reads explicit booth field
+// 🔹 Booth getter – Mongo column is exactly "Booth No"
 const getBooth = (r) =>
-  pick(r, ["booth", "Booth", "Booth No", "BoothNo"]) ||
-  pick(r?.__raw, ["Booth", "booth", "Booth No", "BoothNo"]) ||
+  pick(r, ["Booth No", "booth", "Booth", "BoothNo"]) ||
+  pick(r?.__raw, ["Booth No", "Booth", "booth", "BoothNo"]) ||
   "";
 
 const getSerialText = (r) =>
@@ -141,6 +141,24 @@ const getHouseNo = (r) =>
   pick(r, ["House No", "House", "HouseNumber"]) ||
   pick(r?.__raw, ["घर क्रमांक", "घर क्र.", "House No", "House Number"]) ||
   "";
+
+// 🔹 Address getter (from "Address" column)
+const getAddress = (r) =>
+  pick(r, ["Address", "address", "Address Line", "Address1"]) ||
+  pick(r?.__raw, ["Address", "address", "पत्ता"]) ||
+  "";
+
+// 🔹 Second serial from "Source File" column (last number in the string)
+const getSourceSerial = (r) => {
+  const raw =
+    pick(r, ["Source File", "SourceFile", "sourceFile", "Source", "source"]) ||
+    pick(r?.__raw, ["Source File", "SourceFile", "sourceFile", "Source", "source"]) ||
+    "";
+  if (!raw) return "";
+  const m = String(raw).match(/\d+/g);
+  if (!m || m.length === 0) return "";
+  return m[m.length - 1]; // last number
+};
 
 const getAge = (r) =>
   pick(r, ["Age", "age"]) || pick(r?.__raw, ["Age", "age", "वय"]) || "";
@@ -382,11 +400,6 @@ function MobileEditModal({ open, voter, onClose, onSynced }) {
 
 /* ---------------- Separate modals: Caste / Interest / Volunteer -------- */
 
-/**
- * CasteModal
- * - Options come from local voter records (casteOptions)
- * - Also supports typing a brand-new caste
- */
 function CasteModal({ open, voter, onClose, options = [] }) {
   const [caste, setCaste] = useState(getCaste(voter) || "");
   const [customCaste, setCustomCaste] = useState("");
@@ -421,7 +434,6 @@ function CasteModal({ open, voter, onClose, options = [] }) {
             {getName(voter)}
           </Typography>
 
-          {/* Existing caste dropdown from DB values */}
           <TextField
             select
             label="Select caste"
@@ -439,7 +451,6 @@ function CasteModal({ open, voter, onClose, options = [] }) {
             ))}
           </TextField>
 
-          {/* OR add a new caste */}
           <TextField
             label="Or type new caste"
             value={customCaste}
@@ -459,11 +470,6 @@ function CasteModal({ open, voter, onClose, options = [] }) {
   );
 }
 
-/**
- * InterestModal
- * - Options come from Party collection via /api/admin/parties
- * - Also supports typing a brand-new interest
- */
 function InterestModal({ open, voter, onClose, options = [] }) {
   const [interest, setInterest] = useState(getPoliticalInterest(voter) || "");
   const [customInterest, setCustomInterest] = useState("");
@@ -500,7 +506,6 @@ function InterestModal({ open, voter, onClose, options = [] }) {
             {getName(voter)}
           </Typography>
 
-          {/* Party / interest dropdown from Party master */}
           <TextField
             select
             label="Political interest (party)"
@@ -519,7 +524,6 @@ function InterestModal({ open, voter, onClose, options = [] }) {
             ))}
           </TextField>
 
-          {/* OR add a new interest */}
           <TextField
             label="Or type custom interest"
             value={customInterest}
@@ -539,11 +543,6 @@ function InterestModal({ open, voter, onClose, options = [] }) {
   );
 }
 
-/**
- * VolunteerModal
- * - Volunteers come from Users table (filtered as volunteers for this candidate)
- * - You can pick from list OR type custom volunteer name
- */
 function VolunteerModal({ open, voter, onClose, options = [] }) {
   const [volunteerName, setVolunteerName] = useState(getVolunteer(voter) || "");
   const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
@@ -553,7 +552,6 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
       const vName = getVolunteer(voter) || "";
       setVolunteerName(vName);
 
-      // try to auto-select matching volunteer from options
       const matched = options.find(
         (o) => o.name && o.name.toLowerCase() === vName.toLowerCase()
       );
@@ -597,7 +595,6 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
             {getName(voter)}
           </Typography>
 
-          {/* Volunteer dropdown from Users table */}
           <TextField
             select
             label="Select volunteer"
@@ -629,13 +626,11 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
             ))}
           </TextField>
 
-          {/* OR type custom volunteer name */}
           <TextField
             label="Or type volunteer name"
             value={volunteerName}
             onChange={(e) => {
               setVolunteerName(e.target.value);
-              // if typing manually, clear dropdown selection
               if (selectedVolunteerId) setSelectedVolunteerId("");
             }}
             placeholder="Volunteer / party worker name"
@@ -660,6 +655,7 @@ function RecordModal({ open, voter, onClose, collectionName }) {
     ["Name", getName(voter)],
     ["EPIC", getEPIC(voter)],
     ["R/P/S", getRPS(voter) || "—"],
+    ["Address", getAddress(voter) || "—"], // 🔹 Address added
     ["Age", getAge(voter) || "—"],
     ["Sex", getGender(voter) || "—"],
   ];
@@ -752,7 +748,6 @@ export default function Search() {
 
   // 🔴 UPDATED activeDb logic: auto-pick single allowed DB for volunteers
   const [activeDb, setActiveDbState] = useState(() => {
-    // Whatever auth says is active right now
     const id = (getActiveDatabase && getActiveDatabase()) || "";
     return id;
   });
@@ -805,8 +800,8 @@ export default function Search() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all"); // all | male | female
   const [ageBand, setAgeBand] = useState("all");
-  const [partFilter, setPartFilter] = useState("all"); // 🔹 Part-wise filter
-  const [boothFilter, setBoothFilter] = useState("all"); // 🔹 NEW Booth-wise filter
+  const [partFilter, setPartFilter] = useState("all"); // Part-wise filter
+  const [boothFilter, setBoothFilter] = useState("all"); // Booth-wise filter
   const [allRows, setAllRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(200);
   const [busy, setBusy] = useState(false);
@@ -869,7 +864,7 @@ export default function Search() {
     setCasteOptions(list);
   }, [allRows]);
 
-  // 🔹 Build Part tabs (from "Part No" / Part field)
+  // Part tabs (from "Part No" / Part field)
   const partTabs = useMemo(() => {
     const set = new Set();
     for (const r of allRows) {
@@ -888,7 +883,7 @@ export default function Search() {
     return arr;
   }, [allRows]);
 
-  // 🔹 NEW: Build Booth tabs from "booth" field
+  // Booth tabs (from "Booth No" field)
   const boothTabs = useMemo(() => {
     const set = new Set();
     for (const r of allRows) {
@@ -1055,13 +1050,13 @@ export default function Search() {
       if (ageBand === "46-60" && !(ageNum >= 46 && ageNum <= 60)) return false;
       if (ageBand === "61+" && !(ageNum >= 61)) return false;
 
-      // 🔹 Part-wise filter
+      // Part-wise filter
       if (partFilter !== "all") {
         const p = getPart(r);
         if (!p || String(p).trim() !== partFilter) return false;
       }
 
-      // 🔹 NEW Booth-wise filter
+      // Booth-wise filter
       if (boothFilter !== "all") {
         const b = getBooth(r);
         if (!b || String(b).trim() !== boothFilter) return false;
@@ -1077,6 +1072,7 @@ export default function Search() {
         getHouseNo(r),
         getCareOf(r),
         getMobile(r),
+        getAddress(r), // 🔹 include address in search
       ];
 
       const hay = fields
@@ -1335,7 +1331,7 @@ export default function Search() {
               id="searchBoxHindi"
               fullWidth
               size="medium"
-              placeholder="नाम, EPIC, घर, मोबाइल से खोजें..."
+              placeholder="नाम, EPIC, घर, पता, मोबाइल से खोजें..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
               InputProps={{
@@ -1416,7 +1412,7 @@ export default function Search() {
               <ToggleButton value="61+">61+</ToggleButton>
             </ToggleButtonGroup>
 
-            {/* 🔹 Part-wise Tabs (scrollable, uses "Part No" from DB) */}
+            {/* Part-wise Tabs (scrollable, uses "Part No" from DB) */}
             {partTabs.length > 0 && (
               <Tabs
                 value={partFilter}
@@ -1445,7 +1441,7 @@ export default function Search() {
               </Tabs>
             )}
 
-            {/* 🔹 NEW Booth-wise Tabs (below Part filter) */}
+            {/* Booth-wise Tabs (scrollable, uses "Booth No" from DB) */}
             {boothTabs.length > 0 && (
               <Tabs
                 value={boothFilter}
@@ -1497,7 +1493,9 @@ export default function Search() {
               const gender = getGender(r);
               const mobRaw = getMobile(r);
               const mob = normalizePhone(mobRaw);
-              const booth = getBooth(r); // 🔹 NEW: booth for card
+              const booth = getBooth(r);
+              const addr = getAddress(r);
+              const sourceSerial = getSourceSerial(r);
 
               const serialDisplay = !Number.isNaN(serialNum)
                 ? serialNum
@@ -1514,7 +1512,7 @@ export default function Search() {
                     borderRadius: 0.5, // smaller radius
                   }}
                 >
-                  {/* Row 1: Sn · Age · Sex · EPIC · Booth + 3 icons */}
+                  {/* Row 1: Sn · Age · Sex · EPIC + Booth + Source Serial + 3 icons */}
                   <Stack
                     direction="row"
                     spacing={1}
@@ -1534,6 +1532,7 @@ export default function Search() {
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
                         {booth ? ` · Booth ${booth}` : ""}
+                        {sourceSerial ? ` ·  ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
@@ -1616,6 +1615,22 @@ export default function Search() {
                       </IconButton>
                     </Stack>
                   </Stack>
+
+                  {/* Row 3 – Address (small, single line) */}
+                  {addr && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        mt: 0.2,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      📍 {addr}
+                    </Typography>
+                  )}
                 </Paper>
               );
             })}

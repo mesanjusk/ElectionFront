@@ -1406,7 +1406,7 @@ export default function Search() {
                   },
                 }}
               >
-                <Tab key="all-parts" label="All Booth" value="all" />
+                <Tab key="all-parts" label="All Part" value="all" />
                 {partTabs.map((p) => (
                   <Tab key={p} label={String(p)} value={p} />
                 ))}

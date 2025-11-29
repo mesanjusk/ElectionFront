@@ -11,7 +11,8 @@ import Family from "./pages/Family.jsx";
 import Alpha from "./pages/alphafamily.jsx";
 import Caste from "./pages/Caste.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Intro from "./pages/Intro.jsx"; // ⬅️ new intro/landing page
+import Intro from "./pages/Intro.jsx"; // ⬅️ intro/landing page
+import BoothSearch from "./pages/BoothSearch.jsx"; // ⬅️ NEW: Booth search page
 
 export default function App() {
   return (
@@ -68,6 +69,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Alphabetical family search */}
       <Route
         path="/alpha"
         element={
@@ -83,6 +86,16 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Caste />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Booth search */}
+      <Route
+        path="/booth"
+        element={
+          <ProtectedRoute>
+            <BoothSearch />
           </ProtectedRoute>
         }
       />
