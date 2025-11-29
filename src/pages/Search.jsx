@@ -1548,7 +1548,7 @@ export default function Search() {
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
                         {booth ? ` · Booth ${booth}` : ""}
-                        {sourceSerial ? ` · Sr2 ${sourceSerial}` : ""}
+                        {sourceSerial ? ` · क्र. ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
