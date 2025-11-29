@@ -298,18 +298,25 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp – ONLY voter details (no image URL) */
+/* Share text for WhatsApp – voter details only */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r); // EPIC = Voter ID
   const rps = getRPS(r);
   const age = getAge(r);
   const gender = getGender(r);
+  const booth = getBooth(r);
+
+  const serialNum = getSerialNum(r);
+  const serialTxt = getSerialText(r);
+  const numberStr = !Number.isNaN(serialNum) ? serialNum : serialTxt || "";
 
   const lines = [
     "Voter Details",
     `Name: ${name}`,
     `EPIC: ${epic}`,
+    booth ? `Booth: ${booth}` : null,
+    numberStr ? `Number: ${numberStr}` : null,
     rps ? `R/P/S: ${rps}` : null,
     `Age: ${age || "—"}  Sex: ${gender || "—"}`,
   ].filter(Boolean);
@@ -651,11 +658,20 @@ function VolunteerModal({ open, voter, onClose, options = [] }) {
 /* ---------------- Full Record Details modal ---------------- */
 function RecordModal({ open, voter, onClose, collectionName }) {
   if (!open || !voter) return null;
+
+  const serialTxt = getSerialText(voter);
+  const serialNum = getSerialNum(voter);
+  const serialDisplay = !Number.isNaN(serialNum)
+    ? serialNum
+    : serialTxt || "—";
+
   const fields = [
     ["Name", getName(voter)],
     ["EPIC", getEPIC(voter)],
+    ["Booth", getBooth(voter) || "—"],          // 🔹 Booth in details
+    ["Number", serialDisplay || "—"],           // 🔹 Number in details
     ["R/P/S", getRPS(voter) || "—"],
-    ["Address", getAddress(voter) || "—"], // 🔹 Address added
+    ["Address", getAddress(voter) || "—"],
     ["Age", getAge(voter) || "—"],
     ["Sex", getGender(voter) || "—"],
   ];
@@ -1072,7 +1088,7 @@ export default function Search() {
         getHouseNo(r),
         getCareOf(r),
         getMobile(r),
-        getAddress(r), // 🔹 include address in search
+        getAddress(r),
       ];
 
       const hay = fields
@@ -1532,7 +1548,7 @@ export default function Search() {
                       <Typography variant="caption" color="text.secondary">
                         · Age {age || "—"} · {gender || "—"} · EPIC {epic || "—"}
                         {booth ? ` · Booth ${booth}` : ""}
-                        {sourceSerial ? ` ·  ${sourceSerial}` : ""}
+                        {sourceSerial ? ` · Sr2 ${sourceSerial}` : ""}
                       </Typography>
                     </Stack>
 
