@@ -135,7 +135,6 @@ const getSourceSerial = (r) => {
   return String(n);
 };
 
-// NEW: R/P/S helper – adjust keys if your DB uses different field name
 // R/P/S helper – now mapped to Roll/Part/Serial
 const getRPS = (r) =>
   pick(r, [
@@ -633,15 +632,14 @@ export default function Family() {
               color="text.secondary"
               sx={{ pl: 0.5 }}
             >
-              Voters{" "}
-              {filteredVoters.length.toLocaleString()} · Total{" "}
+              Voters {filteredVoters.length.toLocaleString()} · Total{" "}
               {allRows.length.toLocaleString()}
             </Typography>
           </Stack>
         </Container>
       </Box>
 
-      {/* Voter list: each row = Name + EPIC + WhatsApp (SINGLE LINE) */}
+      {/* Voter list: each row = Name + EPIC + Age/sex/RPS/Booth/No + Address + WhatsApp */}
       <Container
         maxWidth="lg"
         sx={{
@@ -654,6 +652,12 @@ export default function Family() {
             const r = v.record;
             const name = v.name || getName(r);
             const epic = v.epic || getEPIC(r);
+            const age = getAge(r);
+            const gender = getGender(r);
+            const rps = getRPS(r);
+            const booth = getBooth(r);
+            const sourceSerial = getSourceSerial(r);
+            const addr = getAddress(r);
             const mobRaw = getMobile(r);
             const mob = normalizePhone(mobRaw);
             const shareText = buildShareText(r, collectionName);
@@ -675,7 +679,7 @@ export default function Family() {
                   bgcolor: "#ffffff",
                 }}
               >
-                {/* LEFT: single line Name + EPIC */}
+                {/* LEFT: Name + EPIC/Age/Sex/RPS/Booth/No + Address */}
                 <Box sx={{ minWidth: 0, mr: 1, flex: 1 }}>
                   <Typography
                     variant="body2"
@@ -687,8 +691,37 @@ export default function Family() {
                       color: "primary.main",
                     }}
                   >
-                    {name || "—"} {epic ? `· ${epic}` : ""}
+                    {name || "—"}
                   </Typography>
+
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"} ·
+                    {" R/P/S "} {rps || "—"}
+                    {booth ? ` · Booth ${booth}` : ""}
+                    {sourceSerial ? ` · No ${sourceSerial}` : ""}
+                  </Typography>
+
+                  {addr && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      📍 {addr}
+                    </Typography>
+                  )}
                 </Box>
 
                 {/* RIGHT: WhatsApp button */}

@@ -86,7 +86,7 @@ const getHouseNo = (r) =>
 
 const getCareOf = (r) =>
   pick(r, ["CareOf", "careof", "C/O", "CO", "Father", "Husband"]) ||
-  pick(r?.__raw, ["Father", "Husband", "Care Of", "C/O", "वڈील", "पती"]) ||
+  pick(r?.__raw, ["Father", "Husband", "Care Of", "C/O", "वडील", "पती"]) ||
   "";
 
 /* 🔹 Address getter (same as Search.jsx) */
@@ -94,6 +94,33 @@ const getAddress = (r) =>
   pick(r, ["Address", "address", "Address Line", "Address1"]) ||
   pick(r?.__raw, ["Address", "address", "पत्ता"]) ||
   "";
+
+/* 🔹 Booth getter – same as Search.jsx */
+const getBooth = (r) =>
+  pick(r, ["Booth No", "booth", "Booth", "BoothNo"]) ||
+  pick(r?.__raw, ["Booth No", "Booth", "booth", "BoothNo"]) ||
+  "";
+
+/* 🔹 Source serial – same logic as Search.jsx (from "Source File") */
+const parseLastNumber = (s) => {
+  const m = String(s || "").match(/\d+/g);
+  if (!m) return NaN;
+  const n = parseInt(m[m.length - 1], 10);
+  return Number.isNaN(n) ? NaN : n;
+};
+
+const getSourceFile = (r) =>
+  pick(r, ["Source File", "SourceFile", "sourceFile", "source_file"]) ||
+  pick(r?.__raw, ["Source File", "SourceFile", "sourceFile", "source_file"]) ||
+  "";
+
+const getSourceSerial = (r) => {
+  const sf = getSourceFile(r);
+  if (!sf) return "";
+  const n = parseLastNumber(sf);
+  if (Number.isNaN(n)) return "";
+  return String(n);
+};
 
 const getMobile = (r) =>
   r?.mobile ||
@@ -191,22 +218,24 @@ const devToLatin = (s) => {
   return out;
 };
 
-/* Share text for WhatsApp (simple version for family modal) */
+/* Share text for WhatsApp – aligned with Search.jsx style */
 const buildShareText = (r, collectionName) => {
   const name = getName(r);
   const epic = getEPIC(r);
-  const age = getAge(r);
-  const gender = getGender(r);
   const rps = getRPS(r);
-  const addr = getAddress(r); // ⭐ NEW: address
+  const sourceSerial = getSourceSerial(r);
+  const booth = getBooth(r);
+  const addr = getAddress(r);
   const dbName = collectionName || "";
 
   const lines = [
     "Voter Details",
-    `Name: ${name}`,
-    `EPIC: ${epic || "—"}`,
-    `Age: ${age || "—"}  Sex: ${gender || "—"}  R/P/S: ${rps || "—"}`,
-    addr ? `मतदान केंद्र: ${addr}` : null, // ⭐ NEW: address line
+    `नाम: ${name || "—"}`,
+    `${epic || "—"}`,
+    rps ? `${rps}` : null,
+    sourceSerial ? `Number: ${sourceSerial}` : null,
+    booth ? `Booth: ${booth}` : null,
+    addr ? `मतदान केंद्र: ${addr}` : null,
     // dbName && `Database: ${dbName}`,
   ].filter(Boolean);
 
@@ -234,7 +263,7 @@ const getSurname = (r) => {
   return parts[0];
 };
 
-/* Caste color tag style */
+/* Caste color tag style (currently only used if you add caste chips later) */
 const getCasteChipSx = (caste) => {
   const v = String(caste || "OPEN").toUpperCase();
   const base = {
@@ -324,6 +353,10 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
                   const rps = getRPS(r);
                   const mobRaw = getMobile(r);
                   const mob = normalizePhone(mobRaw);
+                  const addr = getAddress(r);
+                  const booth = getBooth(r);
+                  const sourceSerial = getSourceSerial(r);
+
                   const shareText = buildShareText(r, collectionName);
                   const waHref = mob
                     ? `https://wa.me/91${mob}?text=${encodeURIComponent(
@@ -379,10 +412,21 @@ function FamilyDetailModal({ open, family, onClose, collectionName }) {
                           </IconButton>
                         </Stack>
                       </Stack>
+
+                      {/* Line 1: EPIC / Age / Sex / RPS / Booth / Number */}
                       <Typography variant="caption" color="text.secondary">
-                        EPIC {epic || "—"} · Age {age || "—"} · {gender || "—"} ·
-                        {" R/P/S "} {rps || "—"}
+                        EPIC {epic || "—"} · Age {age || "—"} ·{" "}
+                        {gender || "—"} · R/P/S {rps || "—"}
+                        {booth ? ` · Booth ${booth}` : ""}
+                        {sourceSerial ? ` · No ${sourceSerial}` : ""}
                       </Typography>
+
+                      {/* Line 2: Address */}
+                      {addr && (
+                        <Typography variant="caption" color="text.secondary">
+                          Address: {addr}
+                        </Typography>
+                      )}
                     </Paper>
                   );
                 })}
@@ -838,7 +882,7 @@ export default function Family() {
                   {fam.surname}
                 </Typography>
 
-                {/* RIGHT: Count + caste color tag */}
+                {/* RIGHT: Count */}
                 <Stack
                   direction="row"
                   spacing={0.75}
